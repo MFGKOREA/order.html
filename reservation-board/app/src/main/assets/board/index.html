@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>예약 알림판</title>
+<link rel="stylesheet" href="board.css">
+</head>
+<body>
+<div class="arrival" id="arrival" aria-hidden="true"></div>
+
+<header class="topbar">
+  <a class="brand" href="#" aria-label="예약 알림판 처음 화면">
+    <svg class="mark" viewBox="0 0 28 28" aria-hidden="true">
+      <rect x="2" y="2" width="16" height="16" rx="5" fill="var(--naver)"/>
+      <rect x="10" y="10" width="16" height="16" rx="5" fill="var(--own)"/>
+      <path d="M10 15a5 5 0 0 1 5-5h3v3a5 5 0 0 1-5 5h-3z" fill="var(--text)"/>
+    </svg>
+    <span class="brand-name">예약 알림판</span>
+  </a>
+  <span class="pill" id="status"></span>
+  <div class="topbar-right">
+    <p class="clock"><span id="date"></span> <time id="time" class="num"></time></p>
+    <a class="button button-outline" id="nav-settings" href="#settings">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 12.6a2.6 2.6 0 1 0 0-5.2 2.6 2.6 0 0 0 0 5.2Z"/><path d="M16.1 12.2a1.3 1.3 0 0 0 .26 1.43l.05.05a1.58 1.58 0 1 1-2.23 2.23l-.05-.05a1.3 1.3 0 0 0-1.43-.26 1.3 1.3 0 0 0-.79 1.19v.14a1.58 1.58 0 1 1-3.16 0v-.07a1.3 1.3 0 0 0-.85-1.19 1.3 1.3 0 0 0-1.43.26l-.05.05a1.58 1.58 0 1 1-2.23-2.23l.05-.05a1.3 1.3 0 0 0 .26-1.43 1.3 1.3 0 0 0-1.19-.79h-.14a1.58 1.58 0 1 1 0-3.16h.07a1.3 1.3 0 0 0 1.19-.85 1.3 1.3 0 0 0-.26-1.43l-.05-.05a1.58 1.58 0 1 1 2.23-2.23l.05.05a1.3 1.3 0 0 0 1.43.26h.06a1.3 1.3 0 0 0 .79-1.19v-.14a1.58 1.58 0 1 1 3.16 0v.07a1.3 1.3 0 0 0 .79 1.19 1.3 1.3 0 0 0 1.43-.26l.05-.05a1.58 1.58 0 1 1 2.23 2.23l-.05.05a1.3 1.3 0 0 0-.26 1.43v.06a1.3 1.3 0 0 0 1.19.79h.14a1.58 1.58 0 1 1 0 3.16h-.07a1.3 1.3 0 0 0-1.19.79Z"/></svg>
+      설정
+    </a>
+    <a class="button button-outline" id="nav-back" href="#">
+      <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M12.5 15 7.5 10l5-5"/></svg>
+      알림판으로
+    </a>
+  </div>
+</header>
+
+<main id="view-board" class="view">
+  <section class="headline">
+    <div class="headline-text">
+      <h1>오늘 들어온 예약</h1>
+      <p class="finding" id="finding"></p>
+    </div>
+    <figure class="flow" id="flow">
+      <figcaption class="flow-head">
+        <span>오늘 수신 흐름</span>
+        <span class="legend" id="legend"></span>
+      </figcaption>
+      <div class="flow-track" id="flow-track"></div>
+      <div class="flow-axis" id="flow-axis"></div>
+    </figure>
+  </section>
+
+  <div id="notice"></div>
+
+  <div class="toolbar">
+    <nav class="tabs" id="tabs" aria-label="출처별 보기"></nav>
+    <button class="button button-primary" id="ack-all" type="button"></button>
+  </div>
+
+  <section class="list" id="list" aria-live="polite"></section>
+</main>
+
+<main id="view-settings" class="view" hidden>
+  <h1>설정</h1>
+  <p class="finding">이 태블릿에서 어떤 앱의 예약 알림을 모을지 정해요. 바꾼 내용은 바로 저장돼요.</p>
+
+  <section class="settings-group">
+    <h2>예약 받기</h2>
+    <div class="setting">
+      <div class="setting-label">
+        <h3>알림 접근 권한</h3>
+        <p>예약 알림판이 네이버·자사앱의 알림을 읽으려면 필요해요. 두 앱은 그대로 두고, 태블릿에 뜬 알림만 읽어요.</p>
+      </div>
+      <div class="setting-control">
+        <div class="inline">
+          <span class="pill" id="perm-pill"></span>
+          <button class="button button-outline" type="button" data-call="openListenerSettings">권한 설정 열기</button>
+        </div>
+        <p class="help">목록에서 ‘예약 알림판’을 켜 주세요. 스위치가 회색으로 막혀 있으면 태블릿 설정 → 애플리케이션 → 예약 알림판 → 오른쪽 위 ⋮ → ‘제한된 설정 허용’을 누른 뒤 다시 켜요.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="settings-group" id="sources"></section>
+
+  <section class="settings-group">
+    <h2>알림 방식</h2>
+    <div class="setting">
+      <div class="setting-label">
+        <h3>알림음</h3>
+        <p>새 예약이 오면 알람 볼륨으로 울려요. 홀이 시끄러워도 들리게요.</p>
+      </div>
+      <div class="setting-control">
+        <label class="switch"><input type="checkbox" id="opt-sound"><span>켜기</span></label>
+      </div>
+    </div>
+    <div class="setting">
+      <div class="setting-label">
+        <h3>음성 안내</h3>
+        <p>알림음 뒤에 “네이버 새 예약 알림”처럼 어디서 온 예약인지 말해 줘요.</p>
+      </div>
+      <div class="setting-control">
+        <label class="switch"><input type="checkbox" id="opt-voice"><span>켜기</span></label>
+      </div>
+    </div>
+    <div class="setting">
+      <div class="setting-label">
+        <h3>글자 크기</h3>
+        <p>카운터 건너편에서도 읽히게 키울 수 있어요.</p>
+      </div>
+      <div class="setting-control">
+        <div class="segmented" id="opt-size" role="radiogroup" aria-label="글자 크기">
+          <button type="button" role="radio" data-size="0">보통</button>
+          <button type="button" role="radio" data-size="1">크게</button>
+          <button type="button" role="radio" data-size="2">아주 크게</button>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section class="settings-group">
+    <h2>관리</h2>
+    <div class="setting">
+      <div class="setting-label">
+        <h3>테스트 알림</h3>
+        <p>소리와 화면 깜빡임이 잘 나오는지 가짜 예약 한 건으로 확인해요. 누를 때마다 출처가 번갈아 바뀌어요.</p>
+      </div>
+      <div class="setting-control">
+        <button class="button button-outline" type="button" id="test">테스트 알림 보내기</button>
+      </div>
+    </div>
+    <div class="setting">
+      <div class="setting-label">
+        <h3>하루 종일 켜 두기</h3>
+        <p>배터리 최적화에서 예약 알림판을 ‘제한 없음’으로 바꿔야 오래 켜 둬도 알림을 놓치지 않아요. 태블릿은 충전기에 꽂아 두세요.</p>
+      </div>
+      <div class="setting-control">
+        <button class="button button-outline" type="button" data-call="openBatterySettings">배터리 설정 열기</button>
+      </div>
+    </div>
+    <div class="setting">
+      <div class="setting-label">
+        <h3>기록 지우기</h3>
+        <p>알림판의 기록만 지워요. 네이버·자사앱의 실제 예약은 그대로예요. 기록은 일주일이 지나면 저절로 지워져요.</p>
+      </div>
+      <div class="setting-control">
+        <button class="button button-danger" type="button" id="clear">기록 모두 지우기</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<dialog class="sheet" id="picker" aria-labelledby="picker-title">
+  <form method="dialog" class="sheet-inner">
+    <header class="sheet-head">
+      <h2 id="picker-title" tabindex="-1" autofocus></h2>
+      <p>예약 알림을 보내는 앱을 골라요. 최근에 알림을 보낸 앱이 위에 있어요.</p>
+      <input class="field" type="search" id="picker-search" placeholder="앱 이름으로 찾기" autocomplete="off">
+    </header>
+    <ul class="apps" id="picker-list"></ul>
+    <footer class="sheet-foot">
+      <button class="button button-outline" value="cancel">취소</button>
+      <button class="button button-primary" value="save" id="picker-save">저장</button>
+    </footer>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status"></div>
+
+<script src="mock.js"></script>
+<script src="board.js"></script>
+</body>
+</html>
