@@ -1,0 +1,1182 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>숏핑 스튜디오</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: 왼쪽 상품 카드(입력) + 오른쪽 작업대(탭: 대본·업로드·영상·AI·보관함). 900px 이하에서 한 줄로 쌓임. */
+:root {
+  --bg: #EDEFF3;
+  --surface: #FFFFFF;
+  --surface-2: #F5F6F9;
+  --ink: #14161C;
+  --muted: #5A6070;
+  --line: #D8DCE4;
+  --tag: #FFD23F;
+  --tag-ink: #1B1A10;
+  --sale: #D3381F;
+  --ok: #1D7F47;
+  --focus: #2D5BFF;
+  --f-display: "Black Han Sans", "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --f-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0E1014; --surface: #171A21; --surface-2: #1E222B; --ink: #ECEEF2; --muted: #9BA2B0;
+    --line: #2B303B; --tag: #FFD23F; --tag-ink: #1B1A10; --sale: #FF6B57; --ok: #4CC383; --focus: #8AA4FF;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0E1014; --surface: #171A21; --surface-2: #1E222B; --ink: #ECEEF2; --muted: #9BA2B0;
+  --line: #2B303B; --tag: #FFD23F; --tag-ink: #1B1A10; --sale: #FF6B57; --ok: #4CC383; --focus: #8AA4FF;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body {
+  background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.55;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 20px 48px;
+}
+[hidden] { display: none !important; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+h1, h2, h3 { text-wrap: balance; margin: 0; }
+.wrap { max-width: 1280px; margin: 0 auto; display: flex; flex-direction: column; gap: 20px; }
+
+/* Header */
+.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px 24px; }
+.brand { display: flex; align-items: center; gap: 12px; }
+.brand h1 { font-family: var(--f-display); font-weight: 400; font-size: 32px; letter-spacing: -0.01em; line-height: 1.1; }
+.pricetag {
+  font-family: var(--f-display); font-size: 15px; background: var(--tag); color: var(--tag-ink);
+  padding: 5px 12px 5px 18px; clip-path: polygon(10px 0, 100% 0, 100% 100%, 10px 100%, 0 50%); position: relative;
+}
+.pricetag::before { content: ""; position: absolute; left: 7px; top: 50%; width: 5px; height: 5px; margin-top: -2.5px; border-radius: 50%; background: var(--surface); }
+.top p { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+.legal { font-size: 13px; color: var(--muted); max-width: 46ch; }
+
+.layout { display: grid; grid-template-columns: minmax(300px, 390px) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 900px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: var(--r); min-width: 0; }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 14px 16px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.panel-head h2 { font-size: 16px; font-weight: 700; }
+.panel-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+
+/* Form */
+.field { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.field label, .label { font-size: 13px; font-weight: 600; }
+.hint { font-size: 12px; color: var(--muted); font-weight: 400; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+input[type="text"], input[type="url"], input[type="number"], textarea, select {
+  width: 100%; font: inherit; font-size: 14px; color: var(--ink); background: var(--surface-2);
+  border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; min-width: 0;
+}
+textarea { resize: vertical; min-height: 84px; line-height: 1.5; }
+input:focus, textarea:focus, select:focus { border-color: var(--focus); outline: none; box-shadow: 0 0 0 2px color-mix(in srgb, var(--focus) 25%, transparent); }
+.check { display: flex; gap: 8px; align-items: flex-start; font-size: 14px; }
+.check input { margin-top: 4px; accent-color: var(--ink); }
+.group { border-top: 1px dashed var(--line); padding-top: 14px; display: flex; flex-direction: column; gap: 12px; }
+.group-title { font-size: 12px; font-weight: 700; letter-spacing: 0.06em; color: var(--muted); }
+
+.btns { display: flex; flex-wrap: wrap; gap: 8px; }
+button, .btn {
+  font: inherit; font-size: 14px; font-weight: 600; cursor: pointer; border-radius: 8px; padding: 8px 14px;
+  border: 1px solid var(--line); background: var(--surface); color: var(--ink); line-height: 1.3;
+}
+button:hover { border-color: var(--ink); }
+button.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+button.tag { background: var(--tag); color: var(--tag-ink); border-color: var(--tag); }
+button.small { font-size: 12px; padding: 5px 10px; }
+button:disabled { opacity: 0.5; cursor: not-allowed; }
+.pill { font-size: 12px; font-weight: 600; padding: 2px 9px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.pill.example { background: var(--surface-2); }
+.warn { font-size: 13px; border-left: 3px solid var(--sale); background: var(--surface-2); padding: 8px 10px; border-radius: 0 6px 6px 0; }
+
+/* Tabs */
+.tabs { display: flex; gap: 2px; overflow-x: auto; padding: 0 8px; border-bottom: 1px solid var(--line); scrollbar-width: thin; }
+.tabs button { border: 0; border-radius: 0; background: none; padding: 13px 12px 11px; color: var(--muted); border-bottom: 2px solid transparent; white-space: nowrap; }
+.tabs button[aria-selected="true"] { color: var(--ink); border-bottom-color: var(--ink); }
+.pane { padding: 16px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+
+/* Script */
+.summary { display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: baseline; }
+.stat { display: flex; align-items: baseline; gap: 6px; }
+.stat b { font-family: var(--f-mono); font-size: 20px; font-weight: 500; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 13px; color: var(--muted); }
+.hooks { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 640px) { .hooks { grid-template-columns: minmax(0, 1fr); } }
+.hook { text-align: left; display: flex; flex-direction: column; gap: 4px; padding: 10px 12px; font-weight: 400; background: var(--surface-2); }
+.hook strong { font-family: var(--f-display); font-weight: 400; font-size: 17px; }
+.hook small { color: var(--muted); font-size: 13px; }
+.hook[aria-pressed="true"] { border-color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink); background: var(--surface); }
+.tablebox { overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+table { border-collapse: collapse; width: 100%; min-width: 720px; font-size: 14px; }
+th, td { text-align: left; vertical-align: top; padding: 9px 10px; border-bottom: 1px solid var(--line); }
+th { font-size: 12px; color: var(--muted); font-weight: 600; background: var(--surface-2); position: sticky; top: 0; }
+tr:last-child td { border-bottom: 0; }
+td.time { font-family: var(--f-mono); font-size: 12.5px; white-space: nowrap; font-variant-numeric: tabular-nums; color: var(--muted); }
+td.kind { white-space: nowrap; font-weight: 600; font-size: 13px; }
+td [contenteditable] { display: block; border-radius: 4px; padding: 2px 4px; margin: -2px -4px; min-height: 1.5em; }
+td [contenteditable]:hover { background: var(--surface-2); }
+td [contenteditable]:focus { outline: 1px solid var(--focus); background: var(--surface-2); }
+td.cap [contenteditable] { font-weight: 700; }
+td.visual { color: var(--muted); font-size: 13px; width: 26%; }
+
+/* Upload copy blocks */
+.block { display: flex; flex-direction: column; gap: 8px; }
+.block-head { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.block-head h3 { font-size: 14px; font-weight: 700; }
+.titles { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.titles li { display: flex; gap: 8px; align-items: center; justify-content: space-between; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px 7px 12px; }
+.titles li span { min-width: 0; overflow-wrap: anywhere; }
+.titles li em { font-style: normal; font-family: var(--f-mono); font-size: 11px; color: var(--muted); white-space: nowrap; }
+pre.out { margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--f-body); font-size: 14px; background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+pre.out.mono { font-family: var(--f-mono); font-size: 12.5px; }
+.checklist { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 16px; }
+@media (max-width: 640px) { .checklist { grid-template-columns: minmax(0, 1fr); } }
+.cols { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 1100px) { .cols { grid-template-columns: minmax(0, 1fr); } }
+
+/* Video */
+.studio { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 700px) { .studio { grid-template-columns: minmax(0, 1fr); } }
+.screen { width: 288px; max-width: 100%; display: flex; flex-direction: column; gap: 8px; margin: 0 auto; }
+.screen canvas { width: 100%; aspect-ratio: 9 / 16; max-width: 100%; border-radius: 14px; background: #15171D; display: block; border: 1px solid var(--line); }
+.scrub { width: 100%; accent-color: var(--ink); }
+.timecode { font-family: var(--f-mono); font-size: 12px; color: var(--muted); text-align: center; font-variant-numeric: tabular-nums; }
+.thumbs { display: flex; flex-wrap: wrap; gap: 8px; }
+.thumb { position: relative; width: 64px; aspect-ratio: 9 / 16; border-radius: 6px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); }
+.thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.thumb b { position: absolute; left: 4px; top: 4px; font-family: var(--f-mono); font-size: 10px; font-weight: 500; background: var(--ink); color: var(--surface); border-radius: 3px; padding: 0 4px; }
+.thumb button { position: absolute; right: 2px; top: 2px; padding: 0 6px; font-size: 12px; line-height: 18px; border-radius: 4px; }
+.drop { border: 1.5px dashed var(--line); border-radius: 8px; padding: 14px; display: flex; flex-direction: column; gap: 6px; align-items: flex-start; background: var(--surface-2); }
+.drop.over { border-color: var(--ink); }
+video.result { width: 220px; max-width: 100%; border-radius: 10px; border: 1px solid var(--line); }
+
+/* Library */
+.lib { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.lib li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px 12px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+.lib .meta { font-size: 12px; color: var(--muted); font-family: var(--f-mono); }
+.lib .name { font-weight: 600; overflow-wrap: anywhere; }
+.lib .act { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; justify-content: flex-end; }
+.lib select { width: auto; padding: 5px 8px; font-size: 13px; }
+.empty { color: var(--muted); font-size: 14px; border: 1px dashed var(--line); border-radius: 8px; padding: 16px; }
+
+.toast { position: fixed; left: 50%; bottom: calc(20px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--ink); color: var(--surface); padding: 9px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; z-index: 20; max-width: calc(100% - 32px); }
+@media (prefers-reduced-motion: no-preference) { .toast { transition: opacity .2s; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div>
+      <div class="brand"><h1>숏핑 스튜디오</h1><span class="pricetag">쇼츠 × 쿠팡</span></div>
+      <p>상품 하나를 입력하면 얼굴 없이 만드는 유튜브 쇼츠의 대본, 자막(SRT), 제목·설명·해시태그, 광고 표기, AI 영상 프롬프트, 9:16 영상까지 한 번에 만듭니다.</p>
+    </div>
+    <p class="legal">생성된 영상에는 처음부터 끝까지 광고 배지가 들어갑니다. 가격·평점은 업로드 당일 상품 페이지에서 다시 확인하세요.</p>
+  </header>
+
+  <main class="layout">
+    <!-- 입력 -->
+    <section class="panel" aria-labelledby="form-title">
+      <div class="panel-head">
+        <h2 id="form-title">상품 정보</h2>
+        <span class="pill example" id="example-pill">예시 상품</span>
+      </div>
+      <form class="panel-body" id="form" autocomplete="off">
+        <div class="field"><label for="p-name">상품명</label><input type="text" id="p-name" placeholder="쿠팡 상품명 그대로 붙여넣기"></div>
+        <div class="field"><label for="p-short">화면용 짧은 이름 <span class="hint">자막·내레이션에 쓰여요</span></label><input type="text" id="p-short" placeholder="예: 접이식 설거지통"></div>
+        <div class="row2">
+          <div class="field"><label for="p-category">분야</label><input type="text" id="p-category" placeholder="주방, 욕실, 차량…"></div>
+          <div class="field"><label for="p-target">누구에게</label><input type="text" id="p-target" placeholder="자취생, 육아맘…"></div>
+        </div>
+        <div class="field"><label for="p-pain">해결하는 고민 <span class="hint">짧은 명사형이 자연스러워요</span></label><input type="text" id="p-pain" placeholder="예: 좁은 싱크대 자리 부족"></div>
+        <div class="field"><label for="p-features">핵심 장점 <span class="hint">한 줄에 하나, 문장형으로</span></label><textarea id="p-features" rows="4" placeholder="안 쓸 땐 접어서 두께 4cm로 보관"></textarea></div>
+        <div class="row2">
+          <div class="field"><label for="p-price">판매가(원)</label><input type="text" inputmode="numeric" id="p-price" placeholder="12900"></div>
+          <div class="field"><label for="p-orig">정가(원) <span class="hint">할인 시</span></label><input type="text" inputmode="numeric" id="p-orig" placeholder="18900"></div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="p-rating">평점</label><input type="text" inputmode="decimal" id="p-rating" placeholder="4.8"></div>
+          <div class="field"><label for="p-reviews">리뷰 수</label><input type="text" inputmode="numeric" id="p-reviews" placeholder="1250"></div>
+        </div>
+        <label class="check"><input type="checkbox" id="p-rocket"> 로켓배송 상품</label>
+        <div class="field"><label for="p-link">쿠팡 파트너스 링크</label><input type="url" id="p-link" placeholder="https://link.coupang.com/a/…"></div>
+        <div class="field"><label for="p-en">영문 상품 묘사 <span class="hint">AI 영상 프롬프트용</span></label><input type="text" id="p-en" placeholder="a collapsible gray silicone dish basin"></div>
+
+        <div class="group">
+          <div class="group-title">대본 설정</div>
+          <div class="row2">
+            <div class="field"><label for="s-style">훅 스타일</label>
+              <select id="s-style">
+                <option value="problem">고민 해결형</option>
+                <option value="price">가격 충격형</option>
+                <option value="curiosity">호기심형</option>
+                <option value="list">추천템형</option>
+                <option value="review">직접 사용 후기형</option>
+              </select>
+            </div>
+            <div class="field"><label for="s-len">길이</label>
+              <select id="s-len"><option value="15">약 15초</option><option value="30">약 30초</option><option value="45">약 45초</option></select>
+            </div>
+          </div>
+          <div class="field"><label for="s-cta">구매 안내 방식</label>
+            <select id="s-cta">
+              <option value="tag">유튜브 쇼핑 상품 태그</option>
+              <option value="profile">채널 프로필 링크</option>
+              <option value="comment">고정 댓글</option>
+            </select>
+          </div>
+          <label class="check"><input type="checkbox" id="p-used"> 이 상품을 직접 구매해서 써봤어요</label>
+          <p class="warn" id="used-warn" hidden>직접 써보지 않은 상품에 ‘써봤다’, ‘후기’ 같은 표현을 쓰면 기만 광고가 될 수 있어요. 후기형은 직접 사용한 경우에만 고를 수 있습니다.</p>
+          <label class="check"><input type="checkbox" id="s-adtitle"> 제목 앞에 [광고] 붙이기</label>
+        </div>
+
+        <div class="btns">
+          <button type="button" class="primary" id="btn-save">보관함에 저장</button>
+          <button type="button" id="btn-example">예시 불러오기</button>
+          <button type="button" id="btn-clear">비우기</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- 작업대 -->
+    <section class="panel" aria-label="결과">
+      <div class="tabs" role="tablist" aria-label="결과 보기">
+        <button role="tab" id="tab-script" aria-controls="pane-script" aria-selected="true">대본·자막</button>
+        <button role="tab" id="tab-upload" aria-controls="pane-upload" aria-selected="false">업로드 문구</button>
+        <button role="tab" id="tab-video" aria-controls="pane-video" aria-selected="false">영상 만들기</button>
+        <button role="tab" id="tab-ai" aria-controls="pane-ai" aria-selected="false">AI 프롬프트</button>
+        <button role="tab" id="tab-lib" aria-controls="pane-lib" aria-selected="false">보관함 <span id="lib-count"></span></button>
+      </div>
+
+      <!-- 대본 -->
+      <div class="pane" role="tabpanel" id="pane-script" aria-labelledby="tab-script">
+        <div class="summary">
+          <div class="stat"><b id="sum-total">0.0</b><span>초 (예상 길이)</span></div>
+          <div class="stat"><b id="sum-scenes">0</b><span>장면</span></div>
+          <div class="btns" style="margin-left:auto">
+            <button type="button" class="small" id="btn-tts">내레이션 듣기</button>
+            <button type="button" class="small" id="btn-copy-script">대본 복사</button>
+            <button type="button" class="small" id="btn-copy-srt">SRT 복사</button>
+            <button type="button" class="small tag" id="btn-dl-srt">SRT 내려받기</button>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-head"><h3>첫 2초 훅 고르기</h3><span class="hint">스와이프를 멈추게 하는 첫 문장</span></div>
+          <div class="hooks" id="hooks"></div>
+        </div>
+        <div class="block">
+          <div class="block-head"><h3>장면 구성</h3><span class="hint">표 안의 글자를 눌러 바로 고칠 수 있어요. 상품 정보를 바꾸면 다시 생성됩니다.</span></div>
+          <div class="tablebox">
+            <table>
+              <thead><tr><th>시간</th><th>장면</th><th>화면 연출</th><th>자막</th><th>내레이션</th></tr></thead>
+              <tbody id="scenes"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- 업로드 -->
+      <div class="pane" role="tabpanel" id="pane-upload" aria-labelledby="tab-upload" hidden>
+        <div class="block">
+          <div class="block-head"><h3>제목 후보</h3><span class="hint">쇼츠 제목은 40자 안쪽이 잘 읽혀요</span></div>
+          <ul class="titles" id="titles"></ul>
+        </div>
+        <div class="cols">
+          <div class="block">
+            <div class="block-head"><h3>설명란</h3><button type="button" class="small" data-copy="out-desc">복사</button></div>
+            <pre class="out" id="out-desc"></pre>
+          </div>
+          <div class="block">
+            <div class="block-head"><h3>해시태그</h3><button type="button" class="small" data-copy="out-tags">복사</button></div>
+            <pre class="out" id="out-tags"></pre>
+            <div class="block-head"><h3>고정 댓글</h3><button type="button" class="small" data-copy="out-comment">복사</button></div>
+            <pre class="out" id="out-comment"></pre>
+            <div class="block-head"><h3>영상 속 광고 표기</h3><button type="button" class="small" data-copy="out-disclosure">복사</button></div>
+            <pre class="out" id="out-disclosure"></pre>
+          </div>
+        </div>
+        <div class="block">
+          <div class="block-head"><h3>업로드 전 체크</h3></div>
+          <ul class="checklist" id="checklist"></ul>
+        </div>
+      </div>
+
+      <!-- 영상 -->
+      <div class="pane" role="tabpanel" id="pane-video" aria-labelledby="tab-video" hidden>
+        <div class="studio">
+          <div class="screen">
+            <canvas id="cv" width="1080" height="1920" aria-label="9:16 쇼츠 미리보기"></canvas>
+            <input type="range" class="scrub" id="scrub" min="0" max="1000" value="0" aria-label="미리보기 위치">
+            <div class="timecode" id="timecode">00:00.0 / 00:00.0</div>
+          </div>
+          <div class="block" style="gap:14px">
+            <div class="drop" id="drop">
+              <span class="label">상품 사진 · 장면 이미지</span>
+              <span class="hint">장면 순서대로 돌아가며 들어가요. 세로 사진이 가장 잘 맞아요. 직접 찍은 사진이나 사용 허락된 이미지만 쓰세요.</span>
+              <input type="file" id="img-input" accept="image/*" multiple>
+            </div>
+            <div class="thumbs" id="thumbs"></div>
+            <div class="drop">
+              <span class="label">내레이션·배경음 파일 (선택)</span>
+              <span class="hint">TTS로 만든 음성이나 저작권 걱정 없는 배경음을 넣으면 함께 녹화돼요.</span>
+              <input type="file" id="audio-input" accept="audio/*">
+              <span class="hint" id="audio-name"></span>
+            </div>
+            <label class="check"><input type="checkbox" id="safe-zone" checked> 쇼츠 UI 가림 영역 보기 (녹화에는 안 들어가요)</label>
+            <div class="btns">
+              <button type="button" id="btn-play">재생</button>
+              <button type="button" class="tag" id="btn-record">영상 녹화하기</button>
+            </div>
+            <p class="hint" id="rec-status">녹화는 실제 길이만큼 걸려요. 녹화 중에는 이 탭을 열어 두세요.</p>
+            <div id="result" class="block" hidden>
+              <video class="result" id="result-video" controls playsinline></video>
+              <div class="btns"><button type="button" class="primary small" id="btn-dl-video">영상 내려받기</button></div>
+              <p class="hint">내려받기가 안 되는 환경(미리보기 창 등)에서는 저장소의 index.html을 브라우저에서 직접 열어 쓰세요.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- AI -->
+      <div class="pane" role="tabpanel" id="pane-ai" aria-labelledby="tab-ai" hidden>
+        <div class="block">
+          <div class="block-head"><h3>대본 다듬기 프롬프트</h3><button type="button" class="small" data-copy="out-llm">복사</button></div>
+          <span class="hint">Claude나 ChatGPT에 붙여넣으면 이 상품 정보로 대본을 더 다듬어 줍니다.</span>
+          <pre class="out" id="out-llm"></pre>
+        </div>
+        <div class="block">
+          <div class="block-head"><h3>장면별 이미지→영상 프롬프트</h3><button type="button" class="small" data-copy="out-video">복사</button></div>
+          <span class="hint">상품 사진을 시작 프레임으로 넣고 Kling, Veo, Higgsfield 같은 이미지→영상 도구에 쓰세요. 괄호 안 한국어는 영어로 바꾸면 결과가 좋아집니다.</span>
+          <pre class="out mono" id="out-video"></pre>
+        </div>
+        <div class="block">
+          <div class="block-head"><h3>표지(썸네일) 이미지 프롬프트</h3><button type="button" class="small" data-copy="out-thumb">복사</button></div>
+          <pre class="out mono" id="out-thumb"></pre>
+        </div>
+      </div>
+
+      <!-- 보관함 -->
+      <div class="pane" role="tabpanel" id="pane-lib" aria-labelledby="tab-lib" hidden>
+        <div class="block-head"><h3>상품 보관함</h3><span class="hint">이 브라우저에만 저장돼요</span></div>
+        <ul class="lib" id="lib"></ul>
+        <div class="btns"><button type="button" class="small" id="btn-export">보관함 JSON 복사</button></div>
+      </div>
+    </section>
+  </main>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(() => {
+'use strict';
+const $ = (s) => document.querySelector(s);
+const W = 1080, H = 1920;
+const DISCLOSURE_SHORT = '광고 · 쿠팡 파트너스 활동으로 수수료를 받을 수 있어요';
+const DISCLOSURE_FULL = '이 영상은 쿠팡 파트너스 활동의 일환으로, 이에 따른 일정액의 수수료를 제공받습니다.';
+const STORE_KEY = 'shopping-studio:library:v1';
+const DRAFT_KEY = 'shopping-studio:draft:v1';
+const STATUSES = ['아이디어', '대본 완료', '영상 완료', '업로드 완료'];
+
+const EXAMPLE = {
+  name: '접이식 실리콘 설거지통 10L', short: '접이식 설거지통', category: '주방', target: '자취생',
+  pain: '좁은 싱크대 자리 부족',
+  features: '안 쓸 땐 접어서 두께 4cm로 보관\n바닥 배수 마개로 물 빼기 간편\n실리콘 소재라 가볍고 잘 안 깨져요',
+  price: '12900', orig: '18900', rating: '4.8', reviews: '1250', rocket: true,
+  link: 'https://link.coupang.com/a/example', en: 'a collapsible gray silicone dish basin',
+  used: false, style: 'problem', len: '30', cta: 'tag', adTitle: true
+};
+const TEXT_FIELDS = ['name', 'short', 'category', 'target', 'pain', 'features', 'price', 'orig', 'rating', 'reviews', 'link', 'en'];
+
+const store = {
+  get(k, fb) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : fb; } catch { return fb; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* 저장 불가 환경 */ } }
+};
+
+/* ---------- 한국어 조사 ---------- */
+function jong(word) {
+  const s = String(word).trim();
+  if (!s) return 0;
+  const ch = s[s.length - 1];
+  const c = ch.charCodeAt(0);
+  if (c >= 0xAC00 && c <= 0xD7A3) return (c - 0xAC00) % 28;
+  if (/[0-9]/.test(ch)) return { '0': 21, '1': 8, '3': 16, '6': 1, '7': 8, '8': 8 }[ch] || 0;
+  if (/[lmnr]/i.test(ch)) return ch.toLowerCase() === 'l' ? 8 : 4;
+  return 0;
+}
+// j('설거지통','이에요','예요') → 받침 있으면 앞, 없으면 뒤
+function j(w, withJ, without) {
+  const k = jong(w);
+  if (withJ === '으로') return w + (k && k !== 8 ? '으로' : '로');
+  return w + (k ? withJ : without);
+}
+
+/* ---------- 입력 ---------- */
+function readForm() {
+  const d = {};
+  TEXT_FIELDS.forEach((k) => { d[k] = $('#p-' + k).value.trim(); });
+  d.rocket = $('#p-rocket').checked;
+  d.used = $('#p-used').checked;
+  d.style = $('#s-style').value;
+  d.len = $('#s-len').value;
+  d.cta = $('#s-cta').value;
+  d.adTitle = $('#s-adtitle').checked;
+  return d;
+}
+function writeForm(d) {
+  TEXT_FIELDS.forEach((k) => { $('#p-' + k).value = d[k] || ''; });
+  $('#p-rocket').checked = !!d.rocket;
+  $('#p-used').checked = !!d.used;
+  $('#s-style').value = d.style || 'problem';
+  $('#s-len').value = d.len || '30';
+  $('#s-cta').value = d.cta || 'tag';
+  $('#s-adtitle').checked = d.adTitle !== false;
+}
+const num = (s) => { const n = parseInt(String(s || '').replace(/[^0-9]/g, ''), 10); return isNaN(n) ? 0 : n; };
+const won = (n) => n.toLocaleString('ko-KR') + '원';
+
+function derive(d) {
+  const price = num(d.price), orig = num(d.orig);
+  const rating = parseFloat(String(d.rating).replace(/[^0-9.]/g, '')) || 0;
+  const reviews = num(d.reviews);
+  const cat = d.category || '살림';
+  return {
+    ...d,
+    short: d.short || d.name || '이 상품',
+    cat, catTem: cat.replace(/\s/g, '') + '템',
+    feats: d.features.split('\n').map((s) => s.trim()).filter(Boolean),
+    price, orig, rating, reviews,
+    disc: orig > price && price > 0 ? Math.round((1 - price / orig) * 100) : 0,
+    priceText: price ? won(price) : '', origText: orig ? won(orig) : '',
+    reviewsText: reviews ? reviews.toLocaleString('ko-KR') : '',
+    len: +d.len || 30
+  };
+}
+
+/* ---------- 대본 생성 ---------- */
+function buildHooks(c) {
+  const T = {
+    problem: [
+      c.pain && { cap: `${c.pain} 해결템`, nar: `${c.pain}, 아직도 그냥 참고 계세요?` },
+      c.target && { cap: `${c.target} 필수 해결템`, nar: `${j(c.target, '이라면', '라면')} 이거 모르면 손해예요` },
+      c.pain && { cap: '딱 3초만 보세요', nar: `${c.pain} 때문에 스트레스라면 딱 3초만 보세요` }
+    ],
+    price: [
+      c.price && { cap: `${j(c.priceText, '으로')} 이게 돼?`, nar: `${j(c.priceText, '으로')} 이게 된다고요?` },
+      c.disc && { cap: `지금 ${c.disc}% 할인 중`, nar: `지금 ${c.disc}% 할인 중인 ${c.catTem} 하나 알려드릴게요` },
+      { cap: '가성비 끝판왕?', nar: '이 가격에 이 정도면 가성비 끝판왕 아닌가요?' }
+    ],
+    curiosity: [
+      { cap: '왜 이제 알았지?', nar: `이거 왜 이제 알았지 싶은 ${j(c.catTem, '이에요', '예요')}` },
+      c.reviews && { cap: `리뷰 ${c.reviewsText}개의 이유`, nar: `리뷰가 ${c.reviewsText}개나 달린 데는 이유가 있더라고요` },
+      { cap: '이거 하나면 끝', nar: `${c.cat} 고민, 이거 하나면 정리됩니다` }
+    ],
+    list: [
+      c.target && { cap: `${c.target} 필수템`, nar: `${c.target} 필수템, 딱 하나만 고르라면 이거예요` },
+      { cap: `알면 못 지나치는 ${c.catTem}`, nar: `알고 나면 그냥 못 지나치는 ${j(c.catTem, '이에요', '예요')}` },
+      { cap: `오늘의 ${c.catTem}`, nar: `오늘의 ${c.catTem} 추천, 바로 갑니다` }
+    ],
+    review: [
+      { cap: '직접 사서 써봤습니다', nar: `${c.short}, 제가 직접 사서 써봤어요` },
+      { cap: '써보고 놀란 점', nar: '직접 써보고 제일 놀랐던 점부터 말씀드릴게요' },
+      { cap: '쿠팡 언박싱', nar: `쿠팡에서 주문한 ${c.short}, 바로 열어볼게요` }
+    ]
+  };
+  const generic = [
+    { cap: `이런 ${c.catTem} 있었어?`, nar: `이런 ${j(c.catTem, '이', '가')} 있는 줄 몰랐죠?` },
+    { cap: `${c.catTem} 하나 추천`, nar: `${c.catTem} 하나 추천해 드릴게요` },
+    { cap: '끝까지 보면 이득', nar: '끝까지 보시면 장바구니에 담고 싶어질 거예요' }
+  ];
+  const style = c.style === 'review' && !c.used ? 'problem' : c.style;
+  const out = (T[style] || []).filter(Boolean);
+  for (const g of generic) { if (out.length >= 3) break; out.push(g); }
+  return out.slice(0, 3);
+}
+
+const ORD = ['첫째,', '둘째,', '셋째,', '넷째,', '다섯째,'];
+function estimate(text) {
+  const n = String(text).replace(/\s/g, '').length;
+  return Math.min(7, Math.max(1.4, n / 7.2 + 0.3));
+}
+function buildScenes(c, hook) {
+  const S = [];
+  const add = (type, label, visual, cap, nar) => S.push({ type, label, visual, cap, nar });
+  add('hook', '훅', '가장 극적인 사용 장면이나 결과를 클로즈업. 0.5초 안에 상품이 보이게.', hook.cap, hook.nar);
+  if (c.pain && c.len >= 30 && !hook.nar.includes(c.pain)) {
+    add('problem', '공감', `불편한 상황 재현 컷 (${c.pain})`, c.pain, `${c.pain}, 은근 스트레스죠?`);
+  }
+  add('reveal', '등장', '상품 전체샷 + 빠른 줌인, 효과음 하나', c.short,
+    c.used ? `그래서 제가 산 게 바로 이 ${j(c.short, '이에요', '예요')}` : `그래서 가져온 게 바로 이 ${j(c.short, '이에요', '예요')}`);
+  const maxF = c.len >= 45 ? 5 : c.len >= 30 ? 3 : 1;
+  const feats = c.feats.slice(0, maxF);
+  feats.forEach((f, i) => {
+    add('feature', `포인트 ${i + 1}`, `기능이 보이는 클로즈업: ${f}`, f, feats.length > 1 ? `${ORD[i]} ${f}` : f);
+  });
+  if (c.len >= 30 && (c.rating || c.reviews)) {
+    const cap = [c.rating ? `★ ${c.rating}` : '', c.reviews ? `리뷰 ${c.reviewsText}개` : ''].filter(Boolean).join(' · ');
+    const nar = c.rating && c.reviews ? `리뷰 ${c.reviewsText}개에 평점은 ${c.rating}점이에요`
+      : c.rating ? `평점은 ${c.rating}점이에요` : `리뷰가 ${c.reviewsText}개 달려 있어요`;
+    add('proof', '신뢰', '평점·리뷰 수 화면 (업로드 당일 수치로)', cap, nar);
+  }
+  if (c.price) {
+    let nar = c.disc ? `정가는 ${c.origText}인데 지금은 ${c.priceText}, ${c.disc}% 할인 중이에요` : `가격은 ${c.priceText}이에요`;
+    if (c.rocket && c.len >= 30) nar += '. 로켓배송이라 빨리 받아볼 수 있어요';
+    add('price', '가격', '가격 카드 그래픽, 할인율 강조', c.priceText, nar);
+  }
+  const CTA = {
+    tag: { cap: '아래 상품 태그 확인!', nar: '구매 정보는 화면 아래 상품 태그에 넣어둘게요' },
+    profile: { cap: '링크는 프로필에', nar: '구매 링크는 채널 프로필 링크에 모아뒀어요' },
+    comment: { cap: '고정 댓글 확인!', nar: '제품 정보는 고정 댓글에 남겨둘게요' }
+  }[c.cta] || { cap: '아래 상품 태그 확인!', nar: '구매 정보는 화면 아래 상품 태그에 넣어둘게요' };
+  add('cta', '마무리', '상품을 한 번 더 보여주며 끝. 구매 안내 위치를 손가락·화살표로.', CTA.cap,
+    CTA.nar + (c.len >= 30 ? '. 다음 꿀템도 보고 싶으면 구독!' : ''));
+  // 목표 길이를 넘으면 신뢰 → 뒤쪽 포인트 → 공감 순으로 덜어냄
+  const over = () => S.reduce((a, s) => a + estimate(s.nar), 0) > c.len + 2;
+  const drop = (pred) => { for (let i = S.length - 1; i >= 0; i--) if (pred(S[i])) { S.splice(i, 1); return true; } return false; };
+  while (over()) {
+    if (drop((s) => s.type === 'proof')) continue;
+    if (S.filter((s) => s.type === 'feature').length > 1 && drop((s) => s.type === 'feature')) continue;
+    if (drop((s) => s.type === 'problem')) continue;
+    break;
+  }
+  const fs = S.filter((s) => s.type === 'feature');
+  fs.forEach((s, i) => { s.label = `포인트 ${i + 1}`; s.nar = fs.length > 1 ? `${ORD[i]} ${s.cap}` : s.cap; });
+  return timeScenes(S);
+}
+function timeScenes(S) {
+  let t = 0;
+  S.forEach((s) => { s.dur = estimate(s.nar); s.start = t; t += s.dur; });
+  return S;
+}
+
+/* ---------- 상태 ---------- */
+const state = { c: null, hooks: [], hookIdx: 0, scenes: [], total: 0, images: [], isExample: false };
+
+function regenerate(keepHook) {
+  const d = readForm();
+  state.c = derive(d);
+  state.hooks = buildHooks(state.c);
+  if (!keepHook || state.hookIdx >= state.hooks.length) state.hookIdx = 0;
+  state.scenes = buildScenes(state.c, state.hooks[state.hookIdx]);
+  refreshAll(true);
+  store.set(DRAFT_KEY, d);
+}
+function refreshAll(rebuildTable) {
+  state.total = state.scenes.reduce((a, s) => a + s.dur, 0);
+  renderHooks();
+  if (rebuildTable) renderScenes(); else updateTimes();
+  renderUpload();
+  renderPrompts();
+  loadCaptionFonts().then(() => drawAt(currentPreviewTime()));
+  drawAt(currentPreviewTime());
+}
+
+/* ---------- 렌더: 대본 ---------- */
+const fmt = (t) => { const m = Math.floor(t / 60), s = t - m * 60; return String(m).padStart(2, '0') + ':' + s.toFixed(1).padStart(4, '0'); };
+const esc = (s) => String(s).replace(/[&<>"]/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]));
+
+function renderHooks() {
+  const box = $('#hooks');
+  box.innerHTML = state.hooks.map((h, i) =>
+    `<button type="button" class="hook" data-i="${i}" aria-pressed="${i === state.hookIdx}"><strong>${esc(h.cap)}</strong><small>${esc(h.nar)}</small></button>`).join('');
+}
+function renderScenes() {
+  $('#scenes').innerHTML = state.scenes.map((s, i) => `
+    <tr data-i="${i}">
+      <td class="time">${fmt(s.start)}<br>${fmt(s.start + s.dur)}</td>
+      <td class="kind">${esc(s.label)}</td>
+      <td class="visual"><span contenteditable="plaintext-only" data-k="visual">${esc(s.visual)}</span></td>
+      <td class="cap"><span contenteditable="plaintext-only" data-k="cap">${esc(s.cap)}</span></td>
+      <td><span contenteditable="plaintext-only" data-k="nar">${esc(s.nar)}</span></td>
+    </tr>`).join('');
+  updateTimes();
+}
+function updateTimes() {
+  document.querySelectorAll('#scenes tr').forEach((tr) => {
+    const s = state.scenes[+tr.dataset.i];
+    if (s) tr.querySelector('.time').innerHTML = `${fmt(s.start)}<br>${fmt(s.start + s.dur)}`;
+  });
+  $('#sum-total').textContent = state.total.toFixed(1);
+  $('#sum-scenes').textContent = state.scenes.length;
+  $('#scrub').max = 1000;
+}
+
+/* ---------- 출력물 ---------- */
+function scriptText() {
+  return state.scenes.map((s, i) =>
+    `#${i + 1} ${s.label} (${fmt(s.start)}~${fmt(s.start + s.dur)})\n화면: ${s.visual}\n자막: ${s.cap}\n내레이션: ${s.nar}`).join('\n\n')
+    + `\n\n[영상 전체 광고 표기] ${DISCLOSURE_SHORT}`;
+}
+function srtTime(t) {
+  const ms = Math.round(t * 1000);
+  const h = Math.floor(ms / 3600000), m = Math.floor(ms / 60000) % 60, s = Math.floor(ms / 1000) % 60, r = ms % 1000;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')},${String(r).padStart(3, '0')}`;
+}
+function srtText() {
+  return state.scenes.map((s, i) => `${i + 1}\n${srtTime(s.start)} --> ${srtTime(s.start + s.dur)}\n${s.nar}\n`).join('\n');
+}
+function tagify(s) { return '#' + String(s).replace(/[^0-9A-Za-z가-힣]/g, ''); }
+function hashtags(c) {
+  const list = ['쿠팡', '쿠팡추천템', c.catTem, c.target && c.target + '필수템', c.short, '추천템', '살림꿀템', 'shorts']
+    .filter(Boolean).map(tagify).filter((t) => t.length > 1);
+  return [...new Set(list)];
+}
+function titles(c) {
+  const hook = state.hooks[state.hookIdx] || { cap: '' };
+  const raw = [
+    `${hook.cap} | ${c.short}`,
+    c.target && `${c.target} 필수템, ${c.short}`,
+    c.price && `${j(c.priceText, '으로')} 이게 된다고? ${c.short}`,
+    c.pain && `${c.pain} 해결하는 ${c.catTem}`,
+    `${c.short} 핵심만 ${c.len}초 정리`
+  ].filter(Boolean);
+  return raw.map((t) => ((c.adTitle ? '[광고] ' : '') + t + ' #shorts').slice(0, 100));
+}
+function today() {
+  const d = new Date();
+  return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`;
+}
+function description(c) {
+  const lines = [`[광고] ${DISCLOSURE_FULL}`, '', `▶ ${c.name || c.short}`];
+  if (c.price) lines.push(`· 가격: ${c.priceText}${c.disc ? ` (정가 ${c.origText}, ${c.disc}% 할인)` : ''} - ${today()} 기준, 가격과 재고는 바뀔 수 있어요`);
+  if (c.link) lines.push(`· 구매 링크: ${c.link}`);
+  if (c.feats.length) { lines.push('· 핵심 포인트'); c.feats.forEach((f) => lines.push(`  - ${f}`)); }
+  lines.push('', hashtags(c).join(' '));
+  return lines.join('\n');
+}
+function pinned(c) {
+  return [`[광고] 쿠팡 파트너스 활동으로 수수료를 받을 수 있어요.`, `${c.name || c.short}`, c.link || '(파트너스 링크)',
+    c.price ? `${today()} 기준 ${c.priceText}, 가격은 바뀔 수 있어요.` : ''].filter(Boolean).join('\n');
+}
+const CHECKS = [
+  '업로드 화면에서 ‘유료 프로모션 포함’ 체크',
+  '영상 처음과 끝에 광고 표기가 보이는지 확인',
+  '설명란 첫 줄에 대가성 문구',
+  '가격·평점·할인율을 업로드 당일 다시 확인',
+  '‘최저가’, ‘1위’, ‘무조건’ 같은 근거 없는 표현 빼기',
+  '직접 쓰지 않았다면 ‘써봤다’, ‘후기’ 표현 빼기',
+  '사실적인 AI 장면이 있으면 ‘변경되거나 합성된 콘텐츠’ 표시',
+  '다른 채널의 영상·사진을 그대로 쓰지 않았는지 확인',
+  '유튜브 쇼핑 제휴 가입 시 상품 태그 연결',
+  '보관함 상태를 ‘업로드 완료’로 바꾸기'
+];
+function renderUpload() {
+  const c = state.c;
+  $('#titles').innerHTML = titles(c).map((t, i) =>
+    `<li><span>${esc(t)}</span><span style="display:flex;gap:6px;align-items:center"><em>${t.length}자</em><button type="button" class="small" data-copy-text="${esc(t)}">복사</button></span></li>`).join('');
+  $('#out-desc').textContent = description(c);
+  $('#out-tags').textContent = hashtags(c).join(' ');
+  $('#out-comment').textContent = pinned(c) + (c.cta === 'comment' ? '\n\n※ 쇼츠 댓글의 링크는 눌리지 않을 수 있어요. 프로필 링크나 상품 태그를 함께 쓰세요.' : '');
+  $('#out-disclosure').textContent = `${DISCLOSURE_SHORT}\n\n(영상 만들기 탭에서 만든 영상에는 처음부터 끝까지 자동으로 들어가요)`;
+  if (!$('#checklist').children.length) {
+    $('#checklist').innerHTML = CHECKS.map((t, i) => `<li><label class="check"><input type="checkbox" id="chk-${i}"> ${esc(t)}</label></li>`).join('');
+  }
+}
+function renderPrompts() {
+  const c = state.c;
+  const product = c.en || `the product "${c.name || c.short}"`;
+  const llm = [
+    `너는 유튜브 쇼츠 쇼핑 콘텐츠 작가야. 아래 상품으로 약 ${c.len}초짜리 얼굴 없는 쇼츠(상품 영상 + 자막 + AI 내레이션) 대본을 써줘.`,
+    '',
+    '[상품 정보]',
+    `- 상품명: ${c.name || c.short}`,
+    `- 분야: ${c.cat}` + (c.target ? ` / 대상: ${c.target}` : ''),
+    c.pain && `- 해결하는 고민: ${c.pain}`,
+    c.feats.length && `- 장점: ${c.feats.join(' / ')}`,
+    c.price && `- 가격: ${c.priceText}` + (c.disc ? ` (정가 ${c.origText}, ${c.disc}% 할인)` : ''),
+    (c.rating || c.reviews) && `- 평점/리뷰: ${c.rating || '-'}점 / ${c.reviewsText || '-'}개`,
+    c.rocket && '- 로켓배송',
+    '',
+    '[조건]',
+    '- 첫 2초 훅 3가지를 먼저 제안 (스크롤을 멈추게 하는 질문·숫자·상황)',
+    '- 장면마다 화면 연출 / 자막(15자 이내) / 내레이션을 나눠서',
+    '- 근거 없는 ‘최저가’, ‘1위’, ‘무조건’, 효능 과장 표현 금지',
+    c.used ? '- 직접 사용한 경험이 있으니 솔직한 장단점 한 가지씩 포함' : '- 직접 사용하지 않았으니 ‘써봤다’, ‘후기’ 같은 체험 표현 금지',
+    `- 영상 처음과 끝에 "${DISCLOSURE_SHORT}" 표기가 들어간다는 전제`,
+    `- 구매 안내: ${{ tag: '화면 아래 유튜브 쇼핑 상품 태그', profile: '채널 프로필 링크', comment: '고정 댓글' }[c.cta]}`,
+    '- 마지막에 제목 후보 5개(40자 이내)와 해시태그 8개'
+  ].filter(Boolean).join('\n');
+  $('#out-llm').textContent = llm;
+
+  const base = 'Vertical 9:16, photorealistic product video, start frame = uploaded product photo. Keep the product shape, color and logo exactly as in the photo. No added text, no watermarks, no human faces.';
+  const V = state.scenes.map((s, i) => {
+    let p;
+    switch (s.type) {
+      case 'hook': p = `Fast dynamic push-in on ${product}, it pops into sharp focus, bright clean lighting, shallow depth of field, energetic.`; break;
+      case 'problem': p = `Realistic everyday home scene showing the problem this product solves (${c.pain}), slightly messy and frustrating, handheld feel.`; break;
+      case 'reveal': p = `Hero shot of ${product} on a clean surface, slow 180-degree orbit, soft daylight, minimal background.`; break;
+      case 'feature': p = `Macro close-up demonstrating this feature of ${product}: (${s.cap}). Hands only, smooth slow motion.`; break;
+      case 'proof': p = `Clean flat-lay of ${product} with soft shadows, subtle slow zoom out, calm and trustworthy mood.`; break;
+      case 'price': p = `${product} centered on a solid bright yellow background, playful bounce, studio lighting.`; break;
+      default: p = `Final wide shot of ${product} in a tidy, real home setting, gentle slow push-in, warm light.`;
+    }
+    return `#${i + 1} ${s.label} · ${s.dur.toFixed(1)}s\n${p}\n${base}`;
+  }).join('\n\n');
+  $('#out-video').textContent = V;
+  $('#out-thumb').textContent = `Vertical 9:16 cover image of ${product}, centered hero product shot on a bold yellow background, strong rim light, crisp shadow, empty space in the top third for a Korean headline. No text, no logos added, no faces.\n\n표지 문구 후보: ${state.hooks.map((h) => h.cap).join(' / ')}`;
+}
+
+/* ---------- 영상 캔버스 ---------- */
+const cv = $('#cv');
+const ctx2 = cv.getContext('2d');
+const VC = { bg: '#15171D', ink: '#FFFFFF', stroke: '#0B0C10', tag: '#FFD23F', tagInk: '#1B1A10', sale: '#E5432C' };
+const CAP_FONT = '"Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+const BODY_FONT = '"IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif';
+let previewT = 0;
+const currentPreviewTime = () => Math.min(previewT, Math.max(0, state.total - 0.001));
+
+function loadCaptionFonts() {
+  if (!document.fonts || !document.fonts.load) return Promise.resolve();
+  const text = state.scenes.map((s) => s.cap).join('') + DISCLOSURE_SHORT + '0123456789원%★·포인트가격변동될수있어요';
+  return Promise.all([
+    document.fonts.load(`90px "Black Han Sans"`, text),
+    document.fonts.load(`600 34px "IBM Plex Sans KR"`, text)
+  ]).catch(() => {});
+}
+function sceneAt(t) {
+  for (let i = 0; i < state.scenes.length; i++) {
+    const s = state.scenes[i];
+    if (t < s.start + s.dur) return [s, i];
+  }
+  const i = state.scenes.length - 1;
+  return [state.scenes[i], i];
+}
+function roundRect(x, y, w, h, r) {
+  ctx2.beginPath();
+  ctx2.moveTo(x + r, y); ctx2.arcTo(x + w, y, x + w, y + h, r); ctx2.arcTo(x + w, y + h, x, y + h, r);
+  ctx2.arcTo(x, y + h, x, y, r); ctx2.arcTo(x, y, x + w, y, r); ctx2.closePath();
+}
+function wrap(text, maxW) {
+  const words = String(text).split(/\s+/).filter(Boolean);
+  const lines = []; let line = '';
+  const pushLong = (w) => { let cur = ''; for (const ch of w) { if (ctx2.measureText(cur + ch).width > maxW && cur) { lines.push(cur); cur = ch; } else cur += ch; } return cur; };
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx2.measureText(test).width <= maxW) { line = test; continue; }
+    if (line) lines.push(line);
+    line = ctx2.measureText(w).width > maxW ? pushLong(w) : w;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+const easeOut = (x) => 1 - Math.pow(1 - x, 3);
+const backOut = (x) => { const c1 = 1.70158, c3 = c1 + 1; return 1 + c3 * Math.pow(x - 1, 3) + c1 * Math.pow(x - 1, 2); };
+
+function drawBackground(i, p) {
+  const imgs = state.images;
+  if (!imgs.length) {
+    const g = ctx2.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, '#20232C'); g.addColorStop(1, '#101217');
+    ctx2.fillStyle = g; ctx2.fillRect(0, 0, W, H);
+    ctx2.save();
+    ctx2.globalAlpha = 0.07; ctx2.fillStyle = VC.tag; ctx2.font = `260px ${CAP_FONT}`; ctx2.textAlign = 'center';
+    ctx2.fillText(String(i + 1).padStart(2, '0'), W / 2, 620);
+    ctx2.globalAlpha = 0.55; ctx2.fillStyle = '#C9CDD6'; ctx2.font = `600 34px ${BODY_FONT}`;
+    ctx2.fillText('상품 사진을 올리면 여기에 들어가요', W / 2, 720);
+    ctx2.restore();
+    return;
+  }
+  const img = imgs[i % imgs.length].img;
+  const zoomIn = i % 2 === 0;
+  const k = zoomIn ? 1.04 + 0.1 * easeOut(p) : 1.14 - 0.1 * easeOut(p);
+  const sc = Math.max(W / img.naturalWidth, H / img.naturalHeight) * k;
+  const w = img.naturalWidth * sc, h = img.naturalHeight * sc;
+  const pan = (i % 3 - 1) * 24 * p;
+  ctx2.fillStyle = VC.bg; ctx2.fillRect(0, 0, W, H);
+  ctx2.drawImage(img, (W - w) / 2 + pan, (H - h) / 2, w, h);
+}
+function drawShades() {
+  let g = ctx2.createLinearGradient(0, 0, 0, 420);
+  g.addColorStop(0, 'rgba(0,0,0,0.55)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx2.fillStyle = g; ctx2.fillRect(0, 0, W, 420);
+  g = ctx2.createLinearGradient(0, H * 0.45, 0, H);
+  g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, 'rgba(0,0,0,0.6)');
+  ctx2.fillStyle = g; ctx2.fillRect(0, H * 0.45, W, H * 0.55);
+}
+function drawBadge() {
+  ctx2.save();
+  ctx2.font = `600 32px ${BODY_FONT}`;
+  const tw = ctx2.measureText(DISCLOSURE_SHORT).width;
+  const x = 60, y = 190, h = 58, padX = 22, adW = 64;
+  ctx2.fillStyle = 'rgba(0,0,0,0.62)';
+  roundRect(x, y, tw + padX * 2 + adW + 12, h, 12); ctx2.fill();
+  ctx2.fillStyle = VC.tag; roundRect(x + 10, y + 10, adW, h - 20, 8); ctx2.fill();
+  ctx2.fillStyle = VC.tagInk; ctx2.font = `700 26px ${BODY_FONT}`; ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
+  ctx2.fillText('광고', x + 10 + adW / 2, y + h / 2 + 1);
+  ctx2.fillStyle = '#FFFFFF'; ctx2.font = `600 30px ${BODY_FONT}`; ctx2.textAlign = 'left';
+  ctx2.fillText(DISCLOSURE_SHORT.replace(/^광고 · /, ''), x + 10 + adW + padX - 6, y + h / 2 + 1);
+  ctx2.restore();
+}
+function drawCaption(s, idx, local, still) {
+  const pop = still ? 1 : Math.min(1, local / 0.22);
+  const scale = 0.82 + 0.18 * backOut(pop);
+  const isHook = s.type === 'hook';
+  const size = isHook ? 104 : 90;
+  ctx2.save();
+  ctx2.font = `${size}px ${CAP_FONT}`;
+  const lines = wrap(s.cap, 780).slice(0, 4);
+  const lh = size * 1.18;
+  const cy = 1060;
+  const top = cy - (lines.length * lh) / 2;
+  ctx2.translate(W / 2, cy); ctx2.scale(scale, scale); ctx2.translate(-W / 2, -cy);
+  ctx2.globalAlpha = Math.min(1, pop * 1.6);
+  if (s.type === 'feature') {
+    const label = s.label;
+    ctx2.font = `700 34px ${BODY_FONT}`;
+    const lw = ctx2.measureText(label).width + 36;
+    ctx2.fillStyle = VC.tag; roundRect(W / 2 - lw / 2, top - 78, lw, 54, 27); ctx2.fill();
+    ctx2.fillStyle = VC.tagInk; ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
+    ctx2.fillText(label, W / 2, top - 50);
+    ctx2.font = `${size}px ${CAP_FONT}`;
+  }
+  ctx2.textAlign = 'center'; ctx2.textBaseline = 'top'; ctx2.lineJoin = 'round';
+  lines.forEach((ln, k) => {
+    const y = top + k * lh;
+    ctx2.lineWidth = 16; ctx2.strokeStyle = VC.stroke; ctx2.strokeText(ln, W / 2, y);
+    ctx2.fillStyle = isHook || s.type === 'cta' ? VC.tag : VC.ink; ctx2.fillText(ln, W / 2, y);
+  });
+  ctx2.restore();
+}
+function drawPrice(s, local, still) {
+  const c = state.c;
+  const pop = still ? 1 : Math.min(1, local / 0.3);
+  const scale = 0.7 + 0.3 * backOut(pop);
+  const cw = 780, ch = c.disc ? 400 : 320, cx = (W - cw) / 2, cy = 1060 - ch / 2;
+  ctx2.save();
+  ctx2.translate(W / 2, 1060); ctx2.scale(scale, scale); ctx2.translate(-W / 2, -1060);
+  ctx2.fillStyle = VC.tag; roundRect(cx, cy, cw, ch, 28); ctx2.fill();
+  ctx2.textAlign = 'center'; ctx2.textBaseline = 'middle';
+  if (c.disc) {
+    ctx2.fillStyle = 'rgba(27,26,16,0.6)'; ctx2.font = `600 48px ${BODY_FONT}`;
+    const ot = c.origText; ctx2.fillText(ot, W / 2, cy + 90);
+    const ow = ctx2.measureText(ot).width;
+    ctx2.fillRect(W / 2 - ow / 2 - 6, cy + 88, ow + 12, 5);
+  }
+  ctx2.fillStyle = VC.tagInk; ctx2.font = `${(s.cap || '').length > 9 ? 112 : 136}px ${CAP_FONT}`;
+  ctx2.fillText(s.cap || c.priceText, W / 2, c.disc ? cy + 240 : cy + ch / 2);
+  if (c.disc) {
+    ctx2.fillStyle = VC.sale; ctx2.beginPath(); ctx2.arc(cx + cw - 70, cy + 6, 84, 0, Math.PI * 2); ctx2.fill();
+    ctx2.fillStyle = '#FFFFFF'; ctx2.font = `70px ${CAP_FONT}`; ctx2.fillText(`-${c.disc}%`, cx + cw - 70, cy + 10);
+  }
+  ctx2.fillStyle = '#FFFFFF'; ctx2.font = `600 32px ${BODY_FONT}`; ctx2.lineWidth = 8; ctx2.strokeStyle = VC.stroke;
+  const note = `${today()} 기준 · 가격은 변동될 수 있어요`;
+  ctx2.strokeText(note, W / 2, cy + ch + 56); ctx2.fillText(note, W / 2, cy + ch + 56);
+  ctx2.restore();
+}
+function drawSafeZone() {
+  ctx2.save();
+  ctx2.fillStyle = 'rgba(255, 64, 64, 0.18)';
+  ctx2.fillRect(0, 0, W, 150);
+  ctx2.fillRect(0, H - 420, W, 420);
+  ctx2.fillRect(W - 150, 860, 150, H - 860 - 420);
+  ctx2.strokeStyle = 'rgba(255, 64, 64, 0.8)'; ctx2.setLineDash([14, 10]); ctx2.lineWidth = 3;
+  ctx2.strokeRect(60, 150, W - 210, H - 570);
+  ctx2.fillStyle = 'rgba(255,255,255,0.9)'; ctx2.font = `600 28px ${BODY_FONT}`; ctx2.textAlign = 'center';
+  ctx2.fillText('제목·채널명·버튼에 가려지는 영역', W / 2, H - 200);
+  ctx2.restore();
+}
+function drawAt(t, recording, live) {
+  if (!state.scenes.length) return;
+  const [s, i] = sceneAt(t);
+  const local = t - s.start, p = Math.min(1, local / s.dur);
+  drawBackground(i, p);
+  drawShades();
+  const still = !live && !recording;
+  if (s.type === 'price') drawPrice(s, local, still); else drawCaption(s, i, local, still);
+  drawBadge();
+  // 진행 바
+  ctx2.fillStyle = 'rgba(255,255,255,0.25)'; ctx2.fillRect(60, 268, W - 120, 6);
+  ctx2.fillStyle = VC.tag; ctx2.fillRect(60, 268, (W - 120) * Math.min(1, t / state.total), 6);
+  if (!recording && $('#safe-zone').checked) drawSafeZone();
+  $('#timecode').textContent = `${fmt(t)} / ${fmt(state.total)}`;
+}
+
+let playing = null;
+function play(opts = {}) {
+  stop();
+  const start = performance.now();
+  const from = opts.fromZero ? 0 : (currentPreviewTime() >= state.total - 0.05 ? 0 : currentPreviewTime());
+  const audio = $('#audio-el');
+  if (audio && audio.src && opts.withAudio !== false) { try { audio.currentTime = from; audio.play().catch(() => {}); } catch { /* */ } }
+  const tick = (now) => {
+    const t = from + (now - start) / 1000;
+    if (t >= state.total) {
+      previewT = state.total; drawAt(state.total - 0.001, opts.recording, true);
+      stop(); if (opts.onEnd) opts.onEnd(); return;
+    }
+    previewT = t; drawAt(t, opts.recording, true);
+    $('#scrub').value = Math.round((t / state.total) * 1000);
+    playing = requestAnimationFrame(tick);
+  };
+  playing = requestAnimationFrame(tick);
+  $('#btn-play').textContent = '정지';
+}
+function stop() {
+  if (playing) cancelAnimationFrame(playing);
+  playing = null;
+  const audio = $('#audio-el'); if (audio) audio.pause();
+  $('#btn-play').textContent = '재생';
+}
+
+/* 녹화 */
+let audioCtx = null, audioDest = null, recBlob = null, recExt = 'webm';
+function pickMime() {
+  if (!window.MediaRecorder) return null;
+  const list = ['video/mp4;codecs=avc1.42E01E,mp4a.40.2', 'video/mp4', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm'];
+  return list.find((m) => MediaRecorder.isTypeSupported(m)) || '';
+}
+async function record() {
+  const mime = pickMime();
+  if (mime === null || !cv.captureStream) { toast('이 브라우저는 영상 녹화를 지원하지 않아요. 크롬이나 엣지에서 열어주세요.'); return; }
+  await loadCaptionFonts();
+  const stream = cv.captureStream(30);
+  const audio = $('#audio-el');
+  if (audio && audio.src) {
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const src = audioCtx.createMediaElementSource(audio);
+        audioDest = audioCtx.createMediaStreamDestination();
+        src.connect(audioDest); src.connect(audioCtx.destination);
+      }
+      await audioCtx.resume();
+      audioDest.stream.getAudioTracks().forEach((tr) => stream.addTrack(tr));
+    } catch { toast('오디오를 연결하지 못해 영상만 녹화해요'); }
+  }
+  const rec = new MediaRecorder(stream, mime ? { mimeType: mime, videoBitsPerSecond: 8_000_000 } : undefined);
+  const chunks = [];
+  rec.ondataavailable = (e) => { if (e.data.size) chunks.push(e.data); };
+  rec.onstop = () => {
+    const type = rec.mimeType || mime || 'video/webm';
+    recExt = type.includes('mp4') ? 'mp4' : 'webm';
+    recBlob = new Blob(chunks, { type });
+    const v = $('#result-video');
+    if (v.src) URL.revokeObjectURL(v.src);
+    v.src = URL.createObjectURL(recBlob);
+    $('#result').hidden = false;
+    $('#btn-record').disabled = false; $('#btn-play').disabled = false;
+    $('#rec-status').textContent = `녹화 완료 · ${recExt.toUpperCase()} · ${(recBlob.size / 1048576).toFixed(1)}MB. 유튜브는 MP4와 WebM 모두 올릴 수 있어요.`;
+  };
+  $('#btn-record').disabled = true; $('#btn-play').disabled = true;
+  $('#rec-status').textContent = `녹화 중… ${state.total.toFixed(1)}초 동안 이 탭을 닫지 마세요.`;
+  previewT = 0;
+  rec.start(250);
+  play({ fromZero: true, recording: true, onEnd: () => setTimeout(() => rec.stop(), 150) });
+}
+
+/* ---------- 이미지·오디오 ---------- */
+function addImages(files) {
+  [...files].filter((f) => f.type.startsWith('image/')).forEach((f) => {
+    const url = URL.createObjectURL(f);
+    const img = new Image();
+    img.onload = () => { state.images.push({ img, url, name: f.name }); renderThumbs(); drawAt(currentPreviewTime()); };
+    img.src = url;
+  });
+}
+function renderThumbs() {
+  $('#thumbs').innerHTML = state.images.map((m, i) =>
+    `<div class="thumb"><img src="${m.url}" alt="${esc(m.name)}"><b>${i + 1}</b><button type="button" data-rm="${i}" aria-label="${i + 1}번 이미지 빼기">×</button></div>`).join('');
+}
+
+/* ---------- 보관함 ---------- */
+function getLib() { return store.get(STORE_KEY, []); }
+function setLib(v) { store.set(STORE_KEY, v); renderLib(); }
+function renderLib() {
+  const lib = getLib();
+  $('#lib-count').textContent = lib.length ? `(${lib.length})` : '';
+  if (!lib.length) {
+    $('#lib').innerHTML = '<li class="empty" style="display:block">저장한 상품이 없어요. 왼쪽 아래 ‘보관함에 저장’을 누르면 상품과 대본 설정이 여기에 쌓이고, 제작 상태를 관리할 수 있어요.</li>';
+    return;
+  }
+  $('#lib').innerHTML = lib.map((it) => `
+    <li data-id="${it.id}">
+      <div><div class="name">${esc(it.data.short || it.data.name || '이름 없음')}</div>
+      <div class="meta">${esc(it.savedAt)} · ${esc(it.data.price ? won(num(it.data.price)) : '가격 미입력')}</div></div>
+      <div class="act">
+        <select data-status aria-label="제작 상태">${STATUSES.map((s) => `<option${s === it.status ? ' selected' : ''}>${s}</option>`).join('')}</select>
+        <button type="button" class="small" data-load>불러오기</button>
+        <button type="button" class="small" data-del>삭제</button>
+      </div>
+    </li>`).join('');
+}
+
+/* ---------- 공통 ---------- */
+let toastTimer;
+function toast(msg) {
+  const el = $('#toast'); el.textContent = msg; el.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { el.hidden = true; }, 2200);
+}
+function copy(text, el) {
+  const done = () => toast('복사했어요');
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(text).then(done, () => fallback());
+  } else fallback();
+  function fallback() {
+    if (el) { const r = document.createRange(); r.selectNodeContents(el); const s = getSelection(); s.removeAllRanges(); s.addRange(r); toast('선택했어요. Ctrl+C로 복사하세요'); }
+    else toast('복사하지 못했어요');
+  }
+}
+// claude.ai 아티팩트 안에서는 downloads 기능으로, 일반 브라우저에서는 링크로 내려받기
+const dlReady = window.claude && window.claude.use ? window.claude.use('downloads').catch(() => null) : Promise.resolve(undefined);
+async function download(name, blob, artifactName) {
+  const ns = await dlReady;
+  if (ns) {
+    try { await ns.save({ filename: artifactName || name, data: blob }); toast(artifactName ? `저장했어요. 확장자를 .srt로 바꿔 쓰세요` : '저장했어요'); }
+    catch (e) { if (!e || e.code !== 'declined') toast('여기서는 내려받을 수 없어요. 저장소의 index.html을 브라우저로 열어 쓰세요'); }
+    return;
+  }
+  if (ns === null) { toast('여기서는 내려받을 수 없어요. 저장소의 index.html을 브라우저로 열어 쓰세요'); return; }
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob); a.download = name;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+}
+const fileBase = () => (state.c.short || 'shorts').replace(/[^0-9A-Za-z가-힣]+/g, '_');
+function setExample(on) { state.isExample = on; $('#example-pill').hidden = !on; }
+function syncUsed() {
+  const used = $('#p-used').checked;
+  const opt = $('#s-style').querySelector('option[value="review"]');
+  opt.disabled = !used;
+  if (!used && $('#s-style').value === 'review') $('#s-style').value = 'problem';
+  $('#used-warn').hidden = used;
+}
+
+/* ---------- 이벤트 ---------- */
+let genTimer;
+$('#form').addEventListener('input', () => {
+  setExample(false); syncUsed();
+  clearTimeout(genTimer); genTimer = setTimeout(() => regenerate(true), 200);
+});
+$('#form').addEventListener('submit', (e) => e.preventDefault());
+$('#btn-example').addEventListener('click', () => { writeForm(EXAMPLE); setExample(true); syncUsed(); regenerate(false); toast('예시 상품을 불러왔어요'); });
+$('#btn-clear').addEventListener('click', () => {
+  writeForm({ style: 'problem', len: '30', cta: 'tag', adTitle: true }); setExample(false); syncUsed(); regenerate(false); $('#p-name').focus();
+});
+$('#btn-save').addEventListener('click', () => {
+  const d = readForm();
+  if (!d.name && !d.short) { toast('상품명을 먼저 입력하세요'); $('#p-name').focus(); return; }
+  const lib = getLib();
+  const key = d.link || d.name;
+  const existing = lib.find((it) => (it.data.link || it.data.name) === key);
+  const stamp = new Date().toLocaleString('ko-KR', { dateStyle: 'short', timeStyle: 'short' });
+  if (existing) { existing.data = d; existing.savedAt = stamp; }
+  else lib.unshift({ id: Date.now().toString(36), data: d, status: STATUSES[1], savedAt: stamp });
+  setLib(lib); toast(existing ? '보관함의 상품을 업데이트했어요' : '보관함에 저장했어요');
+});
+
+document.querySelectorAll('[role="tab"]').forEach((tab) => tab.addEventListener('click', () => {
+  document.querySelectorAll('[role="tab"]').forEach((t) => {
+    const on = t === tab; t.setAttribute('aria-selected', on);
+    $('#' + t.getAttribute('aria-controls')).hidden = !on;
+  });
+  if (tab.id === 'tab-video') drawAt(currentPreviewTime());
+  try { sessionStorage.setItem('shopping-studio:tab', tab.id); } catch { /* */ }
+}));
+
+$('#hooks').addEventListener('click', (e) => {
+  const b = e.target.closest('.hook'); if (!b) return;
+  state.hookIdx = +b.dataset.i;
+  state.scenes = buildScenes(state.c, state.hooks[state.hookIdx]);
+  refreshAll(true);
+});
+$('#scenes').addEventListener('input', (e) => {
+  const span = e.target.closest('[data-k]'); if (!span) return;
+  const s = state.scenes[+span.closest('tr').dataset.i];
+  s[span.dataset.k] = span.textContent.trim();
+  if (span.dataset.k === 'nar') timeScenes(state.scenes);
+  refreshAll(false);
+});
+
+document.addEventListener('click', (e) => {
+  const c = e.target.closest('[data-copy]');
+  if (c) { const el = $('#' + c.dataset.copy); copy(el.textContent, el); return; }
+  const t = e.target.closest('[data-copy-text]');
+  if (t) copy(t.dataset.copyText, t.parentElement.previousElementSibling);
+});
+$('#btn-copy-script').addEventListener('click', () => copy(scriptText()));
+$('#btn-copy-srt').addEventListener('click', () => copy(srtText()));
+$('#btn-dl-srt').addEventListener('click', () => download(fileBase() + '.srt', new Blob([srtText()], { type: 'text/plain;charset=utf-8' }), fileBase() + '_srt.txt'));
+$('#btn-tts').addEventListener('click', () => {
+  if (!('speechSynthesis' in window)) { toast('이 브라우저는 음성 읽기를 지원하지 않아요'); return; }
+  if (speechSynthesis.speaking) { speechSynthesis.cancel(); $('#btn-tts').textContent = '내레이션 듣기'; return; }
+  const voice = speechSynthesis.getVoices().find((v) => v.lang && v.lang.toLowerCase().startsWith('ko'));
+  state.scenes.forEach((s, i) => {
+    const u = new SpeechSynthesisUtterance(s.nar);
+    u.lang = 'ko-KR'; u.rate = 1.1; if (voice) u.voice = voice;
+    if (i === state.scenes.length - 1) u.onend = () => { $('#btn-tts').textContent = '내레이션 듣기'; };
+    speechSynthesis.speak(u);
+  });
+  $('#btn-tts').textContent = '그만 듣기';
+});
+
+$('#img-input').addEventListener('change', (e) => { addImages(e.target.files); e.target.value = ''; });
+const drop = $('#drop');
+drop.addEventListener('dragover', (e) => { e.preventDefault(); drop.classList.add('over'); });
+drop.addEventListener('dragleave', () => drop.classList.remove('over'));
+drop.addEventListener('drop', (e) => { e.preventDefault(); drop.classList.remove('over'); addImages(e.dataTransfer.files); });
+$('#thumbs').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-rm]'); if (!b) return;
+  const [m] = state.images.splice(+b.dataset.rm, 1); URL.revokeObjectURL(m.url);
+  renderThumbs(); drawAt(currentPreviewTime());
+});
+$('#audio-input').addEventListener('change', (e) => {
+  const f = e.target.files[0]; if (!f) return;
+  let a = $('#audio-el');
+  if (!a) { a = document.createElement('audio'); a.id = 'audio-el'; a.hidden = true; document.body.appendChild(a); }
+  if (a.src) URL.revokeObjectURL(a.src);
+  a.src = URL.createObjectURL(f);
+  a.onloadedmetadata = () => {
+    const diff = a.duration - state.total;
+    $('#audio-name').textContent = `${f.name} · ${a.duration.toFixed(1)}초` +
+      (Math.abs(diff) > 1.5 ? ` (대본보다 ${Math.abs(diff).toFixed(1)}초 ${diff > 0 ? '길어요, 뒷부분이 잘려요' : '짧아요'})` : '');
+  };
+});
+$('#scrub').addEventListener('input', (e) => { stop(); previewT = (+e.target.value / 1000) * state.total; drawAt(currentPreviewTime()); });
+$('#safe-zone').addEventListener('change', () => drawAt(currentPreviewTime()));
+$('#btn-play').addEventListener('click', () => { if (playing) stop(); else play(); });
+$('#btn-record').addEventListener('click', record);
+$('#btn-dl-video').addEventListener('click', () => { if (recBlob) download(`${fileBase()}.${recExt}`, recBlob); });
+
+$('#lib').addEventListener('click', (e) => {
+  const li = e.target.closest('li[data-id]'); if (!li) return;
+  const lib = getLib(); const it = lib.find((x) => x.id === li.dataset.id); if (!it) return;
+  if (e.target.closest('[data-load]')) {
+    writeForm(it.data); setExample(false); syncUsed(); regenerate(false);
+    $('#tab-script').click(); toast('불러왔어요');
+  }
+  const del = e.target.closest('[data-del]');
+  if (del) {
+    if (del.dataset.armed) { setLib(lib.filter((x) => x.id !== it.id)); toast('삭제했어요'); }
+    else { del.dataset.armed = '1'; del.textContent = '한 번 더 누르면 삭제'; setTimeout(() => { if (del.isConnected) { delete del.dataset.armed; del.textContent = '삭제'; } }, 3000); }
+  }
+});
+$('#lib').addEventListener('change', (e) => {
+  const sel = e.target.closest('[data-status]'); if (!sel) return;
+  const lib = getLib(); const it = lib.find((x) => x.id === sel.closest('li').dataset.id);
+  if (it) { it.status = sel.value; setLib(lib); }
+});
+$('#btn-export').addEventListener('click', () => copy(JSON.stringify(getLib(), null, 2)));
+
+/* ---------- 시작 ---------- */
+const draft = store.get(DRAFT_KEY, null);
+if (draft && (draft.name || draft.short)) { writeForm(draft); setExample(false); }
+else { writeForm(EXAMPLE); setExample(true); }
+syncUsed();
+regenerate(false);
+renderLib();
+try { const last = sessionStorage.getItem('shopping-studio:tab'); if (last && $('#' + last)) $('#' + last).click(); } catch { /* */ }
+})();
+</script>
+</body>
+</html>
