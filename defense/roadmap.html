@@ -2,41 +2,45 @@
 <meta name="claude:viewport-fit-sides" content="cover">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;600&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Gowun+Dodum&family=Jua&display=swap">
 <style>
-  /* Layout: a voyage chart. Planets are milestones on one dashed route, each with its log card beside it. */
+  /* Layout: a voyage chart. Planets are milestones on one dashed route, each with its log card beside it.
+     Cream theme and rounded type, matching the game and the Astro Friends sheet. */
   :root {
-    --space: #1f130c;
-    --space-2: #2e1d14;
-    --card: #3b2519;
-    --card-2: #4a2f22;
-    --ink: #120a06;
-    --cream: #fff3d6;
-    --muted: #d9bc94;
-    --dim: #a98e6e;
-    --gold: #ffc93c;
+    --bg: #fbf3e0;
+    --bg-2: #f3e3c3;
+    --card: #fffaf0;
+    --card-2: #f7ead2;
+    --ink: #3a1f10;
+    --fg: #3a1f10;
+    --fg-2: #7a5a40;
+    --fg-3: #a3866a;
+    --sun: #ffc93c;
+    --orange: #f58a2a;
+    --deep: #c8650c;
     --peri: #8fa0ef;
     --mint: #7ee081;
     --pink: #ff8fb1;
     --lav: #c39bff;
-    --font-display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
-    color-scheme: dark;
+    --lav-ink: #6f52bf;
+    --font-display: "Jua", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --font-body: "Gowun Dodum", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    color-scheme: light;
   }
   * { box-sizing: border-box; }
   body {
     margin: 0;
-    background-color: var(--space);
+    background-color: var(--bg);
     background-image:
-      radial-gradient(1.5px 1.5px at 12% 18%, var(--cream) 50%, transparent 51%),
-      radial-gradient(1px 1px at 72% 9%, var(--muted) 50%, transparent 51%),
-      radial-gradient(1.5px 1.5px at 88% 41%, var(--cream) 50%, transparent 51%),
-      radial-gradient(1px 1px at 33% 63%, var(--muted) 50%, transparent 51%),
-      radial-gradient(1px 1px at 55% 82%, var(--cream) 50%, transparent 51%),
-      radial-gradient(1.5px 1.5px at 8% 91%, var(--muted) 50%, transparent 51%),
-      radial-gradient(120% 60% at 70% 0%, var(--space-2), transparent 70%);
+      radial-gradient(3px 3px at 12% 18%, #f0c88a 50%, transparent 51%),
+      radial-gradient(2px 2px at 72% 9%, #c9b6ef 50%, transparent 51%),
+      radial-gradient(3px 3px at 88% 41%, #f5b971 50%, transparent 51%),
+      radial-gradient(2px 2px at 33% 63%, #c9b6ef 50%, transparent 51%),
+      radial-gradient(2px 2px at 55% 82%, #f0c88a 50%, transparent 51%),
+      radial-gradient(3px 3px at 8% 91%, #f5b971 50%, transparent 51%),
+      radial-gradient(120% 60% at 70% 0%, var(--card), transparent 70%);
     background-size: 420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px, 100% 100%;
-    color: var(--cream);
+    color: var(--fg);
     font-family: var(--font-body);
     font-size: 15px;
     line-height: 1.6;
@@ -55,36 +59,37 @@
 
   /* Header */
   .hero { display: grid; gap: 18px; }
-  .eyebrow { font-size: 13px; letter-spacing: 0.08em; color: var(--muted); }
+  .eyebrow { font-size: 13px; letter-spacing: 0.08em; color: var(--fg-2); }
   .hero h1 {
     font-size: clamp(44px, 9vw, 88px);
     line-height: 0.95;
-    color: var(--gold);
-    -webkit-text-stroke: 2px var(--ink);
+    color: var(--sun);
+    -webkit-text-stroke: 3px var(--ink);
+    paint-order: stroke fill;
     text-shadow: 0 6px 0 var(--ink);
     letter-spacing: 0.01em;
   }
-  .ko-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 16px; color: var(--muted); }
+  .ko-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 16px; color: var(--fg-2); }
   .chip {
     display: inline-flex; align-items: center; gap: 6px;
-    border: 2px dashed var(--dim); border-radius: 999px;
-    padding: 2px 12px; color: var(--cream); font-weight: 600; font-size: 14px;
+    border: 2px dashed var(--fg-3); border-radius: 999px;
+    padding: 2px 12px; color: var(--fg); font-weight: 600; font-size: 14px;
   }
-  .pitch { font-size: 18px; max-width: 40em; color: var(--cream); }
+  .pitch { font-size: 18px; max-width: 40em; color: var(--fg); }
   .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
   .fact { background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 12px 14px; min-width: 0; }
-  .fact dt { font-size: 12px; letter-spacing: 0.06em; color: var(--dim); }
+  .fact dt { font-size: 12px; letter-spacing: 0.06em; color: var(--fg-3); }
   .fact dd { margin: 2px 0 0; font-weight: 600; }
 
   .section-head { display: grid; gap: 6px; margin-bottom: 20px; }
-  .section-head h2 { font-size: 30px; color: var(--cream); }
-  .section-head p { color: var(--muted); max-width: 40em; }
+  .section-head h2 { font-size: 30px; color: var(--fg); }
+  .section-head p { color: var(--fg-2); max-width: 40em; }
 
   /* Map */
   .map { position: relative; display: grid; gap: 40px; }
   .route { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
-  .route path { fill: none; stroke: var(--muted); stroke-width: 3; stroke-dasharray: 2 12; stroke-linecap: round; opacity: 0.7; }
-  .route path.done { stroke: var(--gold); opacity: 1; }
+  .route path { fill: none; stroke: var(--fg-3); stroke-width: 4; stroke-dasharray: 2 12; stroke-linecap: round; opacity: 0.8; }
+  .route path.done { stroke: var(--orange); opacity: 1; }
   .stop { position: relative; display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 24px; align-items: center; }
   .stop:nth-child(odd of .stop) { grid-template-columns: minmax(0, 1fr) 150px; }
   .stop:nth-child(odd of .stop) .planet-cell { order: 2; }
@@ -97,7 +102,7 @@
       radial-gradient(circle at 70% 72%, rgb(0 0 0 / 0.28) 0 38%, transparent 39%),
       var(--c);
     border: 4px solid var(--ink);
-    box-shadow: 0 8px 0 rgb(0 0 0 / 0.35);
+    box-shadow: 0 8px 0 rgb(58 31 16 / 0.18);
   }
   .planet::after {
     content: ""; position: absolute; left: -26px; right: -26px; top: 44%; height: 22px;
@@ -106,7 +111,7 @@
     background: transparent;
   }
   .planet.no-ring::after { display: none; }
-  .planet-name { font-family: var(--font-display); font-size: 15px; color: var(--muted); text-align: center; }
+  .planet-name { font-family: var(--font-display); font-size: 15px; color: var(--fg-2); text-align: center; }
   .rocket {
     position: absolute; top: -34px; right: -30px; width: 54px; height: 54px;
     animation: bob 2.4s ease-in-out infinite;
@@ -117,50 +122,50 @@
   .log {
     background: var(--card); border: 3px solid var(--ink); border-radius: 18px;
     padding: 18px 20px; display: grid; gap: 12px; min-width: 0;
-    box-shadow: 0 6px 0 rgb(0 0 0 / 0.3);
+    box-shadow: 0 6px 0 rgb(58 31 16 / 0.15);
   }
   .log-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
   .log-head h3 { font-size: 24px; }
-  .log > p { color: var(--muted); }
+  .log > p { color: var(--fg-2); }
   .status { font-size: 13px; font-weight: 600; border-radius: 999px; padding: 2px 10px; border: 2px solid var(--ink); color: var(--ink); }
   .s-done { background: var(--mint); }
-  .s-next { background: var(--gold); }
+  .s-next { background: var(--sun); }
   .s-wait { background: var(--peri); }
-  .s-open { background: var(--dim); }
+  .s-open { background: var(--bg-2); }
   .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
   .checks li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; }
-  .box { width: 18px; height: 18px; margin-top: 3px; border: 2px solid var(--muted); border-radius: 5px; }
+  .box { width: 18px; height: 18px; margin-top: 3px; border: 2px solid var(--fg-3); border-radius: 5px; background: var(--card); }
   .checks li.ok .box { background: var(--mint); border-color: var(--ink); position: relative; }
   .checks li.ok .box::after {
     content: ""; position: absolute; left: 4px; top: 0; width: 5px; height: 10px;
     border: solid var(--ink); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
   }
-  .checks li.decide .box { border-style: dashed; border-color: var(--gold); }
-  .tag { font-size: 12px; color: var(--gold); font-weight: 600; margin-left: 4px; }
+  .checks li.decide .box { border-style: dashed; border-color: var(--orange); }
+  .tag { font-size: 12px; color: var(--deep); font-weight: 600; margin-left: 4px; }
 
   /* Spec */
   .spec { display: grid; gap: 16px; }
   .table-scroll { overflow-x: auto; border: 3px solid var(--ink); border-radius: 16px; background: var(--card); }
   table { border-collapse: collapse; width: 100%; min-width: 620px; }
   th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--card-2); vertical-align: top; }
-  th { font-size: 12px; letter-spacing: 0.06em; color: var(--dim); font-weight: 600; background: var(--space-2); }
+  th { font-size: 12px; letter-spacing: 0.06em; color: var(--fg-3); font-weight: 600; background: var(--bg-2); }
   tr:last-child td { border-bottom: 0; }
   td.unit { font-weight: 600; white-space: nowrap; }
-  td.skill { font-family: var(--font-display); color: var(--gold); white-space: nowrap; }
+  td.skill { font-family: var(--font-display); color: var(--deep); white-space: nowrap; }
   .oc { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
   .oc-card { background: var(--card-2); border: 3px solid var(--ink); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
-  .oc-card h3 { font-size: 19px; color: var(--lav); }
+  .oc-card h3 { font-size: 19px; color: var(--lav-ink); }
   .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
-  .rule { border-left: 4px solid var(--peri); padding: 4px 0 4px 12px; color: var(--cream); min-width: 0; }
-  .rule b { display: block; font-size: 12px; letter-spacing: 0.06em; color: var(--dim); font-weight: 600; }
+  .rule { border-left: 4px solid var(--orange); padding: 4px 0 4px 12px; color: var(--fg); min-width: 0; }
+  .rule b { display: block; font-size: 12px; letter-spacing: 0.06em; color: var(--fg-3); font-weight: 600; }
 
   /* Open decisions */
   .decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
-  .decision { background: var(--card); border: 2px dashed var(--gold); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
+  .decision { background: var(--card); border: 2.5px dashed var(--orange); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
   .decision h3 { font-size: 18px; }
-  .decision p { color: var(--muted); font-size: 14px; }
+  .decision p { color: var(--fg-2); font-size: 14px; }
 
-  footer { color: var(--dim); font-size: 13px; }
+  footer { color: var(--fg-3); font-size: 13px; }
 
   @media (max-width: 640px) {
     .stop, .stop:nth-child(odd of .stop) { grid-template-columns: 84px minmax(0, 1fr); gap: 14px; align-items: start; }
@@ -199,7 +204,7 @@
 
       <article class="stop">
         <div class="planet-cell">
-          <div class="planet" style="--c: var(--gold)"></div>
+          <div class="planet" style="--c: var(--sun)"></div>
           <span class="planet-name">1 · 프로토타입</span>
         </div>
         <div class="log">
@@ -238,10 +243,10 @@
         <div class="planet-cell">
           <div class="planet" style="--c: var(--peri)">
             <svg class="rocket" viewBox="0 0 54 54" aria-label="현재 목적지">
-              <g transform="rotate(35 27 27)" stroke="#120a06" stroke-width="3" stroke-linejoin="round">
-                <path d="M27 4 C36 12 38 26 34 38 H20 C16 26 18 12 27 4 Z" fill="#fff3d6"/>
+              <g transform="rotate(35 27 27)" stroke="#3a1f10" stroke-width="3" stroke-linejoin="round">
+                <path d="M27 4 C36 12 38 26 34 38 H20 C16 26 18 12 27 4 Z" fill="#ffffff"/>
                 <circle cx="27" cy="20" r="5" fill="#8fa0ef"/>
-                <path d="M20 30 L12 40 L20 38 Z M34 30 L42 40 L34 38 Z" fill="#ff8fb1"/>
+                <path d="M20 30 L12 40 L20 38 Z M34 30 L42 40 L34 38 Z" fill="#f58a2a"/>
                 <path d="M22 38 Q27 50 32 38 Z" fill="#ffc93c"/>
               </g>
             </svg>
