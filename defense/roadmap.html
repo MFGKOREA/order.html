@@ -1,0 +1,377 @@
+<title>아스트로 어드벤처 로드맵</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;600&display=swap">
+<style>
+  /* Layout: a voyage chart. Planets are milestones on one dashed route, each with its log card beside it. */
+  :root {
+    --space: #1f130c;
+    --space-2: #2e1d14;
+    --card: #3b2519;
+    --card-2: #4a2f22;
+    --ink: #120a06;
+    --cream: #fff3d6;
+    --muted: #d9bc94;
+    --dim: #a98e6e;
+    --gold: #ffc93c;
+    --peri: #8fa0ef;
+    --mint: #7ee081;
+    --pink: #ff8fb1;
+    --lav: #c39bff;
+    --font-display: "Black Han Sans", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    --font-body: "IBM Plex Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background-color: var(--space);
+    background-image:
+      radial-gradient(1.5px 1.5px at 12% 18%, var(--cream) 50%, transparent 51%),
+      radial-gradient(1px 1px at 72% 9%, var(--muted) 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 88% 41%, var(--cream) 50%, transparent 51%),
+      radial-gradient(1px 1px at 33% 63%, var(--muted) 50%, transparent 51%),
+      radial-gradient(1px 1px at 55% 82%, var(--cream) 50%, transparent 51%),
+      radial-gradient(1.5px 1.5px at 8% 91%, var(--muted) 50%, transparent 51%),
+      radial-gradient(120% 60% at 70% 0%, var(--space-2), transparent 70%);
+    background-size: 420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px, 420px 420px, 100% 100%;
+    color: var(--cream);
+    font-family: var(--font-body);
+    font-size: 15px;
+    line-height: 1.6;
+  }
+  .wrap {
+    max-width: 960px;
+    margin: 0 auto;
+    padding-block: 40px 64px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    display: grid;
+    gap: 56px;
+  }
+  h1, h2, h3 { font-family: var(--font-display); font-weight: 400; text-wrap: balance; margin: 0; }
+  p { margin: 0; }
+
+  /* Header */
+  .hero { display: grid; gap: 18px; }
+  .eyebrow { font-size: 13px; letter-spacing: 0.08em; color: var(--muted); }
+  .hero h1 {
+    font-size: clamp(44px, 9vw, 88px);
+    line-height: 0.95;
+    color: var(--gold);
+    -webkit-text-stroke: 2px var(--ink);
+    text-shadow: 0 6px 0 var(--ink);
+    letter-spacing: 0.01em;
+  }
+  .ko-title { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; font-size: 16px; color: var(--muted); }
+  .chip {
+    display: inline-flex; align-items: center; gap: 6px;
+    border: 2px dashed var(--dim); border-radius: 999px;
+    padding: 2px 12px; color: var(--cream); font-weight: 600; font-size: 14px;
+  }
+  .pitch { font-size: 18px; max-width: 40em; color: var(--cream); }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .fact { background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 12px 14px; min-width: 0; }
+  .fact dt { font-size: 12px; letter-spacing: 0.06em; color: var(--dim); }
+  .fact dd { margin: 2px 0 0; font-weight: 600; }
+
+  .section-head { display: grid; gap: 6px; margin-bottom: 20px; }
+  .section-head h2 { font-size: 30px; color: var(--cream); }
+  .section-head p { color: var(--muted); max-width: 40em; }
+
+  /* Map */
+  .map { position: relative; display: grid; gap: 40px; }
+  .route { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+  .route path { fill: none; stroke: var(--muted); stroke-width: 3; stroke-dasharray: 2 12; stroke-linecap: round; opacity: 0.7; }
+  .route path.done { stroke: var(--gold); opacity: 1; }
+  .stop { position: relative; display: grid; grid-template-columns: 150px minmax(0, 1fr); gap: 24px; align-items: center; }
+  .stop:nth-child(odd of .stop) { grid-template-columns: minmax(0, 1fr) 150px; }
+  .stop:nth-child(odd of .stop) .planet-cell { order: 2; }
+  .planet-cell { display: grid; justify-items: center; gap: 8px; }
+  .planet {
+    --c: var(--peri);
+    position: relative; width: 112px; height: 112px; border-radius: 50%;
+    background:
+      radial-gradient(circle at 34% 30%, rgb(255 255 255 / 0.55) 0 9%, transparent 10%),
+      radial-gradient(circle at 70% 72%, rgb(0 0 0 / 0.28) 0 38%, transparent 39%),
+      var(--c);
+    border: 4px solid var(--ink);
+    box-shadow: 0 8px 0 rgb(0 0 0 / 0.35);
+  }
+  .planet::after {
+    content: ""; position: absolute; left: -26px; right: -26px; top: 44%; height: 22px;
+    border: 4px solid var(--ink); border-radius: 50%;
+    border-top-color: transparent; transform: rotate(-14deg);
+    background: transparent;
+  }
+  .planet.no-ring::after { display: none; }
+  .planet-name { font-family: var(--font-display); font-size: 15px; color: var(--muted); text-align: center; }
+  .rocket {
+    position: absolute; top: -34px; right: -30px; width: 54px; height: 54px;
+    animation: bob 2.4s ease-in-out infinite;
+  }
+  @keyframes bob { 50% { transform: translateY(-6px) rotate(4deg); } }
+  @media (prefers-reduced-motion: reduce) { .rocket { animation: none; } }
+
+  .log {
+    background: var(--card); border: 3px solid var(--ink); border-radius: 18px;
+    padding: 18px 20px; display: grid; gap: 12px; min-width: 0;
+    box-shadow: 0 6px 0 rgb(0 0 0 / 0.3);
+  }
+  .log-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+  .log-head h3 { font-size: 24px; }
+  .log > p { color: var(--muted); }
+  .status { font-size: 13px; font-weight: 600; border-radius: 999px; padding: 2px 10px; border: 2px solid var(--ink); color: var(--ink); }
+  .s-done { background: var(--mint); }
+  .s-next { background: var(--gold); }
+  .s-wait { background: var(--peri); }
+  .s-open { background: var(--dim); }
+  .checks { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+  .checks li { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 8px; align-items: start; }
+  .box { width: 18px; height: 18px; margin-top: 3px; border: 2px solid var(--muted); border-radius: 5px; }
+  .checks li.ok .box { background: var(--mint); border-color: var(--ink); position: relative; }
+  .checks li.ok .box::after {
+    content: ""; position: absolute; left: 4px; top: 0; width: 5px; height: 10px;
+    border: solid var(--ink); border-width: 0 2.5px 2.5px 0; transform: rotate(45deg);
+  }
+  .checks li.decide .box { border-style: dashed; border-color: var(--gold); }
+  .tag { font-size: 12px; color: var(--gold); font-weight: 600; margin-left: 4px; }
+
+  /* Spec */
+  .spec { display: grid; gap: 16px; }
+  .table-scroll { overflow-x: auto; border: 3px solid var(--ink); border-radius: 16px; background: var(--card); }
+  table { border-collapse: collapse; width: 100%; min-width: 620px; }
+  th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--card-2); vertical-align: top; }
+  th { font-size: 12px; letter-spacing: 0.06em; color: var(--dim); font-weight: 600; background: var(--space-2); }
+  tr:last-child td { border-bottom: 0; }
+  td.unit { font-weight: 600; white-space: nowrap; }
+  td.skill { font-family: var(--font-display); color: var(--gold); white-space: nowrap; }
+  .oc { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .oc-card { background: var(--card-2); border: 3px solid var(--ink); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
+  .oc-card h3 { font-size: 19px; color: var(--lav); }
+  .rules { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+  .rule { border-left: 4px solid var(--peri); padding: 4px 0 4px 12px; color: var(--cream); min-width: 0; }
+  .rule b { display: block; font-size: 12px; letter-spacing: 0.06em; color: var(--dim); font-weight: 600; }
+
+  /* Open decisions */
+  .decisions { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+  .decision { background: var(--card); border: 2px dashed var(--gold); border-radius: 14px; padding: 14px 16px; display: grid; gap: 4px; min-width: 0; }
+  .decision h3 { font-size: 18px; }
+  .decision p { color: var(--muted); font-size: 14px; }
+
+  footer { color: var(--dim); font-size: 13px; }
+
+  @media (max-width: 640px) {
+    .stop, .stop:nth-child(odd of .stop) { grid-template-columns: 84px minmax(0, 1fr); gap: 14px; align-items: start; }
+    .stop:nth-child(odd of .stop) .planet-cell { order: 0; }
+    .planet { width: 68px; height: 68px; border-width: 3px; }
+    .planet::after { left: -16px; right: -16px; height: 14px; border-width: 3px; }
+    .planet-name { font-size: 12px; }
+    .rocket { width: 40px; height: 40px; top: -26px; right: -22px; }
+    .log { padding: 14px 16px; }
+    .log-head h3 { font-size: 20px; }
+  }
+</style>
+
+<div class="wrap">
+  <header class="hero">
+    <span class="eyebrow">프로젝트 계획서 · 2026년 10월 기준</span>
+    <h1>ASTRO<br>ADVENTURE</h1>
+    <div class="ko-title">한글 제목 <span class="chip">미정</span></div>
+    <p class="pitch">우주 고양이 용병단이 오른쪽에서 몰려오는 외계 벌레를 막아내는 머지 웨이브 디펜스. 코인으로 유닛을 뽑고, 같은 유닛끼리 합성하고, 30라운드를 버텨 최종 보스를 잡으면 승리해요.</p>
+    <dl class="facts">
+      <div class="fact"><dt>장르</dt><dd>머지 + 웨이브 디펜스 (가로 레인)</dd></div>
+      <div class="fact"><dt>지금 형태</dt><dd>웹 프로토타입 (HTML 파일 1개)</dd></div>
+      <div class="fact"><dt>현재 위치</dt><dd>1번 행성 완료, 2번 행성 출발 전</dd></div>
+      <div class="fact"><dt>그림체</dt><dd>굵은 갈색 외곽선 + 셀 셰이딩</dd></div>
+    </dl>
+  </header>
+
+  <section>
+    <div class="section-head">
+      <h2>항로 지도</h2>
+      <p>행성 하나가 개발 단계 하나예요. 위에서 아래로 진행하고, 로켓이 있는 곳이 다음 목적지예요.</p>
+    </div>
+    <div class="map" id="map">
+      <svg class="route" id="route" aria-hidden="true"></svg>
+
+      <article class="stop">
+        <div class="planet-cell">
+          <div class="planet" style="--c: var(--gold)"></div>
+          <span class="planet-name">1 · 프로토타입</span>
+        </div>
+        <div class="log">
+          <div class="log-head"><h3>기본 게임 완성</h3><span class="status s-done">완료</span></div>
+          <p>지금 플레이할 수 있는 버전이에요. 수치는 봇으로 8판씩 돌려 맞췄어요.</p>
+          <ul class="checks">
+            <li class="ok"><span class="box"></span><span>30라운드, 라운드당 30초, 10·20라운드 중간 보스와 30라운드 최종 보스</span></li>
+            <li class="ok"><span class="box"></span><span>코인 뽑기 4등급 (일반 72% · 희귀 22% · 영웅 5.5% · 전설 0.5%), 합성, 판매</span></li>
+            <li class="ok"><span class="box"></span><span>유닛 6종: 소총·저격·화염·포격·냉기·전기냥</span></li>
+            <li class="ok"><span class="box"></span><span>레벨 업 카드 17종, 추천 카드 표시, 리롤 3회</span></li>
+            <li class="ok"><span class="box"></span><span>영구 업그레이드 6종 (골드로 구매, 브라우저에 저장)</span></li>
+            <li class="ok"><span class="box"></span><span>전설 등장 연출, 최종 보스 경고 배너, 데미지 숫자</span></li>
+            <li class="ok"><span class="box"></span><span>영어·한국어 전환</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stop">
+        <div class="planet-cell">
+          <div class="planet" style="--c: var(--peri)">
+            <svg class="rocket" viewBox="0 0 54 54" aria-label="현재 목적지">
+              <g transform="rotate(35 27 27)" stroke="#120a06" stroke-width="3" stroke-linejoin="round">
+                <path d="M27 4 C36 12 38 26 34 38 H20 C16 26 18 12 27 4 Z" fill="#fff3d6"/>
+                <circle cx="27" cy="20" r="5" fill="#8fa0ef"/>
+                <path d="M20 30 L12 40 L20 38 Z M34 30 L42 40 L34 38 Z" fill="#ff8fb1"/>
+                <path d="M22 38 Q27 50 32 38 Z" fill="#ffc93c"/>
+              </g>
+            </svg>
+          </div>
+          <span class="planet-name">2 · 기술 성운</span>
+        </div>
+        <div class="log">
+          <div class="log-head"><h3>고유기술과 오버클럭</h3><span class="status s-next">다음 목적지</span></div>
+          <p>질문으로 사양을 모두 정했어요. 아래 "확정 사양"을 기준으로 만들어요.</p>
+          <ul class="checks">
+            <li><span class="box"></span><span>유닛 6종에 고유기술 1개씩, 유닛마다 1.5초에 한 번 자동 발동</span></li>
+            <li><span class="box"></span><span>오버클럭 공통 3종, 한 기술에 서로 다른 3개까지</span></li>
+            <li><span class="box"></span><span>4·8·12레벨: 일반 카드를 고른 뒤 오버클럭 3장 중 1장 추가 선택</span></li>
+            <li><span class="box"></span><span>오버클럭 후보는 필드에 있는 유닛의 기술만</span></li>
+            <li><span class="box"></span><span>일시정지 메뉴에 기술 6종과 오버클럭 상태 목록</span></li>
+            <li><span class="box"></span><span>몬스터 체력 재조정, 봇으로 승률 다시 확인</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stop">
+        <div class="planet-cell">
+          <div class="planet no-ring" style="--c: var(--pink)"></div>
+          <span class="planet-name">3 · 이름표 위성</span>
+        </div>
+        <div class="log">
+          <div class="log-head"><h3>제목과 브랜딩</h3><span class="status s-wait">진행 전</span></div>
+          <p>영어 제목은 정해졌어요. 게임 화면에는 아직 이전 이름(Kitty Defense)이 남아 있어요.</p>
+          <ul class="checks">
+            <li class="ok"><span class="box"></span><span>영어 제목 확정: Astro Adventure</span></li>
+            <li><span class="box"></span><span>게임 타이틀 화면과 페이지 제목을 Astro Adventure로 교체</span></li>
+            <li class="decide"><span class="box"></span><span>한글 제목 정하기<span class="tag">결정 필요</span></span></li>
+            <li><span class="box"></span><span>로고와 앱 아이콘</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stop">
+        <div class="planet-cell">
+          <div class="planet" style="--c: var(--mint)"></div>
+          <span class="planet-name">4 · 화실 행성</span>
+        </div>
+        <div class="log">
+          <div class="log-head"><h3>아트 교체 (힉스필드)</h3><span class="status s-wait">크레딧 대기</span></div>
+          <p>지금 그림은 코드로 그린 도형이에요. 힉스필드 크레딧이 3.1뿐이라 충전이 먼저 필요해요.</p>
+          <ul class="checks">
+            <li class="decide"><span class="box"></span><span>힉스필드 크레딧 충전<span class="tag">결정 필요</span></span></li>
+            <li><span class="box"></span><span>기준 캐릭터 1장 만들고, 그 캐릭터를 참조해 그림체 통일</span></li>
+            <li><span class="box"></span><span>유닛 6종, 외계 벌레 3종, 보스 2종, 배경</span></li>
+            <li><span class="box"></span><span>배경 제거로 투명 이미지 만들어 게임에 넣기</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stop">
+        <div class="planet-cell">
+          <div class="planet no-ring" style="--c: var(--lav)"></div>
+          <span class="planet-name">5 · 출항 기지</span>
+        </div>
+        <div class="log">
+          <div class="log-head"><h3>콘텐츠 보강과 출시 준비</h3><span class="status s-open">미정</span></div>
+          <p>방향이 정해지지 않은 항목들이에요. 앞 단계를 마치면 다시 질문으로 정해요.</p>
+          <ul class="checks">
+            <li class="decide"><span class="box"></span><span>출시 플랫폼 (웹 그대로 / 모바일 앱)<span class="tag">결정 필요</span></span></li>
+            <li class="decide"><span class="box"></span><span>광고·결제를 넣을지, 넣는다면 어떤 방식으로<span class="tag">결정 필요</span></span></li>
+            <li><span class="box"></span><span>배경음악과 효과음 보강</span></li>
+            <li><span class="box"></span><span>보류한 기능 검토: 유닛 대기소, 뽑기 기계 연출</span></li>
+            <li><span class="box"></span><span>스토어 스크린샷과 홍보 영상</span></li>
+          </ul>
+        </div>
+      </article>
+    </div>
+  </section>
+
+  <section class="spec">
+    <div class="section-head">
+      <h2>확정 사양: 고유기술과 오버클럭</h2>
+      <p>2번 행성에서 만들 내용이에요. 위력 수치는 아직 기본안이라 만든 뒤 봇으로 맞춰요.</p>
+    </div>
+    <div class="table-scroll">
+      <table>
+        <thead>
+          <tr><th>유닛</th><th>고유기술</th><th>효과</th><th>위력 기본안</th><th>확장 탄창을 붙이면</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="unit">소총냥</td><td class="skill">3연발 사격</td><td>가장 앞의 적에게 총알 3발을 추가로 쏴요</td><td>공격력 60% × 3발</td><td>5연발</td></tr>
+          <tr><td class="unit">저격냥</td><td class="skill">관통탄</td><td>일직선 경로의 적을 모두 뚫어요</td><td>공격력 150%</td><td>탄이 굵어지고 위력 증가</td></tr>
+          <tr><td class="unit">화염냥</td><td class="skill">화염병 투척</td><td>먼 적 무리에 화염병을 던져 범위 폭발</td><td>기본안 미정</td><td>화염병 2개</td></tr>
+          <tr><td class="unit">포격냥</td><td class="skill">대형 포탄</td><td>크고 느린 포탄으로 넓은 범위에 큰 피해</td><td>공격력 200%</td><td>범위 +40%</td></tr>
+          <tr><td class="unit">냉기냥</td><td class="skill">얼음 가시</td><td>일직선 얼음 가시로 관통 피해와 둔화</td><td>기본안 미정</td><td>가시 2줄</td></tr>
+          <tr><td class="unit">전기냥</td><td class="skill">전기 구체</td><td>천천히 나아가며 닿는 적에게 계속 피해</td><td>기본안 미정</td><td>구체가 커짐</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="oc">
+      <div class="oc-card"><h3>출력 한계 해제</h3><p>기술 위력 +50%</p></div>
+      <div class="oc-card"><h3>연사 모드</h3><p>발동 간격 1.5초 → 1초</p></div>
+      <div class="oc-card"><h3>확장 탄창</h3><p>발사 수나 범위 증가 (기술마다 다름, 위 표 참고)</p></div>
+    </div>
+    <div class="rules">
+      <div class="rule"><b>발동</b>뽑는 순간부터 켜짐, 유닛마다 각자 발동</div>
+      <div class="rule"><b>등장</b>4·8·12레벨, 일반 카드 선택 뒤 추가로 1장</div>
+      <div class="rule"><b>후보</b>필드에 있는 유닛의 기술, 아직 안 붙은 오버클럭만</div>
+      <div class="rule"><b>확인</b>일시정지 메뉴의 기술 목록</div>
+    </div>
+  </section>
+
+  <section>
+    <div class="section-head">
+      <h2>결정이 필요한 것</h2>
+      <p>이 항목들은 정해지는 대로 질문으로 하나씩 확정해요.</p>
+    </div>
+    <div class="decisions">
+      <div class="decision"><h3>한글 제목</h3><p>영어 제목 Astro Adventure에 맞출 이름. 음역(아스트로 어드벤처)으로 갈지, 새 이름을 지을지.</p></div>
+      <div class="decision"><h3>기술 위력 수치</h3><p>화염병, 얼음 가시, 전기 구체의 위력 기본안. 정하지 않으면 제가 잡고 봇으로 확인해요.</p></div>
+      <div class="decision"><h3>힉스필드 크레딧</h3><p>아트 교체에 필요해요. 지금 3.1로는 이미지 1장 정도예요.</p></div>
+      <div class="decision"><h3>출시 플랫폼</h3><p>웹 페이지로 둘지, 모바일 앱으로 감쌀지.</p></div>
+      <div class="decision"><h3>광고·결제</h3><p>레퍼런스 게임의 광고 보상, 유료 팩 같은 요소를 넣을지.</p></div>
+      <div class="decision"><h3>보류 기능</h3><p>유닛 대기소, 뽑기 기계 연출을 다시 넣을지.</p></div>
+    </div>
+  </section>
+
+  <footer>게임 파일: defense/index.html · 브랜치 claude/defense-game-dev-i4ujci</footer>
+</div>
+
+<script>
+(() => {
+  // Draw the dashed route through every planet's center, curving between alternating sides
+  const map = document.getElementById('map');
+  const svg = document.getElementById('route');
+  function draw() {
+    const box = map.getBoundingClientRect();
+    const pts = [...map.querySelectorAll('.planet')].map(p => {
+      const r = p.getBoundingClientRect();
+      return [r.left - box.left + r.width / 2, r.top - box.top + r.height / 2];
+    });
+    svg.setAttribute('viewBox', `0 0 ${box.width} ${box.height}`);
+    let html = '';
+    for (let i = 1; i < pts.length; i++) {
+      const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
+      const my = (y0 + y1) / 2;
+      const d = `M${x0} ${y0} C${x0} ${my}, ${x1} ${my}, ${x1} ${y1}`;
+      html += `<path class="${i === 1 ? 'done' : ''}" d="${d}"/>`;
+    }
+    svg.innerHTML = html;
+  }
+  draw();
+  window.addEventListener('resize', draw);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+})();
+</script>
