@@ -1,11 +1,11 @@
-# Kitty Defense
+# Astro Adventure
 
 [한국어](README.ko.md)
 
 A portrait wave-defense game prototype that runs straight in the browser. Everything lives in a single `index.html`.
 
 ## Rules
-- Your side is on the left (18 slots for cat mercenaries). Alien bugs charge in from the right.
+- Your side is on the left (18 slots for the Astro Friends). Alien bugs charge in from the right.
 - **Summon**: spend coins to get a random unit from 6 types. Each summon costs 2 more than the last.
   - Grade odds: Common 72% · Rare 22% · Epic 5.5% · Legendary 0.5%
 - **Merge**: drag a unit onto another of the same type and grade to make the next grade.
@@ -18,14 +18,18 @@ A portrait wave-defense game prototype that runs straight in the browser. Everyt
 - **Upgrades**: each run pays out gold (more for later rounds and a win). Spend it on permanent upgrades from the title or results screen: Attack, Wall HP, Armor, Starting Coins, Lucky Summons, Fast Learner. Progress is saved in this browser.
 
 ## Units
-| Unit | Role |
-|---|---|
-| Rifle Cat | Rapid fire at the closest enemy |
-| Sniper Cat | Full-map range, targets the enemy with the most HP |
-| Flame Cat | Short-range area damage (place near the wall) |
-| Mortar Cat | Shells deal area damage |
-| Frost Cat | Slows the enemies it hits |
-| Tesla Cat | Lightning chains between enemies |
+The units are the Astro Friends. A badge in the corner of each slot shows the role.
+
+| Friend | Animal | Role |
+|---|---|---|
+| Cheddar | Cat | Rifle: rapid fire at the closest enemy |
+| Cotton | Rabbit | Sniper: full-map range, targets the enemy with the most HP |
+| Maple | Fox | Flame: short-range area damage (place near the wall) |
+| Chestnut | Bear | Mortar: shells deal area damage |
+| Mochi | Panda | Frost: slows the enemies it hits |
+| Zippy | Hamster | Tesla: lightning chains between enemies |
+
+Five friends are cut from the character sheet. Zippy is drawn in code until real art exists.
 
 Range is how far a unit reaches to the right of its slot, so short-range units belong in the column next to the wall.
 

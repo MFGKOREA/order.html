@@ -71,7 +71,7 @@
     padding: 2px 12px; color: var(--cream); font-weight: 600; font-size: 14px;
   }
   .pitch { font-size: 18px; max-width: 40em; color: var(--cream); }
-  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; }
+  .facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; }
   .fact { background: var(--card); border: 2px solid var(--ink); border-radius: 14px; padding: 12px 14px; min-width: 0; }
   .fact dt { font-size: 12px; letter-spacing: 0.06em; color: var(--dim); }
   .fact dd { margin: 2px 0 0; font-weight: 600; }
@@ -179,12 +179,13 @@
     <span class="eyebrow">프로젝트 계획서 · 2026년 10월 기준</span>
     <h1>ASTRO<br>ADVENTURE</h1>
     <div class="ko-title">한글 제목 <span class="chip">미정</span></div>
-    <p class="pitch">우주 고양이 용병단이 오른쪽에서 몰려오는 외계 벌레를 막아내는 머지 웨이브 디펜스. 코인으로 유닛을 뽑고, 같은 유닛끼리 합성하고, 30라운드를 버텨 최종 보스를 잡으면 승리해요.</p>
+    <p class="pitch">아스트로 프렌즈 여섯 친구가 오른쪽에서 몰려오는 외계 벌레를 막아내는 머지 웨이브 디펜스. 코인으로 유닛을 뽑고, 같은 유닛끼리 합성하고, 30라운드를 버텨 최종 보스를 잡으면 승리해요.</p>
     <dl class="facts">
       <div class="fact"><dt>장르</dt><dd>머지 + 웨이브 디펜스 (가로 레인)</dd></div>
       <div class="fact"><dt>지금 형태</dt><dd>웹 프로토타입 (HTML 파일 1개)</dd></div>
-      <div class="fact"><dt>현재 위치</dt><dd>1번 행성 완료, 2번 행성 출발 전</dd></div>
-      <div class="fact"><dt>그림체</dt><dd>굵은 갈색 외곽선 + 셀 셰이딩</dd></div>
+      <div class="fact"><dt>캐릭터</dt><dd>아스트로 프렌즈 6마리</dd></div>
+      <div class="fact"><dt>현재 위치</dt><dd>2번 별까지 완료, 3번 기술 성운 출발 전</dd></div>
+      <div class="fact"><dt>그림체</dt><dd>둥근 얼굴, 흰 우주복, 주황 칼라와 안테나</dd></div>
     </dl>
   </header>
 
@@ -218,6 +219,23 @@
 
       <article class="stop">
         <div class="planet-cell">
+          <div class="planet no-ring" style="--c: #f58a2a"></div>
+          <span class="planet-name">2 · 친구들의 별</span>
+        </div>
+        <div class="log">
+          <div class="log-head"><h3>아스트로 프렌즈 합류</h3><span class="status s-done">완료</span></div>
+          <p>고양이 용병을 아스트로 프렌즈로 바꿨어요. 무기는 들지 않고, 칸 모서리 배지로 역할을 구분해요.</p>
+          <ul class="checks">
+            <li class="ok"><span class="box"></span><span>치즈(고양이·소총), 솜이(토끼·저격), 단풍(여우·화염), 밤톨(곰·포격), 콩떡(판다·냉기), 찌릿(햄스터·전기)</span></li>
+            <li class="ok"><span class="box"></span><span>5마리는 보내주신 캐릭터 시트에서 잘라 배경을 지우고 넣음</span></li>
+            <li class="ok"><span class="box"></span><span>찌릿은 같은 우주복 디자인으로 코드로 그린 임시 그림</span></li>
+            <li class="ok"><span class="box"></span><span>게임 화면 제목을 Astro Adventure로 교체</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stop">
+        <div class="planet-cell">
           <div class="planet" style="--c: var(--peri)">
             <svg class="rocket" viewBox="0 0 54 54" aria-label="현재 목적지">
               <g transform="rotate(35 27 27)" stroke="#120a06" stroke-width="3" stroke-linejoin="round">
@@ -228,7 +246,7 @@
               </g>
             </svg>
           </div>
-          <span class="planet-name">2 · 기술 성운</span>
+          <span class="planet-name">3 · 기술 성운</span>
         </div>
         <div class="log">
           <div class="log-head"><h3>고유기술과 오버클럭</h3><span class="status s-next">다음 목적지</span></div>
@@ -247,14 +265,15 @@
       <article class="stop">
         <div class="planet-cell">
           <div class="planet no-ring" style="--c: var(--pink)"></div>
-          <span class="planet-name">3 · 이름표 위성</span>
+          <span class="planet-name">4 · 이름표 위성</span>
         </div>
         <div class="log">
           <div class="log-head"><h3>제목과 브랜딩</h3><span class="status s-wait">진행 전</span></div>
-          <p>영어 제목은 정해졌어요. 게임 화면에는 아직 이전 이름(Kitty Defense)이 남아 있어요.</p>
+          <p>영어 제목은 게임에 적용했어요. 한글 제목은 아직 미정이라 한국어 모드에서도 영어 제목을 보여줘요.</p>
           <ul class="checks">
             <li class="ok"><span class="box"></span><span>영어 제목 확정: Astro Adventure</span></li>
-            <li><span class="box"></span><span>게임 타이틀 화면과 페이지 제목을 Astro Adventure로 교체</span></li>
+            <li class="ok"><span class="box"></span><span>게임 타이틀 화면과 페이지 제목을 Astro Adventure로 교체</span></li>
+            <li class="ok"><span class="box"></span><span>캐릭터 그룹 이름: 아스트로 프렌즈</span></li>
             <li class="decide"><span class="box"></span><span>한글 제목 정하기<span class="tag">결정 필요</span></span></li>
             <li><span class="box"></span><span>로고와 앱 아이콘</span></li>
           </ul>
@@ -264,16 +283,16 @@
       <article class="stop">
         <div class="planet-cell">
           <div class="planet" style="--c: var(--mint)"></div>
-          <span class="planet-name">4 · 화실 행성</span>
+          <span class="planet-name">5 · 화실 행성</span>
         </div>
         <div class="log">
-          <div class="log-head"><h3>아트 교체 (힉스필드)</h3><span class="status s-wait">크레딧 대기</span></div>
-          <p>지금 그림은 코드로 그린 도형이에요. 힉스필드 크레딧이 3.1뿐이라 충전이 먼저 필요해요.</p>
+          <div class="log-head"><h3>아트 교체</h3><span class="status s-wait">일부 완료</span></div>
+          <p>친구 5마리는 진짜 그림이 들어갔어요. 남은 그림은 찌릿, 외계 벌레, 보스, 배경이에요.</p>
           <ul class="checks">
-            <li class="decide"><span class="box"></span><span>힉스필드 크레딧 충전<span class="tag">결정 필요</span></span></li>
-            <li><span class="box"></span><span>기준 캐릭터 1장 만들고, 그 캐릭터를 참조해 그림체 통일</span></li>
-            <li><span class="box"></span><span>유닛 6종, 외계 벌레 3종, 보스 2종, 배경</span></li>
-            <li><span class="box"></span><span>배경 제거로 투명 이미지 만들어 게임에 넣기</span></li>
+            <li class="ok"><span class="box"></span><span>기준 캐릭터 시트 확보 (친구 5마리)</span></li>
+            <li class="decide"><span class="box"></span><span>찌릿(햄스터) 정식 그림: 같은 도구로 직접 만들기 또는 힉스필드<span class="tag">결정 필요</span></span></li>
+            <li><span class="box"></span><span>외계 벌레 3종, 보스 2종, 배경을 친구들 그림체에 맞추기</span></li>
+            <li><span class="box"></span><span>힉스필드를 쓸 경우 크레딧 충전 (현재 3.1)</span></li>
           </ul>
         </div>
       </article>
@@ -281,7 +300,7 @@
       <article class="stop">
         <div class="planet-cell">
           <div class="planet no-ring" style="--c: var(--lav)"></div>
-          <span class="planet-name">5 · 출항 기지</span>
+          <span class="planet-name">6 · 출항 기지</span>
         </div>
         <div class="log">
           <div class="log-head"><h3>콘텐츠 보강과 출시 준비</h3><span class="status s-open">미정</span></div>
@@ -301,7 +320,7 @@
   <section class="spec">
     <div class="section-head">
       <h2>확정 사양: 고유기술과 오버클럭</h2>
-      <p>2번 행성에서 만들 내용이에요. 위력 수치는 아직 기본안이라 만든 뒤 봇으로 맞춰요.</p>
+      <p>3번 기술 성운에서 만들 내용이에요. 위력 수치는 아직 기본안이라 만든 뒤 봇으로 맞춰요.</p>
     </div>
     <div class="table-scroll">
       <table>
@@ -309,12 +328,12 @@
           <tr><th>유닛</th><th>고유기술</th><th>효과</th><th>위력 기본안</th><th>확장 탄창을 붙이면</th></tr>
         </thead>
         <tbody>
-          <tr><td class="unit">소총냥</td><td class="skill">3연발 사격</td><td>가장 앞의 적에게 총알 3발을 추가로 쏴요</td><td>공격력 60% × 3발</td><td>5연발</td></tr>
-          <tr><td class="unit">저격냥</td><td class="skill">관통탄</td><td>일직선 경로의 적을 모두 뚫어요</td><td>공격력 150%</td><td>탄이 굵어지고 위력 증가</td></tr>
-          <tr><td class="unit">화염냥</td><td class="skill">화염병 투척</td><td>먼 적 무리에 화염병을 던져 범위 폭발</td><td>기본안 미정</td><td>화염병 2개</td></tr>
-          <tr><td class="unit">포격냥</td><td class="skill">대형 포탄</td><td>크고 느린 포탄으로 넓은 범위에 큰 피해</td><td>공격력 200%</td><td>범위 +40%</td></tr>
-          <tr><td class="unit">냉기냥</td><td class="skill">얼음 가시</td><td>일직선 얼음 가시로 관통 피해와 둔화</td><td>기본안 미정</td><td>가시 2줄</td></tr>
-          <tr><td class="unit">전기냥</td><td class="skill">전기 구체</td><td>천천히 나아가며 닿는 적에게 계속 피해</td><td>기본안 미정</td><td>구체가 커짐</td></tr>
+          <tr><td class="unit">치즈 · 고양이</td><td class="skill">3연발 사격</td><td>가장 앞의 적에게 총알 3발을 추가로 쏴요</td><td>공격력 60% × 3발</td><td>5연발</td></tr>
+          <tr><td class="unit">솜이 · 토끼</td><td class="skill">관통탄</td><td>일직선 경로의 적을 모두 뚫어요</td><td>공격력 150%</td><td>탄이 굵어지고 위력 증가</td></tr>
+          <tr><td class="unit">단풍 · 여우</td><td class="skill">화염병 투척</td><td>먼 적 무리에 화염병을 던져 범위 폭발</td><td>기본안 미정</td><td>화염병 2개</td></tr>
+          <tr><td class="unit">밤톨 · 곰</td><td class="skill">대형 포탄</td><td>크고 느린 포탄으로 넓은 범위에 큰 피해</td><td>공격력 200%</td><td>범위 +40%</td></tr>
+          <tr><td class="unit">콩떡 · 판다</td><td class="skill">얼음 가시</td><td>일직선 얼음 가시로 관통 피해와 둔화</td><td>기본안 미정</td><td>가시 2줄</td></tr>
+          <tr><td class="unit">찌릿 · 햄스터</td><td class="skill">전기 구체</td><td>천천히 나아가며 닿는 적에게 계속 피해</td><td>기본안 미정</td><td>구체가 커짐</td></tr>
         </tbody>
       </table>
     </div>
@@ -339,7 +358,7 @@
     <div class="decisions">
       <div class="decision"><h3>한글 제목</h3><p>영어 제목 Astro Adventure에 맞출 이름. 음역(아스트로 어드벤처)으로 갈지, 새 이름을 지을지.</p></div>
       <div class="decision"><h3>기술 위력 수치</h3><p>화염병, 얼음 가시, 전기 구체의 위력 기본안. 정하지 않으면 제가 잡고 봇으로 확인해요.</p></div>
-      <div class="decision"><h3>힉스필드 크레딧</h3><p>아트 교체에 필요해요. 지금 3.1로는 이미지 1장 정도예요.</p></div>
+      <div class="decision"><h3>찌릿 그림</h3><p>시트에 없는 햄스터를 같은 도구로 직접 만들지, 힉스필드로 만들지. 힉스필드는 크레딧이 3.1뿐이에요.</p></div>
       <div class="decision"><h3>출시 플랫폼</h3><p>웹 페이지로 둘지, 모바일 앱으로 감쌀지.</p></div>
       <div class="decision"><h3>광고·결제</h3><p>레퍼런스 게임의 광고 보상, 유료 팩 같은 요소를 넣을지.</p></div>
       <div class="decision"><h3>보류 기능</h3><p>유닛 대기소, 뽑기 기계 연출을 다시 넣을지.</p></div>
@@ -366,7 +385,7 @@
       const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
       const my = (y0 + y1) / 2;
       const d = `M${x0} ${y0} C${x0} ${my}, ${x1} ${my}, ${x1} ${y1}`;
-      html += `<path class="${i === 1 ? 'done' : ''}" d="${d}"/>`;
+      html += `<path class="${i <= 2 ? 'done' : ''}" d="${d}"/>`;
     }
     svg.innerHTML = html;
   }
