@@ -184,12 +184,12 @@
     <span class="eyebrow">프로젝트 계획서 · 2026년 10월 기준</span>
     <h1>ASTRO<br>ADVENTURE</h1>
     <div class="ko-title">한글 제목 <span class="chip">미정</span></div>
-    <p class="pitch">아스트로 프렌즈 여섯 친구가 오른쪽에서 몰려오는 외계 벌레를 막아내는 머지 웨이브 디펜스. 코인으로 유닛을 뽑고, 같은 유닛끼리 합성하고, 30라운드를 버텨 최종 보스를 잡으면 승리해요.</p>
+    <p class="pitch">아스트로 프렌즈 여섯 친구가 줄지어 맵을 누비며 외계 벌레를 피하고 물리치는 서바이벌. 라운드 사이 정비 화면에서 친구를 뽑고 합성해 출전시키고, 30라운드를 버텨 최종 보스를 잡으면 승리해요.</p>
     <dl class="facts">
-      <div class="fact"><dt>장르</dt><dd>머지 + 웨이브 디펜스 (가로 레인)</dd></div>
+      <div class="fact"><dt>장르</dt><dd>머지 + 맵 이동 서바이벌</dd></div>
       <div class="fact"><dt>지금 형태</dt><dd>웹 프로토타입 (HTML 파일 1개)</dd></div>
       <div class="fact"><dt>캐릭터</dt><dd>아스트로 프렌즈 6마리</dd></div>
-      <div class="fact"><dt>현재 위치</dt><dd>2번 별까지 완료, 3번 기술 성운 출발 전</dd></div>
+      <div class="fact"><dt>현재 위치</dt><dd>3번 별까지 완료, 4번 기술 성운 출발 전</dd></div>
       <div class="fact"><dt>그림체</dt><dd>둥근 얼굴, 흰 우주복, 주황 칼라와 안테나</dd></div>
     </dl>
   </header>
@@ -213,7 +213,7 @@
           <ul class="checks">
             <li class="ok"><span class="box"></span><span>30라운드, 라운드당 30초, 10·20라운드 중간 보스와 30라운드 최종 보스</span></li>
             <li class="ok"><span class="box"></span><span>코인 뽑기 4등급 (일반 72% · 희귀 22% · 영웅 5.5% · 전설 0.5%), 합성, 판매</span></li>
-            <li class="ok"><span class="box"></span><span>유닛 6종: 소총·저격·화염·포격·냉기·전기냥</span></li>
+            <li class="ok"><span class="box"></span><span>유닛 6종: 소총·저격·화염·포격·냉기·전기 (처음엔 고양이 용병, 가로 레인 방어)</span></li>
             <li class="ok"><span class="box"></span><span>레벨 업 카드 17종, 추천 카드 표시, 리롤 3회</span></li>
             <li class="ok"><span class="box"></span><span>영구 업그레이드 6종 (골드로 구매, 브라우저에 저장)</span></li>
             <li class="ok"><span class="box"></span><span>전설 등장 연출, 최종 보스 경고 배너, 데미지 숫자</span></li>
@@ -241,7 +241,27 @@
 
       <article class="stop">
         <div class="planet-cell">
-          <div class="planet" style="--c: var(--peri)">
+          <div class="planet" style="--c: var(--peri)"></div>
+          <span class="planet-name">3 · 떠돌이 별</span>
+        </div>
+        <div class="log">
+          <div class="log-head"><h3>맵 이동 방식으로 전환</h3><span class="status s-done">완료</span></div>
+          <p>고정된 방어선 대신, 대장을 움직여 맵을 돌아다니며 피하고 싸워요. 질문으로 정한 대로 만들었어요.</p>
+          <ul class="checks">
+            <li class="ok"><span class="box"></span><span>화면 2×2 크기 맵, 달 바위 장애물, 테두리 벽</span></li>
+            <li class="ok"><span class="box"></span><span>가상 조이스틱으로 대장 이동, 출전한 친구들이 줄줄이 따라옴</span></li>
+            <li class="ok"><span class="box"></span><span>대장 = 출전 칸에서 등급이 가장 높은 친구, 대장만 피격</span></li>
+            <li class="ok"><span class="box"></span><span>라운드 사이 정비 화면: 출전 6칸 + 대기소 12칸, 뽑기·합성·판매</span></li>
+            <li class="ok"><span class="box"></span><span>경험치 보석은 가까이 가서 줍기, '강력 자석' 카드 추가</span></li>
+            <li class="ok"><span class="box"></span><span>5라운드부터 포위 웨이브, 미니맵, 화면 밖 보스 화살표</span></li>
+            <li class="ok"><span class="box"></span><span>라운드 끝 대장 체력 30% 회복, 봇 테스트 5판 중 2판 승리로 조정</span></li>
+          </ul>
+        </div>
+      </article>
+
+      <article class="stop">
+        <div class="planet-cell">
+          <div class="planet" style="--c: #8fd3e8">
             <svg class="rocket" viewBox="0 0 54 54" aria-label="현재 목적지">
               <g transform="rotate(35 27 27)" stroke="#3a1f10" stroke-width="3" stroke-linejoin="round">
                 <path d="M27 4 C36 12 38 26 34 38 H20 C16 26 18 12 27 4 Z" fill="#ffffff"/>
@@ -251,7 +271,7 @@
               </g>
             </svg>
           </div>
-          <span class="planet-name">3 · 기술 성운</span>
+          <span class="planet-name">4 · 기술 성운</span>
         </div>
         <div class="log">
           <div class="log-head"><h3>고유기술과 오버클럭</h3><span class="status s-next">다음 목적지</span></div>
@@ -270,7 +290,7 @@
       <article class="stop">
         <div class="planet-cell">
           <div class="planet no-ring" style="--c: var(--pink)"></div>
-          <span class="planet-name">4 · 이름표 위성</span>
+          <span class="planet-name">5 · 이름표 위성</span>
         </div>
         <div class="log">
           <div class="log-head"><h3>제목과 브랜딩</h3><span class="status s-wait">진행 전</span></div>
@@ -288,7 +308,7 @@
       <article class="stop">
         <div class="planet-cell">
           <div class="planet" style="--c: var(--mint)"></div>
-          <span class="planet-name">5 · 화실 행성</span>
+          <span class="planet-name">6 · 화실 행성</span>
         </div>
         <div class="log">
           <div class="log-head"><h3>아트 교체</h3><span class="status s-wait">일부 완료</span></div>
@@ -305,7 +325,7 @@
       <article class="stop">
         <div class="planet-cell">
           <div class="planet no-ring" style="--c: var(--lav)"></div>
-          <span class="planet-name">6 · 출항 기지</span>
+          <span class="planet-name">7 · 출항 기지</span>
         </div>
         <div class="log">
           <div class="log-head"><h3>콘텐츠 보강과 출시 준비</h3><span class="status s-open">미정</span></div>
@@ -325,7 +345,7 @@
   <section class="spec">
     <div class="section-head">
       <h2>확정 사양: 고유기술과 오버클럭</h2>
-      <p>3번 기술 성운에서 만들 내용이에요. 위력 수치는 아직 기본안이라 만든 뒤 봇으로 맞춰요.</p>
+      <p>4번 기술 성운에서 만들 내용이에요. 위력 수치는 아직 기본안이라 만든 뒤 봇으로 맞춰요.</p>
     </div>
     <div class="table-scroll">
       <table>
@@ -390,7 +410,7 @@
       const [x0, y0] = pts[i - 1], [x1, y1] = pts[i];
       const my = (y0 + y1) / 2;
       const d = `M${x0} ${y0} C${x0} ${my}, ${x1} ${my}, ${x1} ${y1}`;
-      html += `<path class="${i <= 2 ? 'done' : ''}" d="${d}"/>`;
+      html += `<path class="${i <= 3 ? 'done' : ''}" d="${d}"/>`;
     }
     svg.innerHTML = html;
   }
