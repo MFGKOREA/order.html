@@ -1,33 +1,36 @@
-# 냥이 방어선
+# Kitty Defense
 
-브라우저에서 바로 실행되는 세로형 웨이브 디펜스 게임 프로토타입입니다. `index.html` 파일 하나로 되어 있어요.
+[한국어](README.ko.md)
 
-## 규칙
-- 왼쪽이 우리 진영(고양이 용병 18칸), 오른쪽에서 외계 벌레가 몰려와요.
-- **유닛 뽑기**: 코인으로 6종 유닛 중 하나를 랜덤으로 뽑아요. 뽑을 때마다 가격이 2씩 올라요.
-  - 등급 확률: 일반 72% · 희귀 22% · 영웅 5.5% · 전설 0.5%
-- **합성**: 같은 종류·같은 등급 유닛을 끌어다 겹치면 다음 등급이 돼요.
-- **판매**: 유닛을 왼쪽 아래 판매 칸으로 끌어다 놓으면 코인을 돌려받아요.
-- **라운드**: 30초마다 다음 라운드로 넘어가요. 총 30라운드예요.
-- **보스**: 10·20라운드에는 중간 보스, 30라운드에는 최종 보스가 나와요. 최종 보스를 30초 안에 잡으면 승리해요.
-- 적이 방벽을 공격해서 방벽 체력이 0이 되면 패배해요.
+A portrait wave-defense game prototype that runs straight in the browser. Everything lives in a single `index.html`.
 
-## 유닛
-| 유닛 | 특징 |
+## Rules
+- Your side is on the left (18 slots for cat mercenaries). Alien bugs charge in from the right.
+- **Summon**: spend coins to get a random unit from 6 types. Each summon costs 2 more than the last.
+  - Grade odds: Common 72% · Rare 22% · Epic 5.5% · Legendary 0.5%
+- **Merge**: drag a unit onto another of the same type and grade to make the next grade.
+- **Sell**: drag a unit onto the Sell zone at the bottom left to get coins back.
+- **Rounds**: a new round starts every 30 seconds. There are 30 rounds.
+- **Bosses**: mini bosses at rounds 10 and 20, the final boss at round 30. Defeat the final boss within 30 seconds to win.
+- Enemies attack the wall. If the wall's HP hits 0, you lose.
+
+## Units
+| Unit | Role |
 |---|---|
-| 소총냥 | 앞쪽 적을 빠르게 사격 |
-| 저격냥 | 맵 전체 사거리, 체력이 가장 높은 적을 노림 |
-| 화염냥 | 짧은 사거리 범위 피해 (앞줄 추천) |
-| 포격냥 | 포탄 범위 피해 |
-| 냉기냥 | 맞은 적을 느리게 만듦 |
-| 전기냥 | 여러 적에게 번개가 튐 |
+| Rifle Cat | Rapid fire at the closest enemy |
+| Sniper Cat | Full-map range, targets the enemy with the most HP |
+| Flame Cat | Short-range area damage (place near the wall) |
+| Mortar Cat | Shells deal area damage |
+| Frost Cat | Slows the enemies it hits |
+| Tesla Cat | Lightning chains between enemies |
 
-사거리는 유닛 위치에서 오른쪽으로 닿는 거리라서, 사거리가 짧은 유닛은 방벽 가까운 칸(오른쪽 열)에 두는 게 좋아요.
+Range is how far a unit reaches to the right of its slot, so short-range units belong in the column next to the wall.
 
-## 조작
-- 터치/마우스: 뽑기 버튼, 유닛 드래그(이동·합성·판매), 유닛 탭(정보·사거리 보기)
-- 키보드: Space/Enter 뽑기, Esc/P 일시정지
+## Controls
+- Touch/mouse: Summon button, drag units (move, merge, sell), tap a unit (info and range)
+- Keyboard: Space/Enter to summon, Esc/P to pause
+- The `EN`/`한` button at the top right switches between English and Korean (English by default)
 
-## 밸런스 메모
-자동 봇(무조건 합성 → 남는 코인으로 뽑기, 배치 전략 없음)으로 8판 돌려 보면 3판 승리, 나머지는 27~30라운드에서 패배해요. 사거리에 맞춰 배치하면 더 유리해요.
-수치는 `index.html` 위쪽 `TYPES`, `GRADES`, `MON`, `BOSS_HP`, `hpBase`, `drawCost`에서 조정해요.
+## Balance notes
+Over 8 runs, a bot that merges everything and spends leftover coins on summons (with no placement strategy) won 3 and lost the other 5 between rounds 27 and 30. Placing units by range gives you an edge.
+Tune the numbers near the top of `index.html`: `TYPES`, `GRADES`, `MON`, `BOSS_HP`, `hpBase`, `drawCost`. On-screen text is in the `STR` table.
