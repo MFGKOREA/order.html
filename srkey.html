@@ -2,7 +2,7 @@
 <html lang="ko">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
 <meta name="theme-color" content="#f4f4f4" media="(prefers-color-scheme: light)">
 <meta name="theme-color" content="#000000" media="(prefers-color-scheme: dark)">
 <meta name="apple-mobile-web-app-capable" content="yes">
@@ -214,10 +214,14 @@ p, li, .sub, .exp { text-wrap: pretty; }
 
 .sa label { display: flex; justify-content: space-between; font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
 .sa label span { font-weight: 600; color: var(--faint); }
-.sa textarea { display: block; width: 100%; min-height: 150px; resize: none; border: 0; border-radius: 14px; background: var(--fill-2); padding: 14px; font-size: 15.5px; line-height: 1.6; outline: none; transition: background-color 150ms, box-shadow 150ms; }
+.sa textarea { display: block; width: 100%; min-height: 120px; resize: none; border: 0; border-radius: 14px; background: var(--fill-2); padding: 14px; font-size: 15.5px; line-height: 1.6; outline: none; transition: background-color 150ms, box-shadow 150ms; }
 .sa textarea:focus { background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--fg); }
 .sa textarea[readonly] { background: var(--fill-2); box-shadow: none; color: var(--muted); }
 .sa .hint { margin: 8px 2px 0; font-size: 12.5px; color: var(--muted); }
+/* 주관식: 키보드에 가리지 않게 버튼을 입력칸 바로 아래에 */
+.sa-act { display: flex; gap: 8px; margin-top: 14px; scroll-margin-bottom: 16px; }
+.sa-act .btn { min-height: 50px; }
+.dock:has(.in:empty) { display: none; }
 
 /* 정답일 때 */
 .okbox { margin-top: 16px; border-radius: 14px; background: var(--ok-bg); padding: 13px 14px; }
@@ -569,11 +573,15 @@ function ask(first) {
     card.querySelectorAll(".opt").forEach(b => b.onclick = () => pick(b));
   } else {
     card.innerHTML = tags + `<h2 class="qtext">${esc(d.q)}</h2><div class="sa"><label for="ans">내 답 <span id="ans-n">0자</span></label><textarea id="ans" placeholder="생각나는 내용을 최대한 적어 주세요" enterkeyhint="done"></textarea><p class="hint">핵심 키워드가 ${d.need}개 이상 들어가면 정답이에요. 띄어쓰기·순서는 상관없어요.</p></div>`;
+    card.insertAdjacentHTML("beforeend", `<div class="sa-act" id="sa-act"><button class="btn ghost" id="skip">모르겠어요</button><button class="btn" id="check" disabled>정답 확인</button></div>`);
     const ta = $("#ans");
-    ta.oninput = () => { $("#check").disabled = !ta.value.trim(); $("#ans-n").textContent = ta.value.trim().length + "자"; ta.style.height = "auto"; ta.style.height = Math.max(150, ta.scrollHeight) + "px"; };
+    const reveal = () => setTimeout(() => $("#sa-act")?.scrollIntoView({ block: "nearest", behavior: reduced() ? "auto" : "smooth" }), 320);
+    ta.onfocus = reveal;
+    ta.oninput = () => { $("#check").disabled = !ta.value.trim(); $("#ans-n").textContent = ta.value.trim().length + "자"; ta.style.height = "auto"; ta.style.height = Math.max(120, ta.scrollHeight) + "px"; if (document.activeElement === ta) $("#sa-act")?.scrollIntoView({ block: "nearest" }); };
   }
   if (!first && !reduced()) { void card.offsetWidth; card.classList.add("enter"); }
-  dock(`<button class="btn ghost" id="skip">모르겠어요</button><button class="btn" id="check" disabled>정답 확인<span class="k">Enter</span></button>`);
+  if (d.type === "mc") dock(`<button class="btn ghost" id="skip">모르겠어요</button><button class="btn" id="check" disabled>정답 확인<span class="k">Enter</span></button>`);
+  else dock("");
   $("#check").onclick = check;
   $("#skip").onclick = () => check(true);
 }
@@ -588,6 +596,7 @@ function pick(b) {
 function check(skipped) {
   if (state.done) return;
   state.done = true;
+  if (document.activeElement?.tagName === "TEXTAREA") document.activeElement.blur(); // 키보드 닫기
   const { x, q, d } = cur();
   const s = st(q.id);
   let ok, mine, sa;
@@ -608,7 +617,7 @@ function check(skipped) {
   card.classList.remove("enter", "pop", "shake");
   if (ok) {
     if (d.type === "mc") card.querySelectorAll(".opt").forEach(b => { b.disabled = true; if (+b.dataset.oi === d.a) { b.classList.add("right"); b.querySelector(".mk").textContent = "정답"; } else b.classList.add("dim"); });
-    else $("#ans").readOnly = true;
+    else { $("#ans").readOnly = true; $("#ans").blur(); $("#sa-act")?.remove(); }
     const extra = d.type === "sa"
       ? `<div class="kws" style="margin-top:10px">${d.kw.map((g, i) => `<span class="kw ${sa.hits[i] ? "hit" : "miss"}">${esc(g[0])}</span>`).join("")}</div><details><summary>모범 답안</summary><p>${esc(d.model)}</p></details>`
       : "";
