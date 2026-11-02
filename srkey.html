@@ -1,0 +1,554 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#f4f4f4">
+<title>Sr.KEY 시험 준비</title>
+<style>
+/* 발주앱 KREAM 스타일을 그대로: 회색 바탕 + 흰 카드, 검정 강조, 짧은 밑줄 탭. 포인트만 아웃백 레드 */
+:root {
+  --bg: #f4f4f4;
+  --surface: #ffffff;
+  --fill: rgba(0, 0, 0, .05);
+  --fill-2: #f4f4f4;
+  --fg: #222222;
+  --muted: #707070;
+  --line: #ebebeb;
+  --red: #c8102e;          /* 아웃백 레드 */
+  --red-ink: #ffffff;
+  --red-soft: #fbeaec;
+  --red-text: #b00e28;
+  --ok: #16804a; --ok-bg: #ebf7f0;
+  --font: "Microsoft GothicNeo", "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #000000; --surface: #141414; --fill: rgba(255,255,255,.08); --fill-2: #1f1f1f;
+    --fg: #f2f2f2; --muted: #8b8b8b; --line: #262626;
+    --red: #ff3b4f; --red-ink: #1a0306; --red-soft: #2c1215; --red-text: #ff7a87;
+    --ok: #4cc38a; --ok-bg: #10261b;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #000000; --surface: #141414; --fill: rgba(255,255,255,.08); --fill-2: #1f1f1f;
+  --fg: #f2f2f2; --muted: #8b8b8b; --line: #262626;
+  --red: #ff3b4f; --red-ink: #1a0306; --red-soft: #2c1215; --red-text: #ff7a87;
+  --ok: #4cc38a; --ok-bg: #10261b;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html { -webkit-tap-highlight-color: transparent; -webkit-text-size-adjust: 100%; overscroll-behavior: none; overflow-x: hidden; }
+body {
+  margin: 0; background: var(--bg); color: var(--fg);
+  font-family: var(--font); font-size: 15px; line-height: 1.5; letter-spacing: -0.01em;
+  -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums;
+  padding: 0 max(16px, env(safe-area-inset-right)) 0 max(16px, env(safe-area-inset-left));
+}
+button, input, textarea { font: inherit; color: inherit; letter-spacing: inherit; }
+button { cursor: pointer; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+button:not(:disabled) { transition: transform 100ms cubic-bezier(.2,.8,.2,1), filter 100ms; }
+button:not(:disabled):active { transform: scale(.97); filter: brightness(.96); }
+:focus-visible { outline: 2px solid var(--red); outline-offset: 2px; }
+svg { display: block; }
+
+.app { max-width: 480px; margin: 0 auto; }
+.view { padding: calc(14px + env(safe-area-inset-top)) 0 calc(108px + env(safe-area-inset-bottom)); }
+.view[hidden] { display: none; }
+
+/* 홈 */
+.hdr { margin: 10px 2px 18px; }
+.hdr h1 { margin: 0; font-size: 28px; font-weight: 800; letter-spacing: -0.035em; line-height: 1.15; }
+.hdr p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
+.draft { display: inline-block; margin-top: 10px; font-size: 11.5px; font-weight: 700; color: var(--red-text); background: var(--red-soft); border-radius: 999px; padding: 3px 10px; }
+
+.stats { display: grid; grid-template-columns: 1.3fr 1fr 1fr; background: var(--surface); border-radius: 20px; padding: 16px 4px; margin-bottom: 14px; }
+.stats div { display: grid; gap: 2px; padding: 0 14px; }
+.stats div + div { border-left: 1px solid var(--line); }
+.stats span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.stats b { font-size: 22px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.2; }
+.stats b small { font-size: 13px; font-weight: 700; color: var(--muted); margin-left: 1px; }
+.stats .wrongn b { color: var(--red); }
+.bar { height: 4px; border-radius: 4px; background: var(--fill); overflow: hidden; margin-top: 6px; }
+.bar i { display: block; height: 100%; background: var(--fg); border-radius: 4px; transition: width 600ms cubic-bezier(.33,1,.68,1); }
+
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); background: var(--surface); border-radius: 14px; overflow: hidden; margin-bottom: 14px; }
+.seg button { position: relative; border: 0; background: none; padding: 12px 0 13px; font-size: 15px; font-weight: 600; color: var(--muted); }
+.seg button + button::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 1px; background: var(--line); }
+.seg button[aria-selected="true"] { color: var(--fg); font-weight: 800; }
+.seg button::after { content: ""; position: absolute; left: 50%; bottom: 0; width: 44px; height: 3px; border-radius: 3px 3px 0 0; background: var(--red); translate: -50% 0; scale: 0 1; transition: scale 200ms cubic-bezier(.2,.8,.2,1); }
+.seg button[aria-selected="true"]::after { scale: 1 1; }
+.seg .cnt { font-size: 12px; font-weight: 800; color: var(--red); margin-left: 3px; }
+
+.panel { background: var(--surface); border-radius: 20px; padding: 16px; }
+.panel h3 { margin: 0 0 4px; font-size: 16px; font-weight: 800; }
+.panel .sub { margin: 0 0 14px; font-size: 13px; color: var(--muted); text-wrap: pretty; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chips button { position: relative; border: 0; border-radius: 999px; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); padding: 8px 15px; font-size: 14px; font-weight: 500; }
+.chips button::after { content: ""; position: absolute; inset: -6px 0; }
+.chips button[aria-pressed="true"] { background: var(--fg); color: var(--surface); box-shadow: none; font-weight: 700; }
+
+.chlist { display: grid; gap: 2px; margin: 0 -6px; }
+.chrow { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; gap: 4px 12px; border: 0; background: none; text-align: left; padding: 11px 10px; border-radius: 12px; }
+.chrow[aria-pressed="true"] { background: var(--fill-2); }
+.chrow b { font-size: 15px; font-weight: 700; }
+.chrow em { font-style: normal; font-size: 12.5px; color: var(--muted); }
+.chrow .bar { grid-column: 1 / -1; margin-top: 0; }
+.chrow[aria-pressed="true"] b::after { content: "선택됨"; margin-left: 6px; font-size: 11px; font-weight: 800; color: var(--red); vertical-align: 1px; }
+
+.wlist { display: grid; gap: 8px; }
+.witem { background: var(--fill-2); border-radius: 12px; padding: 11px 12px; display: grid; gap: 3px; }
+.witem small { font-size: 11.5px; font-weight: 700; color: var(--red-text); }
+.witem span { font-size: 14px; font-weight: 600; text-wrap: pretty; }
+.empty { text-align: center; padding: 18px 8px 8px; color: var(--muted); font-size: 14px; }
+.empty b { display: block; color: var(--fg); font-size: 16px; margin-bottom: 4px; }
+
+/* 아래 고정 버튼: 아웃백 레드 */
+.dock { position: fixed; left: 0; right: 0; bottom: 0; padding: 12px max(16px, env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left)); background: linear-gradient(to top, var(--bg) 70%, transparent); }
+.dock .in { max-width: 480px; margin: 0 auto; display: flex; gap: 8px; }
+.btn { flex: 1; min-height: 54px; border: 0; border-radius: 14px; background: var(--red); color: var(--red-ink); font-size: 16.5px; font-weight: 800; letter-spacing: -0.02em; }
+.btn:disabled { background: var(--fill); color: var(--muted); }
+.btn.ghost { flex: 0 0 auto; padding: 0 18px; background: var(--surface); color: var(--fg); box-shadow: inset 0 0 0 1px var(--line); }
+.btn.dark { background: var(--fg); color: var(--surface); }
+
+/* 문제 화면 */
+.qtop { display: flex; align-items: center; gap: 10px; margin: 6px 0 12px; }
+.x { border: 0; width: 40px; height: 40px; border-radius: 50%; background: var(--surface); display: grid; place-items: center; flex: none; }
+.x svg { width: 18px; height: 18px; stroke: var(--fg); stroke-width: 2.2; fill: none; stroke-linecap: round; }
+.qprog { flex: 1; display: grid; gap: 6px; }
+.qprog .t { display: flex; justify-content: space-between; font-size: 13px; font-weight: 700; }
+.qprog .t span { color: var(--muted); font-weight: 600; }
+.qprog .bar { margin: 0; }
+.qprog .bar i { background: var(--red); }
+
+.card { background: var(--surface); border-radius: 22px; padding: 20px 18px 18px; min-height: 380px; transform-origin: 50% 50%; }
+.card.flip-out { animation: flipout 170ms ease-in forwards; }
+.card.flip-in { animation: flipin 260ms cubic-bezier(.2,.8,.2,1); }
+@keyframes flipout { to { transform: perspective(900px) rotateY(90deg); opacity: .6; } }
+@keyframes flipin { from { transform: perspective(900px) rotateY(-90deg); opacity: .6; } }
+.card.pop { animation: pop 340ms cubic-bezier(.34,1.56,.64,1); }
+@keyframes pop { from { transform: scale(.97); } }
+.card.enter { animation: enter 260ms cubic-bezier(.2,.8,.2,1); }
+@keyframes enter { from { transform: translateX(24px); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .card.flip-out, .card.flip-in, .card.pop, .card.enter { animation: none; } }
+
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.tag { font-size: 12px; font-weight: 700; border-radius: 999px; padding: 4px 10px; background: var(--fill-2); color: var(--muted); }
+.tag.ch { background: var(--fg); color: var(--surface); }
+.tag.var { background: var(--red-soft); color: var(--red-text); }
+.qtext { margin: 0 0 20px; font-size: 20px; font-weight: 800; line-height: 1.42; letter-spacing: -0.03em; text-wrap: pretty; }
+
+.opts { display: grid; gap: 8px; }
+.opt { display: grid; grid-template-columns: 28px minmax(0,1fr) auto; align-items: center; gap: 12px; width: 100%; border: 0; text-align: left; background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); border-radius: 14px; padding: 13px 14px; min-height: 56px; font-size: 15.5px; font-weight: 600; line-height: 1.4; }
+.opt .n { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--fill-2); font-size: 13px; font-weight: 800; color: var(--muted); }
+.opt[aria-pressed="true"] { box-shadow: inset 0 0 0 2px var(--fg); }
+.opt[aria-pressed="true"] .n { background: var(--fg); color: var(--surface); }
+.opt.right { box-shadow: inset 0 0 0 2px var(--ok); background: var(--ok-bg); }
+.opt.right .n { background: var(--ok); color: #fff; }
+.opt.wrong { box-shadow: inset 0 0 0 2px var(--red); }
+.opt.wrong .n { background: var(--red); color: var(--red-ink); }
+.opt:disabled { cursor: default; color: var(--fg); }
+.opt .mk { font-size: 12px; font-weight: 800; }
+.opt.right .mk { color: var(--ok); }
+.opt.wrong .mk { color: var(--red); }
+
+.sa label { display: block; font-size: 12.5px; font-weight: 700; color: var(--muted); margin-bottom: 8px; }
+.sa textarea { width: 100%; min-height: 150px; resize: vertical; border: 0; border-radius: 14px; background: var(--fill-2); padding: 14px; font-size: 15.5px; line-height: 1.55; outline: none; }
+.sa textarea:focus { background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--fg); }
+.sa .hint { margin: 8px 2px 0; font-size: 12.5px; color: var(--muted); }
+
+.okline { display: flex; align-items: center; gap: 8px; margin-top: 16px; padding: 12px 14px; border-radius: 14px; background: var(--ok-bg); color: var(--ok); font-weight: 800; font-size: 15px; }
+.okline svg { width: 18px; height: 18px; stroke: currentColor; stroke-width: 2.6; fill: none; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+.okexp { margin: 10px 2px 0; font-size: 14px; color: var(--muted); text-wrap: pretty; }
+
+/* 해답 카드 */
+.ans .head { display: flex; align-items: center; justify-content: space-between; margin: -20px -18px 18px; padding: 14px 18px; background: var(--red); color: var(--red-ink); border-radius: 22px 22px 0 0; }
+.ans .head b { font-size: 16px; font-weight: 800; }
+.ans .head span { font-size: 12.5px; font-weight: 700; opacity: .9; }
+.ans .q { margin: 0 0 16px; font-size: 14.5px; font-weight: 600; color: var(--muted); text-wrap: pretty; }
+.blk { margin-bottom: 16px; }
+.blk > small { display: block; font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+.correct { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; line-height: 1.35; color: var(--fg); }
+.correct.model { font-size: 15px; font-weight: 500; line-height: 1.6; letter-spacing: -0.01em; }
+.mine { font-size: 14.5px; color: var(--muted); text-decoration: line-through; text-decoration-color: var(--red); text-wrap: pretty; white-space: pre-wrap; }
+.mine.empty-ans { text-decoration: none; font-style: italic; }
+.kws { display: flex; flex-wrap: wrap; gap: 6px; }
+.kw { font-size: 13px; font-weight: 700; border-radius: 999px; padding: 5px 11px; }
+.kw.hit { background: var(--ok-bg); color: var(--ok); }
+.kw.miss { box-shadow: inset 0 0 0 1.5px var(--red); color: var(--red-text); }
+.kwnote { margin: 8px 0 0; font-size: 12.5px; color: var(--muted); }
+.exp { background: var(--fill-2); border-radius: 14px; padding: 14px; font-size: 14.5px; line-height: 1.6; text-wrap: pretty; }
+.src { margin: 12px 2px 0; font-size: 12px; color: var(--muted); }
+.note { margin-top: 12px; font-size: 12.5px; font-weight: 600; color: var(--red-text); }
+
+/* 결과 */
+.res { background: var(--surface); border-radius: 22px; padding: 26px 18px 20px; text-align: center; margin-bottom: 12px; }
+.res .big { font-size: 56px; font-weight: 800; letter-spacing: -0.05em; line-height: 1; }
+.res .big small { font-size: 22px; color: var(--muted); font-weight: 700; letter-spacing: -0.02em; }
+.res p { margin: 10px 0 0; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- 홈 -->
+  <section class="view" id="v-home">
+    <header class="hdr">
+      <h1>Sr.KEY 시험 준비</h1>
+      <p>아웃백 Step1~5 교육자료로 만든 필기 대비 문제</p>
+      <span class="draft">시안 · 샘플 14문제 (완성본 200문제)</span>
+    </header>
+
+    <div class="stats" aria-label="학습 현황">
+      <div><span>푼 문제</span><b id="st-done">0<small>/14</small></b><div class="bar"><i id="st-bar" style="width:0"></i></div></div>
+      <div><span>정답률</span><b id="st-rate">–</b></div>
+      <div class="wrongn"><span>오답노트</span><b id="st-wrong">0</b></div>
+    </div>
+
+    <div class="seg" role="tablist">
+      <button role="tab" aria-selected="true" data-tab="all">전체 랜덤</button>
+      <button role="tab" aria-selected="false" data-tab="ch">단원별</button>
+      <button role="tab" aria-selected="false" data-tab="wrong">오답노트<span class="cnt" id="tab-wrong"></span></button>
+    </div>
+
+    <div class="panel" id="p-all">
+      <h3>몇 문제 풀까요?</h3>
+      <p class="sub">객관식과 주관식이 섞여서 나와요. 틀리면 해답 카드가 열려요.</p>
+      <div class="chips" id="cnt-chips">
+        <button aria-pressed="false" data-n="5">5문제</button>
+        <button aria-pressed="true" data-n="10">10문제</button>
+        <button aria-pressed="false" data-n="0">전부</button>
+      </div>
+    </div>
+
+    <div class="panel" id="p-ch" hidden>
+      <h3>단원 고르기</h3>
+      <p class="sub">고른 단원에서만 나와요. 막대는 맞힌 비율이에요.</p>
+      <div class="chlist" id="chlist"></div>
+    </div>
+
+    <div class="panel" id="p-wrong" hidden>
+      <h3>오답노트</h3>
+      <p class="sub">틀린 문제는 숫자·보기·묻는 방향을 바꾼 변형 문제로 다시 나와요. 변형 문제를 맞히면 목록에서 빠져요.</p>
+      <div class="wlist" id="wlist"></div>
+    </div>
+  </section>
+
+  <!-- 문제 -->
+  <section class="view" id="v-quiz" hidden>
+    <div class="qtop">
+      <button class="x" id="quit" aria-label="그만 풀고 홈으로"><svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <div class="qprog">
+        <div class="t"><b id="q-pos">1 / 10</b><span id="q-score">맞힘 0</span></div>
+        <div class="bar"><i id="q-bar" style="width:0"></i></div>
+      </div>
+    </div>
+    <article class="card" id="card" aria-live="polite"></article>
+  </section>
+
+  <!-- 결과 -->
+  <section class="view" id="v-result" hidden>
+    <header class="hdr"><h1>다 풀었어요</h1></header>
+    <div class="res" id="res"></div>
+    <div class="panel" id="res-wrong"></div>
+  </section>
+</div>
+
+<div class="dock"><div class="in" id="dock"></div></div>
+
+<script>
+/* ───── 문제 데이터 (시안: Step3 Sr.KEY/AKM 자료에서 14문제) ─────
+   type mc: 사지선다, a = 정답 보기 번호(0~3)
+   type sa: 주관식, kw = 핵심 키워드 묶음(같은 뜻은 한 묶음), need = 맞아야 하는 묶음 수
+   v: 오답노트에서 다시 나올 변형 문제 */
+const CH = {
+  claim: "Claim Report",
+  par: "발주 Par",
+  inv: "인벤토리·재고이동",
+  hr: "인사관리",
+  doc: "매장 서류관리",
+};
+const SRC = "Step3 Sr.KEY/AKM";
+const Q = [
+  { id: "claim-1", ch: "claim", type: "mc",
+    q: "냉장육 클레임의 접수 기한은?",
+    opts: ["입고일 D+1 이내", "입고일 D+2 이내", "입고일 D+3 이내", "입고일 D+7 이내"], a: 1,
+    exp: "냉장육은 입고일로부터 D+2 이내에만 클레임을 접수할 수 있어요. 기한이 지나면 접수가 안 되니 검수 때 바로 확인해야 해요.",
+    v: { q: "월요일에 입고된 냉장육에서 결함을 찾았어요. 클레임은 늦어도 언제까지 접수해야 할까요?",
+      opts: ["월요일 당일", "화요일", "수요일", "다음 주 월요일"], a: 2,
+      exp: "냉장육 클레임 기한은 입고일 D+2 이내예요. 월요일 입고 → 수요일까지." } },
+  { id: "claim-2", ch: "claim", type: "mc",
+    q: "26일부터 말일 사이에 접수한 클레임은 어떻게 처리될까요?",
+    opts: ["당월 비용으로 반영", "익월 접수로 처리되어 익월 비용에 반영", "접수 불가", "QA 승인 후 당월 반영"], a: 1,
+    exp: "26일~말일에 접수된 클레임은 익월 접수로 처리되고 익월 비용에 반영돼요. 그래서 인벤토리 전 클레임은 25일까지 접수하고 QA·구매팀 승인을 확인해요.",
+    v: { q: "월말 인벤토리 전에 클레임(반품)은 며칠까지 접수해야 할까요?",
+      opts: ["20일", "25일", "말일", "다음 달 1일"], a: 1,
+      exp: "인벤토리 준비 단계에서 클레임은 25일까지 접수하고 QA와 구매팀 승인을 확인해요. 26일~말일 접수분은 익월로 넘어가요." } },
+  { id: "claim-3", ch: "claim", type: "mc",
+    q: "다음 중 클레임 접수 대상이 아닌 것은?",
+    opts: ["포장 박스가 찌그러져 입고됨", "고객이 맛이 취향에 안 맞는다고 함", "한글표시사항이 훼손되어 확인 불가", "발주 단위보다 입수량이 부족함"], a: 1,
+    exp: "클레임은 제품 자체의 결함만 해당돼요. 고객 취향으로 인한 맛, 서비스 불만족은 대상이 아니에요.",
+    v: { q: "이물질이 나와서 클레임을 넣으려고 해요. 접수가 안 되는 경우는?",
+      opts: ["사진을 찍어 둔 경우", "이물을 이미 폐기한 경우", "농산물에서 나온 이물인 경우", "검수 중에 발견한 경우"], a: 1,
+      exp: "이물을 폐기하면 클레임 접수가 불가해요. 농산물 이물질도 '이물질'로 분류해 접수해요." } },
+  { id: "par-1", ch: "par", type: "mc",
+    q: "발주 Par를 구하는 공식으로 맞는 것은?",
+    opts: ["(출고량 ÷ 총매출액) × Sales Forecast", "(입고량 ÷ 총매출액) × Sales Forecast", "(기말재고 ÷ 출고량) × 매출버젯", "(출고량 × 총매출액) ÷ Sales Forecast"], a: 0,
+    exp: "발주 Par = (출고량 ÷ 총 매출액) × Sales Forecast. 출고량은 수불부의 판매수량(사용량)이에요.",
+    v: { q: "1,000만원 당 사용량을 구하는 공식은?",
+      opts: ["(입고량 ÷ 총매출액) × 10,000,000", "(출고량 ÷ 총매출액) × 10,000,000", "(출고량 × 10,000,000) ÷ 기말재고", "(기초재고 ÷ 총매출액) × 10,000,000"], a: 1,
+      exp: "(출고량 ÷ 총매출액) × 10,000,000. 여기에 매출버젯을 곱하는 대신 1,000만원을 곱한 것이에요." } },
+  { id: "par-2", ch: "par", type: "mc",
+    q: "월요일에 발주해서 수요일에 입고되는 업체라면, 발주 Par를 구할 때 어떤 날의 매출버젯을 봐야 할까요?",
+    opts: ["월·화요일", "화·수요일", "수·목요일", "지난주 수·목요일 실매출"], a: 2,
+    exp: "입고되는 날부터 다음 입고 전까지 쓸 양을 발주해요. 월요일 발주 → 수요일 입고라면 수·목요일 매출버젯을 확인해요.",
+    v: { q: "수·목요일 예상 매출 합계가 1,000만원이에요. 이 정보는 발주 Par 공식에서 어느 자리에 들어갈까요?",
+      opts: ["출고량", "총매출액", "Sales Forecast", "기말재고"], a: 2,
+      exp: "발주 Par = (출고량 ÷ 총매출액) × Sales Forecast. 입고 기간의 예상 매출(매출버젯)이 Sales Forecast 자리에 들어가요." } },
+  { id: "par-3", ch: "par", type: "sa",
+    q: "발주 Par를 작성해야 하는 이유를 관점별로 적어 보세요. (4가지 관점)",
+    kw: [["퀄리티", "quality", "품질", "신선"], ["코스트", "cost", "비용", "폐기"], ["레이버", "labor", "인건비", "생산성", "업무강도"], ["스토리지", "storage", "보관", "소비기한", "선입선출"]], need: 3,
+    model: "Quality: 재고가 많으면 신선도가 떨어지고, 부족하면 레시피 준수가 어려워 86 발생 / Cost: 과발주 시 폐기 증가로 코스트 상승 / Labor: 계획 발주로 벌크 프랩, 인건비·업무강도 조절 / Storage: 소비기한·선입선출·한글표시사항·이력제 관리가 쉬워짐",
+    exp: "자료는 Quality, Cost, Labor, Storage 4가지 관점으로 설명해요. 4개 중 3개 이상 쓰면 정답으로 쳐요.",
+    v: { q: "과발주를 하면 생기는 문제를 적어 보세요.",
+      kw: [["폐기", "버림"], ["코스트", "cost", "비용", "원가"], ["퀄리티", "품질", "신선"], ["관리", "소비기한", "선입선출", "보관"]], need: 2,
+      model: "식자재 폐기량 증가 → 코스트 상승 / 재고가 오래 남아 퀄리티(신선도) 저하 / 단가 변동 시 코스트 관리 어려움 / 소비기한·선입선출 등 보관 관리 포인트를 놓치기 쉬움",
+      exp: "핵심은 폐기 증가로 인한 코스트 상승과 퀄리티 저하예요. 2가지 이상 쓰면 정답." } },
+  { id: "inv-1", ch: "inv", type: "mc",
+    q: "매장 간 재고이동은 영업관리시스템에 언제까지 입력해야 할까요?",
+    opts: ["이동 다음 날까지", "월말 인벤토리 18시 전", "말일 자정 전", "익월 1일까지"], a: 1,
+    exp: "재고이동은 월말 인벤토리 18시 전까지 입력해야 해요. 누락되지 않게 이동한 당일에 진행하는 게 원칙이에요.",
+    v: { q: "재고이동을 등록할 때 빌려주는 매장과 빌리는 매장의 처리로 맞는 것은?",
+      opts: ["빌려주는 매장 +, 빌리는 매장 −", "빌려주는 매장 −, 빌리는 매장 +", "양쪽 모두 +", "빌리는 매장만 입력"], a: 1,
+      exp: "빌려주는 매장은 −, 빌리는 매장은 + 로 처리해요. 단위는 구매 단위로 입력해요." } },
+  { id: "inv-2", ch: "inv", type: "sa",
+    q: "월말 인벤토리를 할 때 유의할 점을 적어 보세요.",
+    kw: [["단위", "box", "ea", "박스"], ["팬", "pan", "무게", "렉산"], ["위에서아래", "왼쪽에서오른쪽", "순서", "누락"], ["2인1조", "두명", "더블체크", "이중체크"]], need: 3,
+    model: "① 재고실사 단위와 입력 단위(Box/EA) 확인 ② 1/6팬·렉산 등 Pan 무게 숙지 ③ 위에서 아래로, 왼쪽에서 오른쪽으로 순서를 정해 누락 방지 ④ 2인 1조 더블체크 ⑤ 평균 이동 단가 확인",
+    exp: "단위 확인, 팬 무게, 순서(누락 방지), 2인1조 더블체크 중 3개 이상 쓰면 정답이에요.",
+    v: { q: "인벤토리를 더 정확하게 하려고 사람과 순서를 어떻게 정해야 하는지 적어 보세요.",
+      kw: [["2인1조", "두명", "더블체크", "이중체크"], ["위에서아래", "왼쪽에서오른쪽", "순서"]], need: 2,
+      model: "2인 1조로 더블체크하고, 위에서 아래로·왼쪽에서 오른쪽으로 순서를 정해 누락 없이 카운트해요.",
+      exp: "사람: 2인 1조 더블체크 / 순서: 위→아래, 왼→오른쪽. 둘 다 써야 정답." } },
+  { id: "hr-1", ch: "hr", type: "mc",
+    q: "불합격한 입사 지원자의 서류는 어떻게 처리할까요?",
+    opts: ["즉시 파기", "30일 보관 후 파기", "90일 보관 후 파기", "1년 보관 후 파기"], a: 2,
+    exp: "채용 전형이 끝나면 잠금장치가 있는 서랍이나 금고에 보관하고 90일 뒤 파기해요. 합격자 서류는 인사시스템(플젝)에 올린 뒤 파기해요.",
+    v: { q: "합격자의 입사 서류는 어떻게 처리할까요?",
+      opts: ["매장 금고에 퇴사 때까지 보관", "인사시스템(플젝)에 업로드한 뒤 파기", "90일 보관 후 파기", "점주에게 전달"], a: 1,
+      exp: "합격자 서류는 인사시스템(플젝) 업로드 후 파기해요. 불합격자 서류는 90일 보관 후 파기." } },
+  { id: "hr-2", ch: "hr", type: "mc",
+    q: "근로계약상 급여 기산일과 지급일로 맞는 것은?",
+    opts: ["당월 1일~말일 / 익월 10일", "전월 16일~당월 15일 / 25일", "전월 21일~당월 20일 / 25일", "전월 16일~당월 15일 / 말일"], a: 1,
+    exp: "급여 기산일은 전월 16일부터 당월 15일까지, 지급일은 25일이에요. 25일이 휴일이면 그 전날 지급해요.",
+    v: { q: "급여 지급일(25일)이 휴일이면 언제 지급할까요?",
+      opts: ["그 전날", "다음 영업일", "그 달 말일", "다음 달 1일"], a: 0,
+      exp: "급여지급일은 25일, 휴일인 경우 그 전일에 지급해요." } },
+  { id: "hr-3", ch: "hr", type: "mc",
+    q: "하루 8시간 이상 근무하는 직원에게 줘야 하는 휴게시간은?",
+    opts: ["30분 이상", "45분 이상", "1시간 이상", "1시간 30분 이상"], a: 2,
+    exp: "근무시간 4시간 이상이면 30분 이상, 8시간 이상이면 1시간 이상 휴게시간을 줘야 해요.",
+    v: { q: "하루 5시간 근무하는 직원에게 줘야 하는 휴게시간은?",
+      opts: ["없음", "15분 이상", "30분 이상", "1시간 이상"], a: 2,
+      exp: "4시간 이상 근무 시 30분 이상, 8시간 이상 근무 시 1시간 이상이에요. 5시간은 30분 이상." } },
+  { id: "hr-4", ch: "hr", type: "sa",
+    q: "면접에서 물어보면 안 되는 질문 항목을 적어 보세요.",
+    kw: [["용모", "키", "체중", "신체", "외모", "몸무게"], ["출신", "지역", "고향"], ["혼인", "결혼"], ["재산"], ["가족"]], need: 3,
+    model: "지원자의 용모·키·체중 등 신체적 조건 / 출신 지역 / 혼인 여부 / 재산 / 가족의 학력·직업·재산. 채용절차법은 직무와 무관한 개인정보 수집을 금지해요(위반 시 과태료).",
+    exp: "신체 조건, 출신 지역, 혼인 여부, 재산, 가족 관련 중 3가지 이상 쓰면 정답이에요.",
+    v: { q: "채용절차법 때문에 면접에서 묻지 않는 '가족' 관련 항목과, 그 밖의 금지 항목 2가지를 적어 보세요.",
+      kw: [["학력"], ["직업"], ["용모", "키", "체중", "신체", "외모", "출신", "지역", "혼인", "결혼", "재산"]], need: 2,
+      model: "가족의 학력·직업·재산 / 그 밖에 지원자의 신체 조건(용모·키·체중), 출신 지역, 혼인 여부, 재산",
+      exp: "가족은 학력·직업·재산을 묻지 않아요. 지원자 본인의 신체 조건, 출신 지역, 혼인 여부, 재산도 금지예요." } },
+  { id: "doc-1", ch: "doc", type: "mc",
+    q: "축산물 이력번호가 적힌 거래명세서(축산물 납품서)는 얼마나 보관해야 할까요?",
+    opts: ["3개월", "6개월", "1년", "2년"], a: 2,
+    exp: "이력번호가 기재된 영수증이나 거래명세서(축산물 납품서)는 1년간 보관해요. 축산물 납품서는 다른 거래명세서와 따로 철해요.",
+    v: { q: "축산물 이력제에서 반드시 일치해야 하는 3가지가 아닌 것은?",
+      opts: ["거래명세서(축산물 납품서)의 이력번호", "제품 라벨의 이력번호", "게시 태블릿의 이력번호", "발주서의 품목코드"], a: 3,
+      exp: "거래명세서(축산물 납품서), 제품 라벨, 게시 태블릿의 이력번호 3가지가 반드시 일치해야 해요." } },
+  { id: "doc-2", ch: "doc", type: "mc",
+    q: "소독증명서(세스코)는 통상 얼마나 보관해야 할까요?",
+    opts: ["6개월", "1년", "2년", "3년"], a: 2,
+    exp: "소독은 월 1회 이상 진행하고, 소독증명서는 통상 2년 보관해요. 관계기관이 요구하면 제출해야 해요.",
+    v: { q: "법에 따라 매장 소독은 최소 얼마마다 진행해야 할까요?",
+      opts: ["주 1회 이상", "월 1회 이상", "분기 1회 이상", "반기 1회 이상"], a: 1,
+      exp: "감염병예방법에 따라 월 1회 이상 소독하고, 증명서는 통상 2년 보관해요." } },
+];
+
+/* ───── 저장 (폰 안에만, 막혀 있어도 앱은 동작) ───── */
+const KEY = "srkey.v1";
+let S = { st: {} }; // st[id] = { n: 푼 횟수, c: 맞힌 횟수, w: 오답노트에 있음, last: 최근 정답 여부 }
+try { const raw = localStorage.getItem(KEY); if (raw) S = JSON.parse(raw); } catch (e) {}
+const save = () => { try { localStorage.setItem(KEY, JSON.stringify(S)); } catch (e) {} };
+const st = id => (S.st[id] ||= { n: 0, c: 0, w: false, last: null });
+
+/* ───── 채점 ───── */
+const norm = s => String(s).toLowerCase().replace(/[\s·,.\/()\-~:;'"!?①②③④⑤]/g, "");
+function gradeSA(item, text) {
+  const t = norm(text);
+  const hits = item.kw.map(g => g.some(w => t.includes(norm(w))));
+  const n = hits.filter(Boolean).length;
+  return { ok: n >= item.need, hits, n };
+}
+
+/* ───── 화면 ───── */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const show = id => { document.querySelectorAll(".view").forEach(v => v.hidden = v.id !== id); scrollTo(0, 0); };
+const dock = html => { $("#dock").innerHTML = html; };
+const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+let tab = "all", count = 10, chSel = new Set();
+let run = null; // { list:[{id, variant}], i, score, wrongIds:[], state }
+
+function home() {
+  const ids = Q.map(q => q.id);
+  const done = ids.filter(id => S.st[id]?.n).length;
+  const tot = ids.reduce((a, id) => a + (S.st[id]?.n || 0), 0);
+  const cor = ids.reduce((a, id) => a + (S.st[id]?.c || 0), 0);
+  const wrong = ids.filter(id => S.st[id]?.w);
+  $("#st-done").innerHTML = `${done}<small>/${ids.length}</small>`;
+  $("#st-bar").style.width = (done / ids.length * 100) + "%";
+  $("#st-rate").innerHTML = tot ? `${Math.round(cor / tot * 100)}<small>%</small>` : "–";
+  $("#st-wrong").textContent = wrong.length;
+  $("#tab-wrong").textContent = wrong.length || "";
+
+  document.querySelectorAll(".seg button").forEach(b => b.setAttribute("aria-selected", b.dataset.tab === tab));
+  $("#p-all").hidden = tab !== "all"; $("#p-ch").hidden = tab !== "ch"; $("#p-wrong").hidden = tab !== "wrong";
+
+  $("#chlist").innerHTML = Object.entries(CH).map(([k, name]) => {
+    const qs = Q.filter(q => q.ch === k);
+    const right = qs.filter(q => S.st[q.id]?.last === true).length;
+    return `<button class="chrow" data-ch="${k}" aria-pressed="${chSel.has(k)}"><b>${name}</b><em>${right}/${qs.length}</em><div class="bar"><i style="width:${right / qs.length * 100}%"></i></div></button>`;
+  }).join("");
+
+  $("#wlist").innerHTML = wrong.length
+    ? wrong.map(id => { const q = Q.find(x => x.id === id); return `<div class="witem"><small>${CH[q.ch]} · 변형 문제로 출제</small><span>${esc(q.q)}</span></div>`; }).join("")
+    : `<div class="empty"><b>틀린 문제가 없어요</b>문제를 풀다 틀리면 여기에 모여요.</div>`;
+
+  let label = "문제 풀기 시작", dis = false;
+  if (tab === "ch") { label = chSel.size ? `고른 단원 풀기 (${Q.filter(q => chSel.has(q.ch)).length}문제)` : "단원을 골라 주세요"; dis = !chSel.size; }
+  if (tab === "wrong") { label = wrong.length ? `오답 ${wrong.length}문제 다시 풀기` : "오답노트가 비어 있어요"; dis = !wrong.length; }
+  dock(`<button class="btn" id="start" ${dis ? "disabled" : ""}>${label}</button>`);
+  $("#start").onclick = start;
+  show("v-home");
+}
+
+function start() {
+  let list;
+  if (tab === "wrong") list = shuffle(Q.filter(q => S.st[q.id]?.w)).map(q => ({ id: q.id, variant: true }));
+  else if (tab === "ch") list = shuffle(Q.filter(q => chSel.has(q.ch))).map(q => ({ id: q.id, variant: false }));
+  else { list = shuffle(Q).map(q => ({ id: q.id, variant: false })); if (count) list = list.slice(0, count); }
+  run = { list, i: 0, score: 0, wrongIds: [] };
+  show("v-quiz");
+  ask(true);
+}
+
+const item = () => { const r = run.list[run.i]; const q = Q.find(x => x.id === r.id); return { r, q, d: r.variant ? { ...q.v, type: q.type } : q }; };
+
+function ask(first) {
+  const { r, q, d } = item();
+  run.state = { sel: null, order: d.type === "mc" ? shuffle([0, 1, 2, 3]) : null };
+  $("#q-pos").textContent = `${run.i + 1} / ${run.list.length}`;
+  $("#q-score").textContent = `맞힘 ${run.score}`;
+  $("#q-bar").style.width = (run.i / run.list.length * 100) + "%";
+  const card = $("#card");
+  card.className = "card";
+  const tags = `<div class="tags"><span class="tag ch">${CH[q.ch]}</span><span class="tag">${d.type === "mc" ? "객관식" : "주관식"}</span>${r.variant ? '<span class="tag var">변형 문제</span>' : ""}</div>`;
+  if (d.type === "mc") {
+    card.innerHTML = tags + `<h2 class="qtext">${esc(d.q)}</h2><div class="opts">${run.state.order.map((oi, k) =>
+      `<button class="opt" data-oi="${oi}" aria-pressed="false"><span class="n">${k + 1}</span><span>${esc(d.opts[oi])}</span><span class="mk"></span></button>`).join("")}</div>`;
+    card.querySelectorAll(".opt").forEach(b => b.onclick = () => {
+      run.state.sel = +b.dataset.oi;
+      card.querySelectorAll(".opt").forEach(x => x.setAttribute("aria-pressed", x === b));
+      $("#check").disabled = false;
+    });
+  } else {
+    card.innerHTML = tags + `<h2 class="qtext">${esc(d.q)}</h2><div class="sa"><label for="ans">내 답</label><textarea id="ans" placeholder="생각나는 내용을 최대한 적어 주세요"></textarea><p class="hint">핵심 키워드가 ${d.need}개 이상 들어가면 정답이에요. 띄어쓰기는 상관없어요.</p></div>`;
+    $("#ans").oninput = e => { $("#check").disabled = !e.target.value.trim(); };
+  }
+  void card.offsetWidth; if (!first) card.classList.add("enter");
+  dock(`<button class="btn" id="check" disabled>정답 확인</button>`);
+  $("#check").onclick = check;
+}
+
+function check() {
+  const { r, q, d } = item();
+  const s = st(q.id);
+  let ok, mine, sa;
+  if (d.type === "mc") { ok = run.state.sel === d.a; mine = d.opts[run.state.sel]; }
+  else { mine = $("#ans").value.trim(); sa = gradeSA(d, mine); ok = sa.ok; }
+  s.n++; s.last = ok;
+  if (ok) { s.c++; run.score++; if (r.variant) s.w = false; }
+  else { s.w = true; run.wrongIds.push(q.id); }
+  save();
+  $("#q-score").textContent = `맞힘 ${run.score}`;
+  $("#q-bar").style.width = ((run.i + 1) / run.list.length * 100) + "%";
+  const last = run.i === run.list.length - 1;
+  const nextLabel = last ? "결과 보기" : "다음 문제";
+  const card = $("#card");
+
+  if (ok) {
+    if (d.type === "mc") card.querySelectorAll(".opt").forEach(b => { b.disabled = true; if (+b.dataset.oi === d.a) { b.classList.add("right"); b.querySelector(".mk").textContent = "정답"; } });
+    else { $("#ans").readOnly = true; }
+    card.insertAdjacentHTML("beforeend", `<div class="okline"><svg viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>${r.variant ? "변형 문제도 맞혔어요. 오답노트에서 뺄게요" : "정답이에요"}</div><p class="okexp">${esc(d.exp)}</p>`);
+    card.classList.remove("enter"); void card.offsetWidth; card.classList.add("pop");
+  } else {
+    // 틀리면 카드를 뒤집어 해답 카드로
+    card.classList.remove("enter", "pop"); void card.offsetWidth;
+    card.classList.add("flip-out");
+    const swap = () => {
+      card.innerHTML = answerCard(q, d, mine, sa, r.variant);
+      card.classList.remove("flip-out"); void card.offsetWidth; card.classList.add("flip-in");
+    };
+    matchMedia("(prefers-reduced-motion: reduce)").matches ? swap() : setTimeout(swap, 170);
+  }
+  dock(`<button class="btn ${ok ? "dark" : ""}" id="next">${nextLabel}</button>`);
+  $("#next").onclick = () => { if (last) result(); else { run.i++; ask(); } };
+}
+
+function answerCard(q, d, mine, sa, variant) {
+  let body;
+  if (d.type === "mc") {
+    body = `<div class="blk"><small>정답</small><div class="correct">${esc(d.opts[d.a])}</div></div>
+      <div class="blk"><small>내가 고른 답</small><div class="mine">${esc(mine)}</div></div>`;
+  } else {
+    const names = d.kw.map(g => g[0]);
+    body = `<div class="blk"><small>핵심 키워드 ${sa.n}개 맞힘 · ${d.need}개 이상이면 정답</small><div class="kws">${names.map((k, i) => `<span class="kw ${sa.hits[i] ? "hit" : "miss"}">${esc(k)}</span>`).join("")}</div>
+      <p class="kwnote">초록은 내 답에 들어간 키워드, 빨간 테두리는 빠진 키워드예요.</p></div>
+      <div class="blk"><small>모범 답안</small><div class="correct model">${esc(d.model)}</div></div>
+      <div class="blk"><small>내 답</small><div class="mine ${mine ? "" : "empty-ans"}">${esc(mine || "(비어 있음)")}</div></div>`;
+  }
+  return `<div class="ans"><div class="head"><b>오답 · 해답 카드</b><span>${CH[q.ch]}</span></div>
+    <p class="q">${esc(d.q)}</p>${body}
+    <div class="exp">${esc(d.exp)}</div>
+    <p class="src">출처: ${SRC} · ${CH[q.ch]}</p>
+    <p class="note">${variant ? "변형 문제도 틀렸어요. 오답노트에 남겨 둘게요." : "오답노트에 담았어요. 다음엔 바뀐 문제로 다시 나와요."}</p></div>`;
+}
+
+function result() {
+  const n = run.list.length;
+  $("#res").innerHTML = `<div class="big">${run.score}<small> / ${n}</small></div><p>정답률 ${Math.round(run.score / n * 100)}% · 틀린 문제 ${run.wrongIds.length}개</p>`;
+  $("#res-wrong").innerHTML = run.wrongIds.length
+    ? `<h3>틀린 문제</h3><p class="sub">오답노트에서 변형 문제로 다시 풀 수 있어요.</p><div class="wlist">${run.wrongIds.map(id => { const q = Q.find(x => x.id === id); return `<div class="witem"><small>${CH[q.ch]}</small><span>${esc(q.q)}</span></div>`; }).join("")}</div>`
+    : `<div class="empty"><b>모두 맞혔어요</b>다른 단원도 풀어 보세요.</div>`;
+  const hasWrong = Q.some(q => S.st[q.id]?.w);
+  dock(`<button class="btn ghost" id="r-home">홈</button><button class="btn" id="r-next">${hasWrong ? "오답노트 풀기" : "다시 풀기"}</button>`);
+  $("#r-home").onclick = () => { tab = "all"; home(); };
+  $("#r-next").onclick = () => { tab = hasWrong ? "wrong" : "all"; start(); };
+  show("v-result");
+}
+
+/* ───── 이벤트 ───── */
+document.querySelector(".seg").onclick = e => { const b = e.target.closest("button"); if (b) { tab = b.dataset.tab; home(); } };
+$("#cnt-chips").onclick = e => { const b = e.target.closest("button"); if (!b) return; count = +b.dataset.n; $("#cnt-chips").querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", x === b)); };
+$("#chlist").onclick = e => { const b = e.target.closest(".chrow"); if (!b) return; const k = b.dataset.ch; chSel.has(k) ? chSel.delete(k) : chSel.add(k); home(); };
+$("#quit").onclick = () => { if (confirm("그만 풀까요? 지금까지 푼 기록은 저장돼요.")) home(); };
+
+home();
+</script>
+</body>
+</html>
