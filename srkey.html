@@ -660,7 +660,7 @@ function result() {
   const g = {};
   r.list.forEach((x, k) => { const c = byId[x.id].ch; (g[c] ||= [0, 0]); g[c][1]++; if (r.res[k] === 1) g[c][0]++; });
   const rows = Object.entries(g).sort((a, b) => a[1][0] / a[1][1] - b[1][0] / b[1][1]);
-  $("#r-ch").innerHTML = `<h3>단원별</h3><p class="sub">약한 단원이 위에 있어요.</p><div class="bych">${rows.map(([c, [a, t]]) => `<div class="r"><span>${esc(c)}</span><b>${a}/${t}</b><div class="mini"><i style="width:${a / t * 100}%"></i></div></div>`).join("")}</div>`;
+  $("#r-ch").innerHTML = `<h3>단원별</h3><p class="sub">${rows.length > 8 ? `약한 단원 8개만 보여요 (전체 ${rows.length}개)` : "약한 단원이 위에 있어요."}</p><div class="bych">${rows.slice(0, 8).map(([c, [a, t]]) => `<div class="r"><span>${esc(c)}</span><b>${a}/${t}</b><div class="mini"><i style="width:${a / t * 100}%"></i></div></div>`).join("")}</div>`;
   $("#r-ch").hidden = rows.length < 2;
 
   $("#r-wrong").innerHTML = wrongIdx.length
