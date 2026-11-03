@@ -11,7 +11,8 @@
 
 ### 이사 점검 기록 (2026-11-03, 클라우드 세션)
 - 힉스필드: 연결됨. pro 플랜, 잔액 91.36크레딧 (문서 기록과 일치)
-- Kling(`plugin:kling-ai`): 설치돼 있으나 OAuth 미인증 → 도구 안 보임. 사용자가 로그인해야 함
+- Kling: claude.ai 커넥터(`mcp__Kling__*`)로 연결 완료 (2026-11-03). Pro(SVIP) 멤버십, 잔여 2,992크레딧. 플러그인판(`plugin:kling-ai`)은 여전히 미인증이지만 커넥터로 쓰면 됨
+- Kling 기본 모델: 이미지 `kling-image-v3_0_omni`(2K), 이미지→영상 `kling-video-v4_0`. 단일 이미지→영상 가성비 `kling-video-v3_0_turbo`, Kling 3.0 `kling-video-v3_0`
 - Manifold: 연결됨
 - 재료 생성 담당 결정(2026-11-03): **Claude가 Kling MCP로 직접 생성**. Kling 로그인 전까진 힉스필드 `kling3_0`으로 대체 가능 (5초 9:16 = 10크레딧, 힉스필드 차감)
 - 클라우드 세션에서는 kling-ai OAuth를 못 띄움 → claude.ai 커넥터(https://claude.ai/customize/connectors)에 `https://kling.ai/mcp/plugin` 추가 후 새 세션, 또는 로컬 Claude Code에서 `/mcp` 로그인
