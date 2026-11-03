@@ -13,6 +13,8 @@
 - 힉스필드: 연결됨. pro 플랜, 잔액 91.36크레딧 (문서 기록과 일치)
 - Kling(`plugin:kling-ai`): 설치돼 있으나 OAuth 미인증 → 도구 안 보임. 사용자가 로그인해야 함
 - Manifold: 연결됨
+- 재료 생성 담당 결정(2026-11-03): **Claude가 Kling MCP로 직접 생성**. Kling 로그인 전까진 힉스필드 `kling3_0`으로 대체 가능 (5초 9:16 = 10크레딧, 힉스필드 차감)
+- 클라우드 세션에서는 kling-ai OAuth를 못 띄움 → claude.ai 커넥터(https://claude.ai/customize/connectors)에 `https://kling.ai/mcp/plugin` 추가 후 새 세션, 또는 로컬 Claude Code에서 `/mcp` 로그인
 - 이 저장소(`mfgkorea/order.html`)에는 프로젝트 문서 11개(`claude/series-bible.md` 등)가 아직 없음 → 문서를 이 `claude/` 폴더로 옮겨 넣으면 이후 세션이 바로 읽을 수 있음
 
 ## 1. 응답 규칙
