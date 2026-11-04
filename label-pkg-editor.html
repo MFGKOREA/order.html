@@ -1,0 +1,571 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- ARTIFACT-HEAD-START -->
+<title>MFG 라벨 패키지 편집기</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one working surface. Toolbar pinned above a dense editable grid; the package summary sits in a thin strip, the save step at the end. */
+:root{
+  --bg:#f3f4f2;
+  --paper:#ffffff;
+  --ink:#1b211e;
+  --ink-2:#4e5752;
+  --ink-3:#8a948e;
+  --line:#d9ddd9;
+  --line-2:#e9ece9;
+  --accent:#c8372d;
+  --accent-ink:#ffffff;
+  --new:#1f7a4d;
+  --new-bg:#e6f4ec;
+  --mod:#b7791f;
+  --mod-bg:#fbf1dc;
+  --danger:#b3261e;
+  --focus:#2f6ad9;
+  --font-body:"Noto Sans KR",-apple-system,"Apple SD Gothic Neo","Malgun Gothic",system-ui,sans-serif;
+  --font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#151816; --paper:#1e2320; --ink:#edf0ed; --ink-2:#b5bdb8; --ink-3:#7d867f;
+  --line:#343b37; --line-2:#2a302d; --accent:#e5564b; --accent-ink:#ffffff;
+  --new:#5fcf93; --new-bg:#1b3327; --mod:#e0ab4e; --mod-bg:#3a2f16; --danger:#f0776e; --focus:#7aa5ff; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#151816; --paper:#1e2320; --ink:#edf0ed; --ink-2:#b5bdb8; --ink-3:#7d867f;
+  --line:#343b37; --line-2:#2a302d; --accent:#e5564b; --accent-ink:#ffffff;
+  --new:#5fcf93; --new-bg:#1b3327; --mod:#e0ab4e; --mod-bg:#3a2f16; --danger:#f0776e; --focus:#7aa5ff; color-scheme:dark }
+
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:14px;line-height:1.5;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:0 32px}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--bg)}
+h1,h2,h3{margin:0;text-wrap:balance;line-height:1.25}
+h1{font-size:20px;font-weight:700;letter-spacing:-.01em}
+h2{font-size:15px;font-weight:700}
+p{margin:0}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer;border:1px solid var(--line);background:var(--paper);border-radius:6px;padding:7px 12px;line-height:1.2}
+button:hover{border-color:var(--ink-3)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+button.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:700}
+button.primary:hover{filter:brightness(.94)}
+button.quiet{border-color:transparent;background:transparent;color:var(--ink-2)}
+button.quiet:hover{background:var(--line-2);border-color:transparent}
+button:disabled{opacity:.45;cursor:not-allowed}
+.wrap{max-width:1280px;margin:0 auto;display:grid;gap:16px;padding-top:18px}
+.topbar{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px}
+.topbar .sub{color:var(--ink-2)}
+.eyebrow{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-3);font-weight:500}
+.card{background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+.drop{border:2px dashed var(--line);border-radius:10px;padding:28px 16px;text-align:center;display:grid;gap:10px;justify-items:center;transition:border-color .15s,background .15s}
+.drop.over{border-color:var(--accent);background:var(--line-2)}
+.drop strong{font-size:15px}
+.drop .hint{color:var(--ink-2);max-width:46ch}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.row.between{justify-content:space-between}
+.meta{display:flex;flex-wrap:wrap;gap:6px 22px;font-size:13px;color:var(--ink-2)}
+.meta b{color:var(--ink);font-weight:500}
+.meta .mono{font-family:var(--font-mono);font-size:12.5px}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:2px 10px;font-size:12.5px;font-weight:500;border:1px solid var(--line);background:var(--bg);color:var(--ink-2)}
+.chip.new{background:var(--new-bg);color:var(--new);border-color:transparent}
+.chip.mod{background:var(--mod-bg);color:var(--mod);border-color:transparent}
+.chip.del{background:var(--line-2);color:var(--danger);border-color:transparent}
+.toolbar{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.toolbar input[type=search],.toolbar select{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:7px 10px;min-width:0}
+.toolbar input[type=search]{flex:1 1 180px}
+.toolbar select{flex:0 1 150px}
+.spacer{flex:1 1 auto}
+.gridwrap{overflow:auto;border:1px solid var(--line);border-radius:8px;max-height:min(68vh,760px);background:var(--paper)}
+table{border-collapse:separate;border-spacing:0;width:100%;min-width:920px;font-size:13px}
+thead th{position:sticky;top:0;background:var(--bg);color:var(--ink-2);font-weight:500;text-align:left;padding:8px 8px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:1;font-size:12px}
+tbody td{padding:0;border-bottom:1px solid var(--line-2);vertical-align:middle}
+tbody tr:hover td{background:var(--line-2)}
+tbody tr.is-new td:first-child{box-shadow:inset 3px 0 0 var(--new)}
+tbody tr.is-mod td:first-child{box-shadow:inset 3px 0 0 var(--mod)}
+td.no{font-family:var(--font-mono);font-variant-numeric:tabular-nums;color:var(--ink-3);padding:0 8px;white-space:nowrap;text-align:right}
+td input{width:100%;border:0;background:transparent;padding:7px 8px;min-width:0;border-radius:0}
+td input:focus{background:var(--paper);box-shadow:inset 0 0 0 2px var(--focus);outline:none}
+td input.num{font-family:var(--font-mono);font-variant-numeric:tabular-nums;text-align:center}
+td.act{white-space:nowrap;padding:0 4px}
+td.act button{padding:4px 7px;font-size:12px;border-color:transparent;background:transparent;color:var(--ink-2)}
+td.act button:hover{background:var(--line);color:var(--ink)}
+td.act button.del:hover{color:var(--danger)}
+col.c-no{width:52px} col.c-cat{width:120px} col.c-item{width:auto} col.c-num{width:70px} col.c-date{width:84px} col.c-open{width:64px} col.c-act{width:112px}
+.foot{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;color:var(--ink-2);font-size:13px}
+.save{display:grid;gap:12px}
+.save .row input[type=text]{border:1px solid var(--line);background:var(--bg);border-radius:6px;padding:8px 10px;font-family:var(--font-mono);font-size:13px;flex:1 1 260px;min-width:0}
+.note{color:var(--ink-2);font-size:13px;max-width:72ch}
+.note ol{margin:6px 0 0;padding-left:20px}
+.note li{margin:2px 0}
+.status{min-height:20px;font-size:13px}
+.status.ok{color:var(--new)}
+.status.err{color:var(--danger)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:12px;color:var(--ink-2)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;vertical-align:-1px;margin-right:5px}
+.legend .n i{background:var(--new)} .legend .m i{background:var(--mod)}
+.help{display:grid;gap:4px;font-size:13px;color:var(--ink-2)}
+.help dt{font-weight:700;color:var(--ink)}
+.help dd{margin:0 0 6px}
+details summary{cursor:pointer;color:var(--ink-2);font-size:13px}
+.toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:13px;box-shadow:0 6px 20px rgba(0,0,0,.2);z-index:20;max-width:calc(100% - 32px)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+@media (max-width:600px){ .toolbar select{flex-basis:46%} h1{font-size:18px} }
+</style>
+<!-- ARTIFACT-HEAD-END -->
+</head>
+<body>
+<!-- ARTIFACT-BODY-START -->
+<div class="wrap">
+  <header class="topbar">
+    <h1>MFG 라벨 패키지 편집기</h1>
+    <p class="sub">SATO FX3-LX 라벨프린터용 .pkg 파일을 열어 품목 목록을 고치고 새 .pkg로 저장합니다.</p>
+  </header>
+
+  <section class="card" id="openCard">
+    <div class="drop" id="drop">
+      <strong>라벨 패키지(.pkg)를 여기에 끌어다 놓거나 선택하세요</strong>
+      <p class="hint">프린터에 설치했던 .pkg 파일을 그대로 넣으면 됩니다. 파일은 이 브라우저 안에서만 처리되고 어디에도 전송되지 않습니다.</p>
+      <div class="row">
+        <button class="primary" type="button" id="pickBtn">파일 선택</button>
+        <button type="button" id="reopenBtn" hidden>마지막 파일 다시 열기</button>
+      </div>
+      <input type="file" id="fileInput" accept=".pkg,application/octet-stream" hidden>
+      <p class="status err" id="openStatus"></p>
+    </div>
+  </section>
+
+  <section class="card" id="editCard" hidden>
+    <div class="row between" style="margin-bottom:12px">
+      <div>
+        <div class="eyebrow">열린 패키지</div>
+        <div class="meta" id="pkgMeta"></div>
+      </div>
+      <div class="chips" id="changeChips"></div>
+    </div>
+
+    <div class="toolbar" style="margin-bottom:10px">
+      <input type="search" id="q" placeholder="품목명 검색" aria-label="품목명 검색">
+      <select id="fCat1" aria-label="카테고리 1 필터"><option value="">카테고리 1 전체</option></select>
+      <select id="fCat2" aria-label="카테고리 2 필터"><option value="">카테고리 2 전체</option></select>
+      <span class="spacer"></span>
+      <button type="button" id="addBtn">+ 품목 추가</button>
+      <button type="button" id="csvOutBtn">CSV 내보내기</button>
+      <button type="button" id="csvInBtn">CSV 가져오기</button>
+      <input type="file" id="csvInput" accept=".csv,text/csv" hidden>
+      <button type="button" class="quiet" id="resetBtn">변경 취소</button>
+    </div>
+
+    <div class="gridwrap">
+      <table id="grid">
+        <colgroup>
+          <col class="c-no"><col class="c-cat"><col class="c-cat"><col class="c-item"><col class="c-num"><col class="c-num"><col class="c-date"><col class="c-date"><col class="c-open"><col class="c-act">
+        </colgroup>
+        <thead><tr>
+          <th>NO</th><th>카테고리 1</th><th>카테고리 2</th><th>품목명</th><th title="보관 일수. T = 시간 입력형">일수</th><th title="보관 시간">시간</th><th>시작일</th><th>종료일</th><th>OPEN</th><th></th>
+        </tr></thead>
+        <tbody id="tbody"></tbody>
+      </table>
+    </div>
+    <div class="foot" style="margin-top:10px">
+      <span id="countInfo"></span>
+      <span class="legend"><span class="n"><i></i>새 품목</span><span class="m"><i></i>수정됨</span></span>
+      <span class="spacer"></span>
+      <details><summary>열 설명</summary>
+        <dl class="help" style="margin-top:8px">
+          <dt>카테고리 1 / 2</dt><dd>프린터 화면의 버튼 이름과 같아야 합니다. 기존 값을 쓰면 목록에서 고를 수 있습니다. 새 값을 넣으면 카테고리 버튼이 바뀌지 않으므로 화면에 안 나올 수 있습니다.</dd>
+          <dt>일수</dt><dd>보관 일수입니다. 0은 당일, T는 시간 입력형 라벨입니다. 시간 열과 둘 중 하나만 채웁니다.</dd>
+          <dt>시간</dt><dd>보관 시간(시간 단위)입니다. 시간형 품목(ⓗ 표시)에 씁니다.</dd>
+          <dt>시작일 / 종료일 / OPEN</dt><dd>기존 품목에 적힌 값을 그대로 따라 쓰세요. 비워 두면 빈 값으로 저장됩니다.</dd>
+        </dl>
+      </details>
+    </div>
+    <datalist id="dlCat1"></datalist>
+    <datalist id="dlCat2"></datalist>
+  </section>
+
+  <section class="card save" id="saveCard" hidden>
+    <div>
+      <div class="eyebrow">새 패키지 저장</div>
+      <h2 style="margin-top:2px">수정한 목록을 넣은 .pkg 만들기</h2>
+    </div>
+    <div class="row">
+      <input type="text" id="outName" aria-label="저장 파일 이름">
+      <button type="button" class="primary" id="saveBtn">PKG 저장</button>
+    </div>
+    <p class="status" id="saveStatus"></p>
+    <div class="note">
+      <p>저장 후 프린터에 올리는 순서</p>
+      <ol>
+        <li>프린터의 현재 설정과 기존 .pkg 파일을 백업해 둡니다.</li>
+        <li>새 .pkg를 USB 메모리에 넣어 프린터에서 설치하거나, SATO All-In-One Tool로 전송합니다.</li>
+        <li>바뀐 품목 한두 개를 골라 라벨을 시험 출력해 날짜와 품목명을 확인합니다.</li>
+      </ol>
+    </div>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+<script>
+/* ===== PKG core (SATO AEP Works 3 package) =====
+   Layout: "PKG " 00 01 00 00 | count | 0 | table[count] of (flags, recordOffset) | records | data (contiguous, entry order).
+   Record (compressed, flags 0x80000003): 12 u32 BE: dataOff(rel. to record), compSize, adler32(comp), 1, 0x18, 0x2710,
+     dataOff-24, rawSize, adler32(path + "\0" + raw), 0x18, mode, nameLen+19 ; then "path\0user\0".
+   Record (stored, flags 0x3): 6 u32: dataOff, size, adler32(path+"\0"+raw), 0x18, mode, nameLen+19 ; then name bytes.
+   Record (script, flags 0x80000004): 9 u32, no name. Scripts are kept verbatim. */
+const PKG = (() => {
+  const te = new TextEncoder(), td = new TextDecoder();
+  function adler32(bytes, seed = 1) {
+    let a = seed & 0xffff, b = (seed >>> 16) & 0xffff;
+    for (let i = 0; i < bytes.length;) {
+      const end = Math.min(i + 3800, bytes.length);
+      for (; i < end; i++) { a += bytes[i]; b += a; }
+      a %= 65521; b %= 65521;
+    }
+    return ((b << 16) | a) >>> 0;
+  }
+  function concat(parts) {
+    let n = 0; for (const p of parts) n += p.length;
+    const out = new Uint8Array(n); let o = 0;
+    for (const p of parts) { out.set(p, o); o += p.length; }
+    return out;
+  }
+  function entryChecksum(nameBytes, raw) {
+    const z = nameBytes.indexOf(0);
+    const path = z >= 0 ? nameBytes.subarray(0, z) : nameBytes;
+    return adler32(concat([path, new Uint8Array([0]), raw]));
+  }
+  function parse(buf) {
+    const d = new Uint8Array(buf), dv = new DataView(buf);
+    if (td.decode(d.subarray(0, 4)) !== 'PKG ') throw new Error('PKG 서명이 없는 파일입니다. SATO 라벨 패키지(.pkg)가 맞는지 확인해 주세요.');
+    const n = dv.getUint32(8);
+    const tbl = []; for (let i = 0; i < n; i++) tbl.push({ fl: dv.getUint32(0x10 + 8 * i), off: dv.getUint32(0x14 + 8 * i) });
+    const entries = [];
+    for (let i = 0; i < n; i++) {
+      const { fl, off } = tbl[i]; const u = k => dv.getUint32(off + 4 * k);
+      if ((fl & 0xff) === 4) {
+        const blob = d.slice(off + u(0), off + u(0) + u(1));
+        entries.push({ kind: 't4', fl, blob, raw: pako.inflate(blob) });
+      } else if (fl & 0x80000000) {
+        const blob = d.slice(off + u(0), off + u(0) + u(1));
+        entries.push({ kind: 'c', fl, blob, raw: pako.inflate(blob), mode: u(10), nameStart: off + 48, nameLen: u(11) - 19 });
+      } else {
+        const raw = d.slice(off + u(0), off + u(0) + u(1));
+        entries.push({ kind: 'r', fl, blob: raw, raw, mode: u(4), nameStart: off + 24, nameLen: u(5) - 19 });
+      }
+    }
+    for (const e of entries) {
+      if (e.kind === 't4') continue;
+      e.nameBytes = d.slice(e.nameStart, e.nameStart + e.nameLen);
+      const z = e.nameBytes.indexOf(0);
+      e.path = td.decode(e.nameBytes.subarray(0, z >= 0 ? z : e.nameBytes.length));
+      delete e.nameStart; delete e.nameLen;
+    }
+    return entries;
+  }
+  function build(entries) {
+    const items = entries.map(e => {
+      if (e.kind === 't4') return { ...e, rec: 36 };
+      if (e.kind === 'c') return { ...e, blob: e.dirty ? pako.deflate(e.raw, { level: 9, memLevel: 8, strategy: 0 }) : e.blob, rec: 48 + e.nameBytes.length };
+      return { ...e, blob: e.raw, rec: 24 + e.nameBytes.length };
+    });
+    const dirStart = 0x10 + 8 * items.length;
+    let p = dirStart; const recOff = items.map(it => { const o = p; p += it.rec; return o; });
+    const dataStart = p;
+    const dataParts = []; let dataLen = 0; const seen = new Map();
+    for (const it of items) {
+      const key = (it.kind === 'r' ? 'r:' : 'c:') + it.blob.length + ':' + adler32(it.blob);
+      const hit = seen.get(key);
+      if (hit !== undefined && sameBytes(hit.blob, it.blob)) { it.pos = hit.pos; continue; }
+      it.pos = dataStart + dataLen; seen.set(key, { pos: it.pos, blob: it.blob }); dataParts.push(it.blob); dataLen += it.blob.length;
+    }
+    const head = new Uint8Array(dataStart); const hv = new DataView(head.buffer);
+    head.set(te.encode('PKG '), 0); head.set([0, 1, 0, 0], 4); hv.setUint32(8, items.length); hv.setUint32(12, 0);
+    items.forEach((it, i) => { hv.setUint32(0x10 + 8 * i, it.fl); hv.setUint32(0x14 + 8 * i, recOff[i]); });
+    items.forEach((it, i) => {
+      const ro = recOff[i], doff = it.pos - ro; let w = ro; const put = v => { hv.setUint32(w, v >>> 0); w += 4; };
+      if (it.kind === 't4') { [doff, it.blob.length, adler32(it.blob), 1, 0x18, 0x2710, doff - 24, it.raw.length, adler32(it.raw)].forEach(put); }
+      else if (it.kind === 'c') { [doff, it.blob.length, adler32(it.blob), 1, 0x18, 0x2710, doff - 24, it.raw.length, entryChecksum(it.nameBytes, it.raw), 0x18, it.mode, it.nameBytes.length + 19].forEach(put); head.set(it.nameBytes, w); }
+      else { [doff, it.blob.length, entryChecksum(it.nameBytes, it.raw), 0x18, it.mode, it.nameBytes.length + 19].forEach(put); head.set(it.nameBytes, w); }
+    });
+    return concat([head, ...dataParts]);
+  }
+  function sameBytes(a, b) { if (a.length !== b.length) return false; for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false; return true; }
+
+  /* ----- product table (tables/*.xml): fixed-width rows, LF line ends, tombstoned <Row> lines kept as-is ----- */
+  const unesc = s => s.replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"').replace(/&apos;/g, "'");
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  function parseTable(raw) {
+    const text = td.decode(raw);
+    const lines = text.split('\n');
+    const first = lines.findIndex(l => l.startsWith('<row '));
+    const headText = (first < 0 ? lines.filter(l => !l.startsWith('</table>')) : lines.slice(0, first)).join('\n') + '\n';
+    const cols = [...headText.matchAll(/<column[^>]*name="([^"]+)"/g)].map(m => unesc(m[1]));
+    const limits = /limits="\[(\d+),(\d+)\]"/.exec(headText);
+    const width = limits ? +limits[2] : 127;
+    const rows = [];
+    for (const l of lines) {
+      if (!l.startsWith('<row ')) continue;
+      const cells = []; const re = /<c>(.*?)<\/c>|<c\/>/g; let m;
+      while ((m = re.exec(l))) cells.push(m[1] === undefined ? '' : unesc(m[1]));
+      while (cells.length < cols.length) cells.push('');
+      rows.push(cells.slice(0, cols.length));
+    }
+    return { headText, cols, rows, width };
+  }
+  function buildTable(t, rows) {
+    const out = [t.headText];
+    const pad = t.width - 1;              // content padded to (limit-1) bytes, then LF; rows at or past (limit-2) are left as-is
+    rows.forEach((cells, i) => {
+      const id = i + 1;
+      const c = cells.slice(); c[0] = String(id);
+      let line = `<row id="${id}">` + c.map(v => v === '' ? '<c/>' : `<c>${esc(v)}</c>`).join('') + '</row>';
+      const len = te.encode(line).length;
+      if (len < pad - 1) line += ' '.repeat(pad - len);
+      out.push(line + '\n');
+    });
+    out.push('</table>\n');
+    return te.encode(out.join(''));
+  }
+  return { parse, build, parseTable, buildTable, adler32 };
+})();
+
+/* ===== CSV helpers ===== */
+function toCSV(cols, rows) {
+  const q = v => /[",\n\r]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  return '﻿' + [cols, ...rows].map(r => r.map(q).join(',')).join('\r\n') + '\r\n';
+}
+function parseCSV(text) {
+  text = text.replace(/^﻿/, ''); const rows = []; let row = [], cell = '', i = 0, inq = false;
+  while (i < text.length) {
+    const ch = text[i];
+    if (inq) { if (ch === '"') { if (text[i + 1] === '"') { cell += '"'; i += 2; continue; } inq = false; i++; continue; } cell += ch; i++; continue; }
+    if (ch === '"') { inq = true; i++; continue; }
+    if (ch === ',') { row.push(cell); cell = ''; i++; continue; }
+    if (ch === '\r') { i++; continue; }
+    if (ch === '\n') { row.push(cell); rows.push(row); row = []; cell = ''; i++; continue; }
+    cell += ch; i++;
+  }
+  if (cell !== '' || row.length) { row.push(cell); rows.push(row); }
+  return rows.filter(r => r.some(c => c.trim() !== ''));
+}
+
+/* ===== minimal ZIP (stored) for hosts that refuse .pkg downloads ===== */
+const CRC_T = (() => { const t = new Int32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c; } return t; })();
+function crc32(b) { let c = -1; for (let i = 0; i < b.length; i++) c = CRC_T[(c ^ b[i]) & 0xff] ^ (c >>> 8); return (c ^ -1) >>> 0; }
+function makeZip(name, data) {
+  const nb = new TextEncoder().encode(name), crc = crc32(data), d = new Date();
+  const dosT = (d.getHours() << 11) | (d.getMinutes() << 5) | (d.getSeconds() >> 1), dosD = ((d.getFullYear() - 1980) << 9) | ((d.getMonth() + 1) << 5) | d.getDate();
+  const lh = new Uint8Array(30 + nb.length), lv = new DataView(lh.buffer);
+  lv.setUint32(0, 0x04034b50, true); lv.setUint16(4, 20, true); lv.setUint16(6, 0x800, true); lv.setUint16(8, 0, true); lv.setUint16(10, dosT, true); lv.setUint16(12, dosD, true);
+  lv.setUint32(14, crc, true); lv.setUint32(18, data.length, true); lv.setUint32(22, data.length, true); lv.setUint16(26, nb.length, true); lv.setUint16(28, 0, true); lh.set(nb, 30);
+  const cd = new Uint8Array(46 + nb.length), cv = new DataView(cd.buffer);
+  cv.setUint32(0, 0x02014b50, true); cv.setUint16(4, 20, true); cv.setUint16(6, 20, true); cv.setUint16(8, 0x800, true); cv.setUint16(10, 0, true); cv.setUint16(12, dosT, true); cv.setUint16(14, dosD, true);
+  cv.setUint32(16, crc, true); cv.setUint32(20, data.length, true); cv.setUint32(24, data.length, true); cv.setUint16(28, nb.length, true); cv.setUint32(42, 0, true); cd.set(nb, 46);
+  const eo = new Uint8Array(22), ev = new DataView(eo.buffer);
+  ev.setUint32(0, 0x06054b50, true); ev.setUint16(8, 1, true); ev.setUint16(10, 1, true); ev.setUint32(12, cd.length, true); ev.setUint32(16, lh.length + data.length, true);
+  const out = new Uint8Array(lh.length + data.length + cd.length + eo.length);
+  out.set(lh, 0); out.set(data, lh.length); out.set(cd, lh.length + data.length); out.set(eo, lh.length + data.length + cd.length);
+  return out;
+}
+
+/* ===== App ===== */
+const $ = id => document.getElementById(id);
+const state = { entries: null, tableEntry: null, table: null, rows: [], origRows: [], fileName: '', info: null };
+const LS_KEY = 'mfg-label-pkg-last';
+let toastTimer = null;
+function toast(msg) { let t = document.querySelector('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; document.body.appendChild(t); } t.textContent = msg; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 2600); }
+
+function openBuffer(buf, name) {
+  $('openStatus').textContent = '';
+  let entries;
+  try { entries = PKG.parse(buf); } catch (e) { $('openStatus').textContent = e.message || String(e); return; }
+  const tableEntry = entries.find(e => e.kind === 'c' && /\/tables\/[^/]+\.xml$/.test(e.path));
+  if (!tableEntry) { $('openStatus').textContent = '이 패키지에는 품목 테이블(tables/*.xml)이 없습니다.'; return; }
+  const table = PKG.parseTable(tableEntry.raw);
+  let info = {};
+  const infoEntry = entries.find(e => e.kind === 'c' && /\/meta\/info\.json$/.test(e.path));
+  if (infoEntry) { try { info = JSON.parse(new TextDecoder().decode(infoEntry.raw)); } catch (_) { } }
+  Object.assign(state, { entries, tableEntry, table, fileName: name, info });
+  state.origRows = table.rows.map(r => r.slice());
+  state.rows = table.rows.map((r, i) => ({ cells: r.slice(), orig: i }));
+  try { localStorage.setItem(LS_KEY, JSON.stringify({ name, date: Date.now(), b64: b64enc(new Uint8Array(buf)) })); } catch (_) { }
+  renderMeta(); buildFilters(); renderGrid();
+  $('editCard').hidden = false; $('saveCard').hidden = false;
+  $('outName').value = suggestName(name);
+  $('saveStatus').textContent = ''; $('saveStatus').className = 'status';
+  $('editCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function b64enc(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
+function b64dec(s) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; }
+function suggestName(name) {
+  const d = new Date(), ymd = String(d.getFullYear()).slice(2) + String(d.getMonth() + 1).padStart(2, '0') + String(d.getDate()).padStart(2, '0');
+  const base = name.replace(/\.pkg$/i, '').replace(/^[0-9a-f]{8}-/i, '');
+  const m = /^(.*?)_(\d{6})(.*)$/.exec(base);
+  return (m ? `${m[1]}_${ymd}${m[3]}` : `${base}_${ymd}`) + '.pkg';
+}
+function renderMeta() {
+  const i = state.info || {}, m = $('pkgMeta');
+  m.innerHTML = '';
+  const add = (k, v, mono) => { if (!v) return; const s = document.createElement('span'); s.innerHTML = `${k} <b class="${mono ? 'mono' : ''}"></b>`; s.querySelector('b').textContent = v; m.appendChild(s); };
+  add('파일', state.fileName, true); add('앱', i.name ? `${i.name} v${i.version || ''}` : ''); add('대상 프린터', i.target); add('펌웨어', i.firmware, true);
+}
+function buildFilters() {
+  const c1 = new Set(), c2 = new Set();
+  for (const r of state.rows) { if (r.cells[1]) c1.add(r.cells[1]); if (r.cells[2]) c2.add(r.cells[2]); }
+  const fill = (sel, set, label) => { const cur = sel.value; sel.innerHTML = `<option value="">${label}</option>`; [...set].sort((a, b) => a.localeCompare(b, 'ko')).forEach(v => { const o = document.createElement('option'); o.value = v; o.textContent = v; sel.appendChild(o); }); sel.value = [...set].includes(cur) ? cur : ''; };
+  fill($('fCat1'), c1, '카테고리 1 전체'); fill($('fCat2'), c2, '카테고리 2 전체');
+  const dl = (id, set) => { const d = $(id); d.innerHTML = ''; for (const v of set) { const o = document.createElement('option'); o.value = v; d.appendChild(o); } };
+  dl('dlCat1', c1); dl('dlCat2', c2);
+}
+function rowStatus(r) {
+  if (r.orig === null) return 'new';
+  const o = state.origRows[r.orig];
+  for (let k = 1; k < o.length; k++) if ((r.cells[k] || '').trim() !== (o[k] || '').trim()) return 'mod';
+  return '';
+}
+function changeSummary() {
+  let added = 0, mod = 0; const present = new Set();
+  for (const r of state.rows) { const s = rowStatus(r); if (s === 'new') added++; else if (s === 'mod') mod++; if (r.orig !== null) present.add(r.orig); }
+  const del = state.origRows.length - present.size;
+  return { added, mod, del };
+}
+function renderChips() {
+  const { added, mod, del } = changeSummary(), c = $('changeChips'); c.innerHTML = '';
+  const chip = (cls, txt) => { const s = document.createElement('span'); s.className = 'chip ' + cls; s.textContent = txt; c.appendChild(s); };
+  if (!added && !mod && !del) chip('', '변경 없음');
+  if (added) chip('new', `추가 ${added}`); if (mod) chip('mod', `수정 ${mod}`); if (del) chip('del', `삭제 ${del}`);
+}
+const FIELDS = [1, 2, 3, 4, 5, 6, 7, 8];
+function renderGrid() {
+  const q = $('q').value.trim().toLowerCase(), f1 = $('fCat1').value, f2 = $('fCat2').value;
+  const tb = $('tbody'); tb.innerHTML = '';
+  const frag = document.createDocumentFragment(); let shown = 0;
+  state.rows.forEach((r, idx) => {
+    if (f1 && r.cells[1] !== f1) return; if (f2 && r.cells[2] !== f2) return;
+    if (q && !r.cells[3].toLowerCase().includes(q)) return;
+    shown++;
+    const tr = document.createElement('tr'); tr.dataset.idx = idx; const st = rowStatus(r); if (st) tr.className = 'is-' + st;
+    const tdNo = document.createElement('td'); tdNo.className = 'no'; tdNo.textContent = idx + 1; tr.appendChild(tdNo);
+    FIELDS.forEach(k => {
+      const td = document.createElement('td'), inp = document.createElement('input');
+      inp.type = 'text'; inp.value = r.cells[k] || ''; inp.dataset.k = k; inp.setAttribute('aria-label', state.table.cols[k]);
+      if (k === 1) inp.setAttribute('list', 'dlCat1'); if (k === 2) inp.setAttribute('list', 'dlCat2');
+      if (k === 4 || k === 5) inp.className = 'num';
+      td.appendChild(inp); tr.appendChild(td);
+    });
+    const act = document.createElement('td'); act.className = 'act';
+    act.innerHTML = '<button type="button" data-act="dup" title="아래에 복제">복제</button><button type="button" data-act="del" class="del" title="삭제">삭제</button>';
+    tr.appendChild(act); frag.appendChild(tr);
+  });
+  tb.appendChild(frag);
+  $('countInfo').textContent = shown === state.rows.length ? `품목 ${state.rows.length}개` : `품목 ${state.rows.length}개 중 ${shown}개 표시`;
+  renderChips();
+}
+$('tbody').addEventListener('input', e => {
+  const inp = e.target; if (inp.tagName !== 'INPUT') return;
+  const tr = inp.closest('tr'), r = state.rows[+tr.dataset.idx]; r.cells[+inp.dataset.k] = inp.value;
+  const st = rowStatus(r); tr.className = st ? 'is-' + st : ''; renderChips();
+});
+$('tbody').addEventListener('change', e => { if (e.target.dataset.k === '1' || e.target.dataset.k === '2') buildFilters(); });
+$('tbody').addEventListener('click', e => {
+  const b = e.target.closest('button[data-act]'); if (!b) return;
+  const idx = +b.closest('tr').dataset.idx, r = state.rows[idx];
+  if (b.dataset.act === 'del') { state.rows.splice(idx, 1); toast(`삭제: ${r.cells[3] || '(이름 없음)'}`); }
+  else { state.rows.splice(idx + 1, 0, { cells: r.cells.slice(), orig: null }); }
+  renderGrid();
+  if (b.dataset.act === 'dup') { const next = $('tbody').querySelector(`tr[data-idx="${idx + 1}"] input[data-k="3"]`); if (next) { next.focus(); next.select(); } }
+});
+$('addBtn').addEventListener('click', () => {
+  const f1 = $('fCat1').value, f2 = $('fCat2').value;
+  const cells = state.table.cols.map(() => ''); cells[1] = f1; cells[2] = f2;
+  state.rows.push({ cells, orig: null }); $('q').value = ''; renderGrid();
+  const last = $('tbody').querySelector(`tr[data-idx="${state.rows.length - 1}"]`); if (last) { last.scrollIntoView({ block: 'nearest' }); const inp = last.querySelector(f1 ? 'input[data-k="3"]' : 'input[data-k="1"]'); if (inp) inp.focus(); }
+});
+['q', 'fCat1', 'fCat2'].forEach(id => $(id).addEventListener('input', renderGrid));
+$('resetBtn').addEventListener('click', () => {
+  const { added, mod, del } = changeSummary(); if (!added && !mod && !del) { toast('되돌릴 변경이 없습니다'); return; }
+  state.rows = state.origRows.map((r, i) => ({ cells: r.slice(), orig: i })); buildFilters(); renderGrid(); toast('원래 목록으로 되돌렸습니다');
+});
+$('csvOutBtn').addEventListener('click', async () => {
+  const rows = state.rows.map((r, i) => { const c = r.cells.slice(); c[0] = String(i + 1); return c; });
+  const name = $('outName').value.replace(/\.pkg$/i, '') + '.csv';
+  await deliver(name, new TextEncoder().encode(toCSV(state.table.cols, rows)), 'csv');
+});
+$('csvInBtn').addEventListener('click', () => $('csvInput').click());
+$('csvInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  const text = await f.text(); const data = parseCSV(text); if (!data.length) { toast('CSV에 내용이 없습니다'); return; }
+  const hdr = data[0].map(s => s.trim()), cols = state.table.cols;
+  const map = cols.map(c => hdr.indexOf(c));
+  if (map[3] < 0) { toast(`CSV 첫 줄에 "${cols[3]}" 열이 없습니다. 내보내기 한 CSV 형식을 그대로 써 주세요.`); return; }
+  const missing = cols.filter((c, k) => k && map[k] < 0);
+  state.rows = data.slice(1).map(r => ({ cells: cols.map((c, k) => map[k] >= 0 ? (r[map[k]] || '').trim() : ''), orig: null }));
+  // re-link rows to originals by position+content so unchanged rows don't show as new
+  const keyOf = c => c.slice(1).map(v => (v || '').trim()).join('\u0001');
+  const pool = new Map(); state.origRows.forEach((o, i) => { const key = keyOf(o); if (!pool.has(key)) pool.set(key, []); pool.get(key).push(i); });
+  for (const r of state.rows) { const list = pool.get(keyOf(r.cells)); if (list && list.length) r.orig = list.shift(); }
+  const usedOrig = new Set(state.rows.map(r => r.orig).filter(v => v !== null));
+  for (const r of state.rows) { if (r.orig !== null) continue; const name = r.cells[3]; const cand = state.origRows.findIndex((o, i) => !usedOrig.has(i) && o[3].trim() === name && o[1].trim() === r.cells[1] && o[2].trim() === r.cells[2]); if (cand >= 0) { r.orig = cand; usedOrig.add(cand); } }
+  for (const r of state.rows) { if (r.orig !== null) continue; const n = parseInt(r.cells[0], 10) - 1; const o = state.origRows[n]; if (o && !usedOrig.has(n) && o[1].trim() === r.cells[1] && o[2].trim() === r.cells[2]) { r.orig = n; usedOrig.add(n); } }
+  buildFilters(); renderGrid();
+  toast(`CSV에서 ${state.rows.length}개 품목을 불러왔습니다` + (missing.length ? ` (없는 열: ${missing.join(', ')})` : ''));
+});
+
+async function deliver(filename, bytes, ext) {
+  const useArtifact = !!(window.claude && typeof window.claude.use === 'function');
+  if (useArtifact) {
+    const dl = await window.claude.use('downloads');
+    if (!dl) throw new Error('이 화면에서는 파일 저장이 지원되지 않습니다. 파일을 내려받아 PC 브라우저에서 열어 주세요.');
+    let name = filename, data = bytes;
+    if (ext === 'pkg') { name = filename.replace(/\.pkg$/i, '') + '.zip'; data = makeZip(filename, bytes); }
+    try { await dl.save({ filename: name, data: new Blob([data]) }); }
+    catch (e) {
+      if (e && e.code === 'declined') throw new Error('저장을 취소했습니다.');
+      throw new Error('저장에 실패했습니다: ' + (e && e.message ? e.message : e));
+    }
+    return name;
+  }
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' })); a.download = filename; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  return filename;
+}
+$('saveBtn').addEventListener('click', async () => {
+  const st = $('saveStatus'); st.className = 'status'; st.textContent = '패키지를 만드는 중…';
+  try {
+    const bad = state.rows.findIndex(r => !r.cells[3].trim());
+    if (bad >= 0) throw new Error(`${bad + 1}번 줄의 품목명이 비어 있습니다. 이름을 넣거나 줄을 삭제해 주세요.`);
+    const rows = state.rows.map(r => r.cells.map(v => (v || '').trim()));
+    const xml = PKG.buildTable(state.table, rows);
+    const check = PKG.parseTable(xml); if (check.rows.length !== rows.length) throw new Error('테이블 생성 확인에 실패했습니다.');
+    const entries = state.entries.map(e => e === state.tableEntry ? { ...e, raw: xml, dirty: true } : e);
+    const out = PKG.build(entries);
+    PKG.parse(out.buffer.slice(0));
+    let name = $('outName').value.trim() || suggestName(state.fileName); if (!/\.pkg$/i.test(name)) name += '.pkg';
+    const saved = await deliver(name, out, 'pkg');
+    const { added, mod, del } = changeSummary();
+    st.className = 'status ok';
+    st.textContent = `${saved} 저장 (품목 ${rows.length}개, 추가 ${added} · 수정 ${mod} · 삭제 ${del})` + (saved.endsWith('.zip') ? ' — ZIP 안의 .pkg 파일을 꺼내 쓰세요.' : '');
+  } catch (e) { st.className = 'status err'; st.textContent = e.message || String(e); }
+});
+
+/* open handlers */
+$('pickBtn').addEventListener('click', () => $('fileInput').click());
+$('fileInput').addEventListener('change', async e => { const f = e.target.files[0]; e.target.value = ''; if (f) openBuffer(await f.arrayBuffer(), f.name); });
+const drop = $('drop');
+['dragenter', 'dragover'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.add('over'); }));
+['dragleave', 'drop'].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); drop.classList.remove('over'); }));
+drop.addEventListener('drop', async e => { const f = e.dataTransfer.files && e.dataTransfer.files[0]; if (f) openBuffer(await f.arrayBuffer(), f.name); });
+(function initReopen() {
+  let saved = null; try { saved = JSON.parse(localStorage.getItem(LS_KEY) || 'null'); } catch (_) { }
+  if (!saved || !saved.b64) return;
+  const b = $('reopenBtn'); b.hidden = false; b.textContent = `마지막 파일 다시 열기 (${saved.name}, ${new Date(saved.date).toLocaleDateString('ko-KR')})`;
+  b.addEventListener('click', () => openBuffer(b64dec(saved.b64), saved.name));
+})();
+</script>
+<!-- ARTIFACT-BODY-END -->
+</body>
+</html>
