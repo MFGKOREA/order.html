@@ -1,0 +1,16 @@
+{
+  "store": "수원컨벤션 BOH",
+  "date": "2026-11-05",
+  "updatedAt": "2026-11-05T21:55:00+09:00",
+  "closing": "완료",
+  "note": "원대연 출근 지문 누락",
+  "staff": [
+    { "name": "유신우", "role": "KM", "sched": { "in": "08:30", "out": "22:00" }, "tag": { "in": "08:43", "out": "21:51" }, "status": "off" },
+    { "name": "김해영", "role": "OP", "sched": { "in": "09:00", "out": "15:00" }, "tag": { "in": "08:57", "out": "15:06" }, "status": "off" },
+    { "name": "원대연", "role": "OP", "sched": { "in": "09:00", "out": "15:00" }, "tag": { "in": null,    "out": "15:03" }, "status": "missing_in" },
+    { "name": "박진석", "role": "OP", "sched": { "in": "11:00", "out": "16:00" }, "tag": { "in": "10:57", "out": "16:18" }, "status": "off" },
+    { "name": "정인욱", "role": "CL", "sched": { "in": "17:00", "out": "22:00" }, "tag": { "in": "16:52", "out": "21:48" }, "status": "off" },
+    { "name": "황아미", "role": "CL", "sched": { "in": "17:00", "out": "22:00" }, "tag": { "in": "16:57", "out": "21:50" }, "status": "off" },
+    { "name": "김동환", "role": "CL", "sched": { "in": "17:00", "out": "22:00" }, "tag": { "in": "16:58", "out": "21:50" }, "status": "off" }
+  ]
+}
