@@ -137,6 +137,9 @@ p { margin: 0; text-wrap: pretty; }
 .toolrow { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 2px 2px 10px; }
 .toolrow .btn { min-height: 38px; padding: 7px 14px; font-size: 14px; }
 .toolrow .sp { flex: 1 1 auto; }
+.tbtns { display: flex; gap: 8px; margin-left: auto; }
+.lockline { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: var(--muted); }
+.lockline .ic { color: var(--accent-text); width: 14px; height: 14px; }
 .toolrow .csv { position: relative; }
 .toolrow .csv .menu { position: absolute; right: 0; top: calc(100% + 6px); display: grid; min-width: 180px; background: var(--surface); border-radius: 14px; padding: 6px; box-shadow: 0 8px 28px rgba(0, 0, 0, .14), 0 0 0 1px var(--line); z-index: 5; }
 .toolrow .csv .menu button { text-align: left; padding: 10px 12px; border-radius: 9px; font-size: 14px; font-weight: 600; }
@@ -263,17 +266,10 @@ label.sw input:checked + span { color: var(--fg); }
     <div class="chips sub" id="chips2" role="group" aria-label="카테고리 2" hidden></div>
 
     <div class="toolrow">
-      <button class="btn dark" type="button" id="addBtn"><svg class="ic"><use href="#i-plus"/></svg>품목 추가</button>
-      <label class="sw"><input type="checkbox" id="unlock"><span>이름·일수도 수정</span></label>
-      <span class="sp"></span>
-      <div class="csv">
-        <button class="btn" type="button" id="csvBtn" aria-haspopup="menu" aria-expanded="false">CSV</button>
-        <div class="menu" id="csvMenu" role="menu" hidden>
-          <button type="button" role="menuitem" id="csvOut">CSV로 내보내기</button>
-          <button type="button" role="menuitem" id="csvIn">CSV 가져오기</button>
-          <button type="button" role="menuitem" id="resetBtn">모든 변경 취소</button>
-        </div>
-        <input type="file" id="csvInput" accept=".csv,text/csv" hidden>
+      <span class="lockline"><svg class="ic"><use href="#i-shield"/></svg>품목명·일수는 바꿀 수 없습니다</span>
+      <div class="tbtns">
+        <button class="btn" type="button" id="csvOut">CSV 내보내기</button>
+        <button class="btn" type="button" id="resetBtn">변경 취소</button>
       </div>
     </div>
 
@@ -283,7 +279,7 @@ label.sw input:checked + span { color: var(--fg); }
 
   <section class="group save" id="v-save" hidden>
     <h2>새 패키지 저장</h2>
-    <p class="lead">품목 테이블만 바꿔 넣은 .pkg를 만듭니다.</p>
+    <p class="lead">카테고리, Open, 순서만 바꿔 넣은 .pkg를 만듭니다.</p>
     <div class="row"><input type="text" id="outName" aria-label="저장 파일 이름"></div>
     <button class="btn green wide" type="button" id="saveBtn">PKG 저장</button>
     <p class="status" id="saveStatus"></p>
@@ -292,7 +288,7 @@ label.sw input:checked + span { color: var(--fg); }
       <li>새 .pkg를 USB 메모리에 넣어 프린터에서 설치하거나 SATO All-In-One Tool로 보냅니다.</li>
       <li>바뀐 품목 한두 개를 골라 라벨을 시험 출력해 확인합니다.</li>
     </ol>
-    <p class="keep"><svg class="ic"><use href="#i-shield"/></svg><span><b>그대로 두는 것</b> 화면, 라벨 디자인, 폰트, 로고, 스크립트. 이 도구는 품목 테이블 파일 하나만 바꿉니다.</span></p>
+    <p class="keep"><svg class="ic"><use href="#i-shield"/></svg><span><b>그대로 두는 것</b> 품목명, 보관 일수·시간, 화면, 라벨 디자인, 폰트, 로고, 스크립트. 바뀌는 것은 카테고리, Open, 순서뿐입니다.</span></p>
   </section>
 </div>
 
@@ -462,9 +458,11 @@ function makeZip(name, data) {
 
 /* ===== App ===== */
 const $ = id => document.getElementById(id);
-const state = { entries: null, tableEntry: null, table: null, rows: [], origRows: [], fileName: '', info: null, tab: 'all', f1: '', f2: '', q: '', unlock: false, draftKey: '' };
+const state = { entries: null, tableEntry: null, table: null, rows: [], origRows: [], fileName: '', info: null, tab: 'all', f1: '', f2: '', q: '', draftKey: '' };
 const LS_LAST = 'mfg-label-pkg-last';
 const C = { NO: 0, C1: 1, C2: 2, ITEM: 3, DAYS: 4, HOURS: 5, OPEN: 8 };
+/* 바꿀 수 있는 칸은 카테고리 1·2와 OPEN뿐. 품목명·일수·시간·시작일·종료일은 저장할 때 원본 그대로 다시 써 넣는다 */
+const EDITABLE = new Set([C.C1, C.C2, C.OPEN]);
 let toastTimer = null, draftTimer = null;
 function toast(msg) { let t = document.querySelector('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; document.body.appendChild(t); } t.textContent = msg; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 2400); }
 function b64enc(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
@@ -488,12 +486,12 @@ function openBuffer(buf, name) {
   const infoEntry = entries.find(e => e.kind === 'c' && /\/meta\/info\.json$/.test(e.path));
   if (infoEntry) { try { info = JSON.parse(new TextDecoder().decode(infoEntry.raw)); } catch (_) { } }
   const clean = name.replace(/^[0-9a-f]{8}-/i, '');
-  Object.assign(state, { entries, tableEntry, table, fileName: clean, info, tab: 'all', f1: '', f2: '', q: '', draftKey: 'mfg-label-draft:' + clean + ':' + table.rows.length });
+  Object.assign(state, { entries, tableEntry, table, fileName: clean, info, tab: 'all', f1: '', f2: '', q: '', draftKey: 'mfg-label-draft-v3:' + clean + ':' + table.rows.length });
   state.origRows = table.rows.map(r => r.slice());
-  state.rows = table.rows.map((r, i) => ({ cells: r.slice(), orig: i, seq: null }));
+  state.rows = table.rows.map((r, i) => ({ cells: r.slice(), orig: i, src: i, seq: null }));
   seqFromNO(state.rows);
   try { localStorage.setItem(LS_LAST, JSON.stringify({ name: clean, date: Date.now(), b64: b64enc(new Uint8Array(buf)) })); } catch (_) { }
-  $('q').value = ''; $('unlock').checked = false; state.unlock = false;
+  $('q').value = '';
   $('v-edit').hidden = false; $('v-save').hidden = false;
   $('outName').value = suggestName(clean);
   $('saveStatus').textContent = ''; $('saveStatus').className = 'status';
@@ -510,7 +508,7 @@ function checkDraft() {
   const when = new Date(d.at); $('draftWhen').textContent = `${when.getMonth() + 1}월 ${when.getDate()}일 ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}에 편집하던 내용`;
   bar.hidden = false; bar._draft = d;
 }
-$('draftKeep').addEventListener('click', () => { const d = $('draftbar')._draft; if (d) { state.rows = d.rows.map(r => ({ cells: r.cells.slice(), orig: r.orig, seq: r.seq ?? null })); renumberSeq(); } $('draftbar').hidden = true; render(); toast('이어서 편집합니다'); });
+$('draftKeep').addEventListener('click', () => { const d = $('draftbar')._draft; if (d) { state.rows = d.rows.filter(r => r.src != null && state.origRows[r.src]).map(r => { const cells = state.origRows[r.src].slice(); EDITABLE.forEach(k => { cells[k] = r.cells[k] ?? ''; }); return { cells, orig: r.orig, src: r.src, seq: r.seq ?? null }; }); renumberSeq(); } $('draftbar').hidden = true; render(); toast('이어서 편집합니다'); });
 $('draftDrop').addEventListener('click', () => { try { localStorage.removeItem(state.draftKey); } catch (_) { } $('draftbar').hidden = true; });
 function saveDraft() {
   clearTimeout(draftTimer);
@@ -521,20 +519,38 @@ function saveDraft() {
 const t = v => (v || '').trim();
 const isOpen = r => !!t(r.cells[C.OPEN]);
 function seqFromNO(rows) { // 프린터는 OPEN 품목을 NO 순서로 출력 → NO에서 순서를 읽어 온다
-  const open = rows.filter(isOpen).map((r, i) => ({ r, n: parseInt(r.cells[C.NO], 10), i })).sort((x, y) => (isNaN(x.n) ? 1e9 : x.n) - (isNaN(y.n) ? 1e9 : y.n) || x.i - y.i);
+  const open = rows.filter(isOpen).map((r, i) => ({ r, n: r.cells[C.NO] || '', i })).sort((x, y) => cmpNO(x.n, y.n) || x.i - y.i);
   rows.forEach(r => { r.seq = null; }); open.forEach((o, k) => { o.r.seq = k + 1; });
 }
+function cmpNO(x, y) { return x < y ? -1 : x > y ? 1 : 0; } // NO 열은 sort="string" (글자 순서)
 function openOrder() { return state.rows.map((r, i) => ({ r, i })).filter(x => isOpen(x.r)).sort((x, y) => (x.r.seq ?? 1e9) - (y.r.seq ?? 1e9) || x.i - y.i); }
 function renumberSeq() { openOrder().forEach((o, k) => { o.r.seq = k + 1; }); }
-function assignNO(rows) { // 저장용 NO: Open 순서 먼저, 나머지는 줄 순서. 문자열 정렬에도 순서가 맞도록 자릿수를 채운다
+function assignNO(rows) {
+  // 1) Open 순서를 안 바꿨으면 원래 NO를 그대로 둔다
+  const want = openOrder().map(o => o.i);
+  const keep = rows.map(r => r.orig !== null ? state.origRows[r.orig][C.NO] : '');
+  const uniq = keep.every(v => v !== '') && new Set(keep).size === keep.length;
+  if (uniq) { const got = want.slice().sort((x, y) => cmpNO(keep[x], keep[y]) || x - y); if (got.every((v, k) => v === want[k])) return keep; }
+  // 2) 바꿨으면 줄 순서대로 번호를 매기되, Open 품목끼리만 번호를 바꿔 Open 순서를 맞춘다. 자릿수를 채워 글자·숫자 정렬이 같게
   const w = Math.max(3, String(rows.length).length); const pad = n => String(n).padStart(w, '0');
-  const order = openOrder().map(o => o.i); const seen = new Set(order);
-  rows.forEach((r, i) => { if (!seen.has(i)) order.push(i); });
-  const no = new Array(rows.length); order.forEach((idx, k) => { no[idx] = pad(k + 1); });
+  const no = rows.map((r, i) => pad(i + 1));
+  const slots = want.slice().sort((x, y) => x - y).map(i => no[i]);
+  want.forEach((i, k) => { no[i] = slots[k]; });
   return no;
 }
+function lockedRows() { // 저장할 줄: 원본 줄을 바탕으로 카테고리·OPEN만 반영
+  const no = assignNO(state.rows);
+  return state.rows.map((r, i) => {
+    const src = state.origRows[r.src]; if (!src) throw new Error('원본에 없는 품목이 있어 저장할 수 없습니다. "모든 변경 취소" 후 다시 해 주세요.');
+    const c = src.slice();
+    EDITABLE.forEach(k => { const v = t(r.cells[k]); if (v !== t(src[k])) c[k] = v; });
+    for (let k = 0; k < c.length; k++) if (k !== C.NO && !EDITABLE.has(k) && c[k] !== src[k]) throw new Error('품목명·일수는 바꿀 수 없습니다.');
+    c[C.NO] = no[i];
+    return c;
+  });
+}
 function openOrderChanged() {
-  const origSeq = state.origRows.map((o, i) => ({ i, open: !!t(o[C.OPEN]), n: parseInt(o[C.NO], 10) })).filter(x => x.open).sort((x, y) => x.n - y.n).map(x => x.i);
+  const origSeq = state.origRows.map((o, i) => ({ i, open: !!t(o[C.OPEN]), n: o[C.NO] || '' })).filter(x => x.open).sort((x, y) => cmpNO(x.n, y.n) || x.i - y.i).map(x => x.i);
   const cur = openOrder().map(o => o.r.orig).filter(v => v !== null && t(state.origRows[v][C.OPEN]));
   const o2 = origSeq.filter(i => cur.includes(i));
   return cur.length !== o2.length || cur.some((v, k) => v !== o2[k]);
@@ -597,7 +613,7 @@ function renderChips() {
 }
 function renderList() {
   const list = $('list'); list.innerHTML = '';
-  const vis = visible(); const unlock = state.unlock;
+  const vis = visible();
   const cat1 = distinct(C.C1);
   const frag = document.createDocumentFragment();
   vis.forEach((idx, vi) => {
@@ -605,7 +621,7 @@ function renderList() {
     const li = document.createElement('li'); li.className = 'item' + (st ? ' chg' : ''); li.dataset.idx = idx; li.draggable = true;
     li.innerHTML = `
       <button type="button" class="grip" aria-label="끌어서 순서 바꾸기" tabindex="-1"><svg class="ic"><use href="#i-grip"/></svg></button>
-      <div class="main"><span class="no">${state.tab === 'open' ? (r.seq || '') : idx + 1}</span>${unlock ? '<input class="name" data-k="3" aria-label="품목명">' : '<span class="name"></span>'}<span class="days"></span></div>
+      <div class="main"><span class="no">${state.tab === 'open' ? (r.seq || '') : idx + 1}</span><span class="name"></span><span class="days"></span></div>
       <div class="cats"><select data-k="1" aria-label="카테고리 1"></select><span class="arrow">›</span><select data-k="2" aria-label="카테고리 2"></select></div>
       <div class="open"><label class="sw"><input type="checkbox" data-k="8" aria-label="Open 출력"><span>Open</span></label></div>
       <div class="ops">
@@ -614,13 +630,9 @@ function renderList() {
         <button type="button" data-act="dup" aria-label="복제"><svg class="ic"><use href="#i-copy"/></svg></button>
         <button type="button" data-act="del" class="del" aria-label="삭제"><svg class="ic"><use href="#i-trash"/></svg></button>
       </div>`;
-    const nameEl = li.querySelector('.name'); if (unlock) nameEl.value = c[C.ITEM]; else nameEl.textContent = c[C.ITEM] || '(이름 없음)';
-    const days = li.querySelector('.days');
-    if (unlock) { days.innerHTML = '일수 <input data-k="4" aria-label="일수"> 시간 <input data-k="5" aria-label="시간">'; days.querySelector('[data-k="4"]').value = c[C.DAYS]; days.querySelector('[data-k="5"]').value = c[C.HOURS]; }
-    else {
-      const d = t(c[C.DAYS]), h = t(c[C.HOURS]);
-      if (/^t$/i.test(d)) days.innerHTML = '<b>T</b>시간입력'; else if (d) days.innerHTML = `<b></b>일`, days.querySelector('b').textContent = d; else if (h) days.innerHTML = `<b></b>시간`, days.querySelector('b').textContent = h; else days.textContent = '';
-    }
+    li.querySelector('.name').textContent = c[C.ITEM] || '(이름 없음)';
+    const days = li.querySelector('.days'), d = t(c[C.DAYS]), h = t(c[C.HOURS]);
+    if (/^t$/i.test(d)) days.innerHTML = '<b>T</b>시간입력'; else if (d) { days.innerHTML = '<b></b>일'; days.querySelector('b').textContent = d; } else if (h) { days.innerHTML = '<b></b>시간'; days.querySelector('b').textContent = h; }
     fillSelect(li.querySelector('[data-k="1"]'), cat1, t(c[C.C1]));
     fillSelect(li.querySelector('[data-k="2"]'), distinct2(t(c[C.C1])), t(c[C.C2]));
     li.querySelector('[data-k="8"]').checked = !!t(c[C.OPEN]);
@@ -644,11 +656,6 @@ function fillSelect(sel, values, cur) {
 
 /* ----- list events ----- */
 const list = $('list');
-list.addEventListener('input', e => {
-  const el = e.target, k = el.dataset.k; if (k === undefined || el.tagName !== 'INPUT' || el.type === 'checkbox') return;
-  const li = el.closest('li'), r = state.rows[+li.dataset.idx]; r.cells[+k] = el.value;
-  li.classList.toggle('chg', !!rowStatus(r)); renderBar(); saveDraft();
-});
 list.addEventListener('change', e => {
   const el = e.target, k = el.dataset.k; if (k === undefined) return;
   const li = el.closest('li'), idx = +li.dataset.idx, r = state.rows[idx];
@@ -669,7 +676,7 @@ list.addEventListener('click', e => {
   const b = e.target.closest('button[data-act]'); if (!b) return;
   const li = b.closest('li'), idx = +li.dataset.idx, r = state.rows[idx], vis = visible(), vi = vis.indexOf(idx);
   if (b.dataset.act === 'del') { state.rows.splice(idx, 1); toast(`삭제: ${r.cells[C.ITEM] || '(이름 없음)'}`); render(); return; }
-  if (b.dataset.act === 'dup') { state.rows.splice(idx + 1, 0, { cells: r.cells.slice(), orig: null, seq: r.seq ? r.seq + 0.5 : null }); renumberSeq(); render(); const n = list.querySelector(`li[data-idx="${idx + 1}"]`); if (n) { n.scrollIntoView({ block: 'nearest' }); const inp = n.querySelector('input.name'); if (inp) { inp.focus(); inp.select(); } } return; }
+  if (b.dataset.act === 'dup') { state.rows.splice(idx + 1, 0, { cells: r.cells.slice(), orig: null, src: r.src, seq: r.seq ? r.seq + 0.5 : null }); renumberSeq(); render(); const n = list.querySelector(`li[data-idx="${idx + 1}"]`); if (n) { n.scrollIntoView({ block: 'nearest' }); } toast('복제했습니다. 카테고리를 바꿔 다른 화면에 넣을 수 있습니다'); return; }
   if (b.dataset.act === 'up' && vi > 0) move(idx, vis[vi - 1], true);
   if (b.dataset.act === 'down' && vi < vis.length - 1) move(idx, vis[vi + 1], false);
 });
@@ -706,42 +713,14 @@ function setTab(tab) { state.tab = tab; $('tabAll').setAttribute('aria-selected'
 $('tabAll').addEventListener('click', () => setTab('all')); $('tabOpen').addEventListener('click', () => setTab('open'));
 $('q').addEventListener('input', () => { state.q = $('q').value.trim(); renderList(); });
 $('qClear').addEventListener('click', () => { $('q').value = ''; state.q = ''; renderList(); $('q').focus(); });
-$('unlock').addEventListener('change', () => { state.unlock = $('unlock').checked; renderList(); });
-$('addBtn').addEventListener('click', () => {
-  const cells = state.table.cols.map(() => ''); cells[C.C1] = state.f1; cells[C.C2] = state.f2; if (state.tab === 'open') cells[C.OPEN] = 'Y';
-  const vis = visible(); const at = state.tab === 'open' ? state.rows.length : (vis.length ? vis[vis.length - 1] + 1 : state.rows.length);
-  state.rows.splice(at, 0, { cells, orig: null, seq: state.tab === 'open' ? openOrder().length + 1 : null });
-  if (!state.unlock) { state.unlock = true; $('unlock').checked = true; }
-  render();
-  const li = list.querySelector(`li[data-idx="${at}"]`); if (li) { li.scrollIntoView({ block: 'nearest' }); const inp = li.querySelector('input.name'); if (inp) inp.focus(); }
-});
-const csvMenu = $('csvMenu');
-$('csvBtn').addEventListener('click', e => { e.stopPropagation(); csvMenu.hidden = !csvMenu.hidden; $('csvBtn').setAttribute('aria-expanded', String(!csvMenu.hidden)); });
-document.addEventListener('click', () => { csvMenu.hidden = true; $('csvBtn').setAttribute('aria-expanded', 'false'); });
 $('resetBtn').addEventListener('click', () => {
   const { added, mod, del, moved } = changeSummary(); if (!added && !mod && !del && !moved) { toast('되돌릴 변경이 없습니다'); return; }
-  state.rows = state.origRows.map((r, i) => ({ cells: r.slice(), orig: i, seq: null })); seqFromNO(state.rows); render(); toast('원래 목록으로 되돌렸습니다');
+  state.rows = state.origRows.map((r, i) => ({ cells: r.slice(), orig: i, src: i, seq: null })); seqFromNO(state.rows); render(); toast('원래 목록으로 되돌렸습니다');
 });
 $('csvOut').addEventListener('click', async () => {
-  const no = assignNO(state.rows); const rows = state.rows.map((r, i) => { const c = r.cells.slice(); c[0] = no[i]; return c; });
+  let rows; try { rows = lockedRows(); } catch (e) { toast(e.message); return; }
   const name = $('outName').value.replace(/\.pkg$/i, '') + '.csv';
   try { await deliver(name, new TextEncoder().encode(toCSV(state.table.cols, rows)), 'csv'); toast('CSV를 저장했습니다'); } catch (e) { toast(e.message || String(e)); }
-});
-$('csvIn').addEventListener('click', () => $('csvInput').click());
-$('csvInput').addEventListener('change', async e => {
-  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
-  const data = parseCSV(await f.text()); if (!data.length) { toast('CSV에 내용이 없습니다'); return; }
-  const hdr = data[0].map(s => s.trim()), cols = state.table.cols, map = cols.map(c => hdr.indexOf(c));
-  if (map[C.ITEM] < 0) { toast(`CSV 첫 줄에 "${cols[C.ITEM]}" 열이 없습니다. 내보내기 한 CSV 형식을 그대로 써 주세요.`); return; }
-  state.rows = data.slice(1).map(r => ({ cells: cols.map((c, k) => map[k] >= 0 ? (r[map[k]] || '').trim() : ''), orig: null, seq: null }));
-  seqFromNO(state.rows);
-  const keyOf = c => c.slice(1).map(v => (v || '').trim()).join('\u0001');
-  const pool = new Map(); state.origRows.forEach((o, i) => { const key = keyOf(o); if (!pool.has(key)) pool.set(key, []); pool.get(key).push(i); });
-  for (const r of state.rows) { const l = pool.get(keyOf(r.cells)); if (l && l.length) r.orig = l.shift(); }
-  const used = new Set(state.rows.map(r => r.orig).filter(v => v !== null));
-  for (const r of state.rows) { if (r.orig !== null) continue; const cand = state.origRows.findIndex((o, i) => !used.has(i) && t(o[C.ITEM]) === r.cells[C.ITEM] && t(o[C.C1]) === r.cells[C.C1] && t(o[C.C2]) === r.cells[C.C2]); if (cand >= 0) { r.orig = cand; used.add(cand); } }
-  for (const r of state.rows) { if (r.orig !== null) continue; const n = state.origRows.findIndex((o, i) => !used.has(i) && t(o[C.NO]) === t(r.cells[C.NO])), o = state.origRows[n]; if (o && t(o[C.C1]) === r.cells[C.C1] && t(o[C.C2]) === r.cells[C.C2]) { r.orig = n; used.add(n); } }
-  render(); toast(`CSV에서 ${state.rows.length}개 품목을 불러왔습니다`);
 });
 
 /* ----- save ----- */
@@ -762,10 +741,7 @@ async function deliver(filename, bytes, ext) {
 $('saveBtn').addEventListener('click', async () => {
   const st = $('saveStatus'); st.className = 'status'; st.textContent = '패키지를 만드는 중…';
   try {
-    const bad = state.rows.findIndex(r => !t(r.cells[C.ITEM]));
-    if (bad >= 0) throw new Error(`${bad + 1}번 품목의 이름이 비어 있습니다. 이름을 넣거나 삭제해 주세요.`);
-    const no = assignNO(state.rows);
-    const rows = state.rows.map((r, i) => { const c = r.cells.map(v => (v || '').trim()); c[C.NO] = no[i]; return c; });
+    const rows = lockedRows();
     const xml = PKG.buildTable(state.table, rows);
     if (PKG.parseTable(xml).rows.length !== rows.length) throw new Error('테이블 생성 확인에 실패했습니다.');
     const out = PKG.build(state.entries.map(e => e === state.tableEntry ? { ...e, raw: xml, dirty: true } : e));
