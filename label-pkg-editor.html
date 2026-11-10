@@ -208,6 +208,35 @@ label.sw input:checked + span { color: var(--fg); }
 .keep b { color: var(--fg); font-weight: 700; }
 
 .toast { position: fixed; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); translate: -50% 0; background: var(--fg); color: var(--bg); font-size: 14px; font-weight: 600; padding: 10px 16px; border-radius: 12px; z-index: 50; max-width: calc(100% - 32px); }
+/* 끌어서 옮기기 */
+.grip { touch-action: none; }
+.ghost { position: fixed; z-index: 30; margin: 0; list-style: none; pointer-events: none; opacity: .96; box-shadow: 0 14px 36px rgba(0, 0, 0, .18), 0 0 0 1px var(--line); }
+html.dragging, html.dragging * { cursor: grabbing !important; -webkit-user-select: none; user-select: none; }
+.item.flash { animation: flash 900ms ease-out; }
+@keyframes flash { from { box-shadow: inset 0 0 0 2px var(--accent); } }
+/* Open 순위 번호: 눌러서 바로 이동 */
+.main .no.jump { position: relative; flex: none; min-width: 30px; padding: 3px 7px; border-radius: 7px; background: var(--fill-2); color: var(--fg); font-size: 12px; font-weight: 800; text-align: center; }
+.main .no.jump::after { content: ""; position: absolute; inset: -8px -4px; }
+.main .jumpin { flex: none; width: 60px; border: 0; border-radius: 7px; padding: 3px 6px; font-size: 13px; font-weight: 800; text-align: center; background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--fg); }
+.main .jumpin:focus { outline: none; }
+/* 품목 추가 시트 */
+.sheet { position: fixed; inset: 0; z-index: 40; display: grid; align-items: end; justify-items: center; }
+.sheet-bg { position: absolute; inset: 0; background: rgba(0, 0, 0, .42); }
+.sheet-card { position: relative; width: min(640px, 100%); max-height: min(82vh, 760px); display: flex; flex-direction: column; gap: 10px; background: var(--bg); border-radius: 20px 20px 0 0; padding: 16px max(16px, env(safe-area-inset-left, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-right, 0px)); }
+.sheet-hd { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.sheet-hd b { display: block; font-size: 18px; font-weight: 800; }
+.sheet-hd span { font-size: 13px; color: var(--muted); }
+.sheet-hd .x { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: var(--surface); color: var(--muted); flex: none; }
+.sheet .search { margin: 0; }
+.picks { list-style: none; margin: 0; padding: 0; overflow: auto; display: grid; gap: 6px; min-height: 0; flex: 1 1 auto; overscroll-behavior: contain; }
+.picks button { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 3px 10px; text-align: left; background: var(--surface); border-radius: 12px; padding: 11px 12px; }
+.picks b { font-size: 15px; font-weight: 700; line-height: 1.3; overflow-wrap: anywhere; }
+.picks .pd { font-size: 13px; font-weight: 800; color: var(--fg); white-space: nowrap; }
+.picks .pc { grid-column: 1 / -1; font-size: 12px; font-weight: 600; color: var(--muted); }
+.picks .none { text-align: center; color: var(--muted); font-size: 14px; padding: 20px 8px; }
+.sheet-note { font-size: 12px; color: var(--muted); }
+html.sheet-open, html.sheet-open body { overflow: hidden; }
+@media (min-width: 700px) { .sheet { align-items: center; } .sheet-card { border-radius: 20px; } }
 @media (pointer: coarse) { input, select { font-size: 16px !important; } .days input { width: 50px; } }
 @media (prefers-reduced-motion: reduce) { .seg button::after, label.sw input, label.sw input::after, button { transition: none; } }
 </style>
@@ -266,6 +295,7 @@ label.sw input:checked + span { color: var(--fg); }
     <div class="chips sub" id="chips2" role="group" aria-label="카테고리 2" hidden></div>
 
     <div class="toolrow">
+      <button class="btn dark" type="button" id="addBtn"><svg class="ic"><use href="#i-plus"/></svg>품목 추가</button>
       <span class="lockline"><svg class="ic"><use href="#i-shield"/></svg>품목명·일수는 바꿀 수 없습니다</span>
       <div class="tbtns">
         <button class="btn" type="button" id="csvOut">CSV 내보내기</button>
@@ -276,6 +306,19 @@ label.sw input:checked + span { color: var(--fg); }
     <ul class="list" id="list"></ul>
     <div class="foot"><span id="countInfo"></span><span id="hint"></span></div>
   </section>
+
+  <div class="sheet" id="addSheet" hidden role="dialog" aria-modal="true" aria-labelledby="addTitle">
+    <div class="sheet-bg" data-close></div>
+    <div class="sheet-card">
+      <div class="sheet-hd">
+        <div><b id="addTitle">품목 추가</b><span id="addWhere"></span></div>
+        <button type="button" class="x" data-close aria-label="닫기"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="search"><svg class="ic"><use href="#i-search"/></svg><input type="search" id="addQ" placeholder="원래 목록에서 품목 찾기" aria-label="원래 목록에서 품목 찾기" autocomplete="off"></div>
+      <ul class="picks" id="addList"></ul>
+      <p class="sheet-note">원래 목록에 있는 품목만 추가됩니다. 이름과 일수는 원본 그대로 들어갑니다.</p>
+    </div>
+  </div>
 
   <section class="group save" id="v-save" hidden>
     <h2>새 패키지 저장</h2>
@@ -522,7 +565,11 @@ function seqFromNO(rows) { // 프린터는 OPEN 품목을 NO 순서로 출력 �
   const open = rows.filter(isOpen).map((r, i) => ({ r, n: r.cells[C.NO] || '', i })).sort((x, y) => cmpNO(x.n, y.n) || x.i - y.i);
   rows.forEach(r => { r.seq = null; }); open.forEach((o, k) => { o.r.seq = k + 1; });
 }
-function cmpNO(x, y) { return x < y ? -1 : x > y ? 1 : 0; } // NO 열은 sort="string" (글자 순서)
+function cmpNO(x, y) { // 프린터는 Open 라벨을 번호(숫자) 순서로 출력
+  const a = parseInt(x, 10), b = parseInt(y, 10), na = isNaN(a), nb = isNaN(b);
+  if (na || nb) return na === nb ? 0 : na ? 1 : -1;
+  return a - b;
+}
 function openOrder() { return state.rows.map((r, i) => ({ r, i })).filter(x => isOpen(x.r)).sort((x, y) => (x.r.seq ?? 1e9) - (y.r.seq ?? 1e9) || x.i - y.i); }
 function renumberSeq() { openOrder().forEach((o, k) => { o.r.seq = k + 1; }); }
 function assignNO(rows) {
@@ -531,9 +578,8 @@ function assignNO(rows) {
   const keep = rows.map(r => r.orig !== null ? state.origRows[r.orig][C.NO] : '');
   const uniq = keep.every(v => v !== '') && new Set(keep).size === keep.length;
   if (uniq) { const got = want.slice().sort((x, y) => cmpNO(keep[x], keep[y]) || x - y); if (got.every((v, k) => v === want[k])) return keep; }
-  // 2) 바꿨으면 줄 순서대로 번호를 매기되, Open 품목끼리만 번호를 바꿔 Open 순서를 맞춘다. 자릿수를 채워 글자·숫자 정렬이 같게
-  const w = Math.max(3, String(rows.length).length); const pad = n => String(n).padStart(w, '0');
-  const no = rows.map((r, i) => pad(i + 1));
+  // 2) 바꿨으면 줄 순서대로 번호를 매기되, Open 품목끼리만 번호를 바꿔 Open 순서를 맞춘다
+  const no = rows.map((r, i) => String(i + 1));
   const slots = want.slice().sort((x, y) => x - y).map(i => no[i]);
   want.forEach((i, k) => { no[i] = slots[k]; });
   return no;
@@ -618,16 +664,16 @@ function renderList() {
   const frag = document.createDocumentFragment();
   vis.forEach((idx, vi) => {
     const r = state.rows[idx], c = r.cells, st = rowStatus(r);
-    const li = document.createElement('li'); li.className = 'item' + (st ? ' chg' : ''); li.dataset.idx = idx; li.draggable = true;
+    const li = document.createElement('li'); li.className = 'item' + (st ? ' chg' : ''); li.dataset.idx = idx;
     li.innerHTML = `
       <button type="button" class="grip" aria-label="끌어서 순서 바꾸기" tabindex="-1"><svg class="ic"><use href="#i-grip"/></svg></button>
-      <div class="main"><span class="no">${state.tab === 'open' ? (r.seq || '') : idx + 1}</span><span class="name"></span><span class="days"></span></div>
+      <div class="main">${state.tab === 'open' ? `<button type="button" class="no jump" aria-label="${r.seq}번째. 눌러서 몇 번째로 옮길지 입력">${r.seq || ''}</button>` : `<span class="no">${idx + 1}</span>`}<span class="name"></span><span class="days"></span></div>
       <div class="cats"><select data-k="1" aria-label="카테고리 1"></select><span class="arrow">›</span><select data-k="2" aria-label="카테고리 2"></select></div>
       <div class="open"><label class="sw"><input type="checkbox" data-k="8" aria-label="Open 출력"><span>Open</span></label></div>
       <div class="ops">
         <button type="button" data-act="up" aria-label="위로" ${vi === 0 ? 'disabled' : ''}><svg class="ic"><use href="#i-up"/></svg></button>
         <button type="button" data-act="down" aria-label="아래로" ${vi === vis.length - 1 ? 'disabled' : ''}><svg class="ic"><use href="#i-down"/></svg></button>
-        <button type="button" data-act="dup" aria-label="복제"><svg class="ic"><use href="#i-copy"/></svg></button>
+        <button type="button" data-act="dup" aria-label="복사 (한 장 더)" title="복사 (한 장 더)"><svg class="ic"><use href="#i-copy"/></svg></button>
         <button type="button" data-act="del" class="del" aria-label="삭제"><svg class="ic"><use href="#i-trash"/></svg></button>
       </div>`;
     li.querySelector('.name').textContent = c[C.ITEM] || '(이름 없음)';
@@ -641,7 +687,7 @@ function renderList() {
   list.appendChild(frag);
   if (!vis.length) { const e = document.createElement('li'); e.className = 'empty'; e.textContent = state.tab === 'open' ? 'Open 출력 품목이 없습니다. 품목 목록에서 Open 스위치를 켜면 여기에 들어옵니다.' : '해당하는 품목이 없습니다.'; list.appendChild(e); }
   $('countInfo').innerHTML = vis.length === state.rows.length ? `<b>${state.rows.length}</b>개` : `<b>${vis.length}</b>개 표시 · 전체 ${state.rows.length}개`;
-  $('hint').textContent = state.tab === 'open' ? 'Open을 누르면 이 순서대로 출력됩니다. 여기서 옮겨도 카테고리 화면 순서는 안 바뀝니다.' : (state.f1 ? '프린터 화면에도 이 순서로 나옵니다. 손잡이를 끌거나 화살표로 옮기세요.' : '카테고리를 고르면 프린터 화면과 같은 순서로 보입니다.');
+  $('hint').textContent = state.tab === 'open' ? 'Open을 누르면 이 순서대로 출력됩니다. 번호를 누르면 몇 번째로 옮길지 바로 입력할 수 있습니다. 여기서 옮겨도 카테고리 화면 순서는 안 바뀝니다.' : (state.f1 ? '프린터 화면에도 이 순서로 나옵니다. 손잡이를 끌거나 화살표로 옮기세요.' : '카테고리를 고르면 프린터 화면과 같은 순서로 보입니다.');
   $('qClear').hidden = !state.q;
 }
 function fillSelect(sel, values, cur) {
@@ -673,13 +719,30 @@ list.addEventListener('change', e => {
   }
 });
 list.addEventListener('click', e => {
+  const j = e.target.closest('button.jump');
+  if (j) {
+    const idx = +j.closest('li').dataset.idx, n = openOrder().length, cur = state.rows[idx].seq;
+    const inp = document.createElement('input'); inp.type = 'number'; inp.inputMode = 'numeric'; inp.min = 1; inp.max = n; inp.value = cur; inp.className = 'jumpin'; inp.setAttribute('aria-label', `몇 번째로 옮길지 (1~${n})`);
+    j.replaceWith(inp); inp.focus(); inp.select();
+    let done = false;
+    const finish = ok => { if (done) return; done = true; const v = parseInt(inp.value, 10); if (ok && v >= 1 && v !== cur) moveOpenTo(idx, Math.min(n, v)); else renderList(); };
+    inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); finish(true); } else if (ev.key === 'Escape') finish(false); });
+    inp.addEventListener('blur', () => finish(true));
+    return;
+  }
   const b = e.target.closest('button[data-act]'); if (!b) return;
   const li = b.closest('li'), idx = +li.dataset.idx, r = state.rows[idx], vis = visible(), vi = vis.indexOf(idx);
   if (b.dataset.act === 'del') { state.rows.splice(idx, 1); toast(`삭제: ${r.cells[C.ITEM] || '(이름 없음)'}`); render(); return; }
-  if (b.dataset.act === 'dup') { state.rows.splice(idx + 1, 0, { cells: r.cells.slice(), orig: null, src: r.src, seq: r.seq ? r.seq + 0.5 : null }); renumberSeq(); render(); const n = list.querySelector(`li[data-idx="${idx + 1}"]`); if (n) { n.scrollIntoView({ block: 'nearest' }); } toast('복제했습니다. 카테고리를 바꿔 다른 화면에 넣을 수 있습니다'); return; }
+  if (b.dataset.act === 'dup') { state.rows.splice(idx + 1, 0, { cells: r.cells.slice(), orig: null, src: r.src, seq: r.seq ? r.seq + 0.5 : null }); renumberSeq(); render(); const n = list.querySelector(`li[data-idx="${idx + 1}"]`); if (n) { n.scrollIntoView({ block: 'nearest' }); } toast(state.tab === 'open' ? '복사했습니다. Open에서 한 장 더 출력됩니다' : '복사했습니다. 카테고리를 바꿔 다른 화면에도 넣을 수 있습니다'); return; }
   if (b.dataset.act === 'up' && vi > 0) move(idx, vis[vi - 1], true);
   if (b.dataset.act === 'down' && vi < vis.length - 1) move(idx, vis[vi + 1], false);
 });
+function moveOpenTo(from, pos) {
+  const ord = openOrder().map(o => o.i).filter(i => i !== from); ord.splice(pos - 1, 0, from); ord.forEach((i, k) => { state.rows[i].seq = k + 1; });
+  render(); const li = list.querySelector(`li[data-idx="${from}"]`); if (li) { li.scrollIntoView({ block: 'center' }); flash(li); }
+  toast(`${pos}번째로 옮겼습니다`);
+}
+function flash(li) { li.classList.add('flash'); setTimeout(() => li.classList.remove('flash'), 900); }
 function move(from, target, before) {
   if (from === target) return;
   if (state.tab === 'open') { // Open 출력 순서만 바꾼다 (줄 순서 유지)
@@ -692,21 +755,56 @@ function move(from, target, before) {
   render();
   const li = list.querySelector(`li[data-idx="${to}"]`); if (li) li.scrollIntoView({ block: 'nearest' });
 }
-let dragIdx = null;
-list.addEventListener('dragstart', e => { const li = e.target.closest('li.item'); if (!li) return; dragIdx = +li.dataset.idx; li.classList.add('drag'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', String(dragIdx)); } catch (_) { } });
-list.addEventListener('dragend', () => { dragIdx = null; list.querySelectorAll('.drag,.over-before,.over-after').forEach(el => el.classList.remove('drag', 'over-before', 'over-after')); });
-list.addEventListener('dragover', e => {
-  if (dragIdx === null) return; const li = e.target.closest('li.item'); if (!li) return; e.preventDefault(); e.dataTransfer.dropEffect = 'move';
-  const rect = li.getBoundingClientRect(), before = e.clientY < rect.top + rect.height / 2;
-  list.querySelectorAll('.over-before,.over-after').forEach(el => el.classList.remove('over-before', 'over-after'));
-  if (+li.dataset.idx !== dragIdx) li.classList.add(before ? 'over-before' : 'over-after');
+/* 끌어서 옮기기: 손잡이를 잡고 끌면 화면 위·아래 끝에서 저절로 스크롤 (오래 대고 있을수록 빨라짐) */
+let drag = null;
+list.addEventListener('pointerdown', e => {
+  const g = e.target.closest('.grip'); if (!g || e.button > 0) return;
+  const li = g.closest('li.item'); if (!li) return; e.preventDefault();
+  const rect = li.getBoundingClientRect();
+  const ghost = li.cloneNode(true); ghost.classList.add('ghost'); ghost.classList.remove('chg');
+  Object.assign(ghost.style, { width: rect.width + 'px', left: rect.left + 'px', top: rect.top + 'px' });
+  document.body.appendChild(ghost); li.classList.add('drag'); document.documentElement.classList.add('dragging');
+  drag = { idx: +li.dataset.idx, li, ghost, dy: e.clientY - rect.top, y: e.clientY, id: e.pointerId, target: null, before: true, edgeT: 0, raf: 0,
+    items: [...list.querySelectorAll('li.item')].filter(x => x !== li) };
+  try { g.setPointerCapture(e.pointerId); } catch (_) { }
+  drag.raf = requestAnimationFrame(dragTick);
 });
-list.addEventListener('drop', e => {
-  if (dragIdx === null) return; const li = e.target.closest('li.item'); if (!li) return; e.preventDefault();
-  const target = +li.dataset.idx; if (target === dragIdx) return;
-  const rect = li.getBoundingClientRect(), before = e.clientY < rect.top + rect.height / 2;
-  move(dragIdx, target, before);
-});
+function dragMove(e) { if (!drag || e.pointerId !== drag.id) return; drag.y = e.clientY; drag.ghost.style.top = (drag.y - drag.dy) + 'px'; findTarget(); }
+function dragEnd(e, cancel) {
+  if (!drag || (e && e.pointerId !== drag.id)) return;
+  const d = drag; drag = null; cancelAnimationFrame(d.raf);
+  d.ghost.remove(); document.documentElement.classList.remove('dragging');
+  list.querySelectorAll('.drag,.over-before,.over-after').forEach(x => x.classList.remove('drag', 'over-before', 'over-after'));
+  if (!cancel && d.target !== null) move(d.idx, d.target, d.before);
+}
+window.addEventListener('pointermove', dragMove);
+window.addEventListener('pointerup', e => dragEnd(e, false));
+window.addEventListener('pointercancel', e => dragEnd(e, true));
+window.addEventListener('keydown', e => { if (e.key === 'Escape' && drag) dragEnd(null, true); });
+function findTarget() {
+  const items = drag.items; if (!items.length) return;
+  let lo = 0, hi = items.length; // 끄는 위치보다 가운데가 아래에 있는 첫 품목 (이분 탐색)
+  while (lo < hi) { const m = (lo + hi) >> 1, r = items[m].getBoundingClientRect(); if (r.top + r.height / 2 > drag.y) hi = m; else lo = m + 1; }
+  const before = lo < items.length, el = before ? items[lo] : items[items.length - 1];
+  const tgt = +el.dataset.idx;
+  if (tgt === drag.target && before === drag.before) return;
+  list.querySelectorAll('.over-before,.over-after').forEach(x => x.classList.remove('over-before', 'over-after'));
+  el.classList.add(before ? 'over-before' : 'over-after'); drag.target = tgt; drag.before = before;
+}
+function dragTick(now) {
+  if (!drag) return;
+  const H = window.innerHeight, zone = Math.min(140, H * 0.2); let v = 0;
+  if (drag.y < zone) v = -Math.min(1, (zone - drag.y) / zone); else if (drag.y > H - zone) v = Math.min(1, (drag.y - (H - zone)) / zone);
+  const lr = list.getBoundingClientRect(); // 목록 끝을 지나서까지 스크롤하지 않음 (첫·마지막 품목이 스크롤 구역 밖에 오도록)
+  if (v < 0 && lr.top >= zone + 8) v = 0;
+  if (v > 0 && lr.bottom <= H - zone - 8) v = 0;
+  if (v) {
+    if (!drag.edgeT) drag.edgeT = now;
+    const acc = Math.min(4, 1 + (now - drag.edgeT) / 600);
+    window.scrollBy(0, Math.sign(v) * Math.max(3, Math.abs(v) * 20 * acc)); findTarget();
+  } else drag.edgeT = 0;
+  drag.raf = requestAnimationFrame(dragTick);
+}
 
 /* ----- tabs, search, tools ----- */
 function setTab(tab) { state.tab = tab; $('tabAll').setAttribute('aria-selected', String(tab === 'all')); $('tabOpen').setAttribute('aria-selected', String(tab === 'open')); renderList(); }
@@ -721,6 +819,50 @@ $('csvOut').addEventListener('click', async () => {
   let rows; try { rows = lockedRows(); } catch (e) { toast(e.message); return; }
   const name = $('outName').value.replace(/\.pkg$/i, '') + '.csv';
   try { await deliver(name, new TextEncoder().encode(toCSV(state.table.cols, rows)), 'csv'); toast('CSV를 저장했습니다'); } catch (e) { toast(e.message || String(e)); }
+});
+
+/* ----- 품목 추가: 원래 목록에서 골라 복사 (이름·일수는 원본 그대로) ----- */
+const sheet = $('addSheet');
+function srcList() { const seen = new Set(), out = []; state.origRows.forEach((o, i) => { const key = [o[C.ITEM], o[C.DAYS], o[C.HOURS], o[6], o[7]].join('\u0001'); if (!seen.has(key)) { seen.add(key); out.push(i); } }); return out; }
+function addWhere() { return state.tab === 'open' ? 'Open 출력 맨 끝에 들어갑니다' : state.f1 ? `${state.f1}${state.f2 ? ' › ' + state.f2 : ''} 맨 끝에 들어갑니다` : '원래 카테고리 맨 끝에 들어갑니다'; }
+function renderPicks() {
+  const q = $('addQ').value.trim().toLowerCase(), ul = $('addList'); ul.innerHTML = '';
+  const frag = document.createDocumentFragment(); let n = 0;
+  for (const i of srcList()) {
+    const o = state.origRows[i]; if (q && !o[C.ITEM].toLowerCase().includes(q)) continue;
+    const li = document.createElement('li'), b = document.createElement('button'); b.type = 'button'; b.dataset.src = i;
+    const d = t(o[C.DAYS]), h = t(o[C.HOURS]);
+    b.innerHTML = '<b></b><span class="pd"></span><span class="pc"></span>';
+    b.querySelector('b').textContent = o[C.ITEM]; b.querySelector('.pd').textContent = /^t$/i.test(d) ? 'T 시간입력' : d ? d + '일' : h ? h + '시간' : '';
+    b.querySelector('.pc').textContent = [t(o[C.C1]), t(o[C.C2])].filter(Boolean).join(' › ');
+    li.appendChild(b); frag.appendChild(li); if (++n >= 200) break;
+  }
+  ul.appendChild(frag);
+  if (!n) ul.innerHTML = '<li class="none">원래 목록에 없는 품목입니다.</li>';
+}
+function openSheet() { $('addWhere').textContent = addWhere(); $('addQ').value = state.q; renderPicks(); sheet.hidden = false; document.documentElement.classList.add('sheet-open'); setTimeout(() => $('addQ').focus(), 30); }
+function closeSheet() { sheet.hidden = true; document.documentElement.classList.remove('sheet-open'); }
+$('addBtn').addEventListener('click', openSheet);
+sheet.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeSheet(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !sheet.hidden) closeSheet(); });
+$('addQ').addEventListener('input', renderPicks);
+$('addList').addEventListener('click', e => {
+  const b = e.target.closest('button[data-src]'); if (!b) return;
+  const i = +b.dataset.src, o = state.origRows[i], cells = o.slice(); let at, seq = null;
+  if (state.tab === 'open') {
+    cells[C.OPEN] = 'Y'; seq = openOrder().length + 1;
+    let last = -1; state.rows.forEach((r, k) => { if (r.src === i) last = k; }); at = last >= 0 ? last + 1 : state.rows.length;
+  } else {
+    cells[C.OPEN] = '';
+    if (state.f1) { if (t(cells[C.C1]) !== state.f1) cells[C.C2] = ''; cells[C.C1] = state.f1; }
+    if (state.f2) cells[C.C2] = state.f2;
+    const vis = visible(); at = vis.length ? vis[vis.length - 1] + 1 : state.rows.length;
+  }
+  state.rows.splice(at, 0, { cells, orig: null, src: i, seq }); renumberSeq(); closeSheet();
+  if (state.q && !o[C.ITEM].toLowerCase().includes(state.q.toLowerCase())) { state.q = ''; $('q').value = ''; }
+  render();
+  const li = list.querySelector(`li[data-idx="${at}"]`); if (li) { li.scrollIntoView({ block: 'center' }); flash(li); }
+  toast(`추가: ${o[C.ITEM]}`);
 });
 
 /* ----- save ----- */
