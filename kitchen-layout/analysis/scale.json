@@ -1,0 +1,104 @@
+{
+ "sx": 15.19343658241695,
+ "sy": 32.97850851438638,
+ "x": [
+  {
+   "label": "섬 작업대 폭 1,500",
+   "px": 100,
+   "label_mm": 1500,
+   "drawn_mm": 1519,
+   "diff_mm": 19,
+   "used": true
+  },
+  {
+   "label": "왼쪽 통로 900",
+   "px": 58,
+   "label_mm": 900,
+   "drawn_mm": 881,
+   "diff_mm": -19,
+   "used": true
+  },
+  {
+   "label": "선반~파티션 통로 709",
+   "px": 46.5,
+   "label_mm": 709,
+   "drawn_mm": 706,
+   "diff_mm": -3,
+   "used": true
+  },
+  {
+   "label": "파티션 장비~섬 통로 800",
+   "px": 52,
+   "label_mm": 800,
+   "drawn_mm": 790,
+   "diff_mm": -10,
+   "used": true
+  },
+  {
+   "label": "섬~조리라인 통로 900",
+   "px": 59,
+   "label_mm": 900,
+   "drawn_mm": 896,
+   "diff_mm": -4,
+   "used": true
+  }
+ ],
+ "y": [
+  {
+   "label": "워크인 깊이 2,050",
+   "px": 61.5,
+   "label_mm": 2050,
+   "drawn_mm": 2028,
+   "diff_mm": -22,
+   "used": true
+  },
+  {
+   "label": "워크인~파티션 870",
+   "px": 26.5,
+   "label_mm": 870,
+   "drawn_mm": 874,
+   "diff_mm": 4,
+   "used": true
+  },
+  {
+   "label": "워크인~섬 690",
+   "px": 20,
+   "label_mm": 690,
+   "drawn_mm": 660,
+   "diff_mm": -30,
+   "used": true
+  },
+  {
+   "label": "섬 작업대 길이 3,910",
+   "px": 119,
+   "label_mm": 3910,
+   "drawn_mm": 3924,
+   "diff_mm": 14,
+   "used": true
+  },
+  {
+   "label": "섬~아래 작업대 890",
+   "px": 27,
+   "label_mm": 890,
+   "drawn_mm": 890,
+   "diff_mm": 0,
+   "used": true
+  },
+  {
+   "label": "위 작업대~휴게실 벽 900",
+   "px": 27.0,
+   "label_mm": 900,
+   "drawn_mm": 890,
+   "diff_mm": -10,
+   "used": true
+  },
+  {
+   "label": "휴게실 작업대~아래 작업대 910",
+   "px": 28,
+   "label_mm": 910,
+   "drawn_mm": 923,
+   "diff_mm": 13,
+   "used": true
+  }
+ ]
+}

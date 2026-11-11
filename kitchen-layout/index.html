@@ -111,7 +111,7 @@ button.pill{cursor:pointer}
 
 /* ---------- panel ---------- */
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
-.tabs{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line);flex:none}
+.tabs{display:grid;grid-template-columns:repeat(5,1fr);border-bottom:1px solid var(--line);flex:none}
 .tabs button{border:0;background:transparent;padding:11px 4px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
 .tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
 .pbody{overflow:auto;min-height:0;flex:1;padding:14px 14px 22px}
@@ -168,6 +168,15 @@ tbody tr:hover{background:var(--panel-2)}
 tfoot td{font-weight:600;border-bottom:0}
 .dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:1px}
 .saved{display:flex;flex-direction:column;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.issue{display:flex;align-items:baseline;justify-content:space-between;gap:10px;width:100%;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:8px 10px;font-size:13px}
+.issue:hover{background:var(--panel-2)}
+.issue b{font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.issue span{font:12px var(--font-mono);color:var(--muted);white-space:nowrap}
+.issue.bad span{color:var(--danger)} .issue.warn span{color:var(--warn)}
+.roles{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;align-items:center;font-size:13px}
+.roles i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+.legno{display:inline-flex;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;font:600 11px var(--font-mono);color:#fff;margin-right:6px}
 .saved .row{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:9px;padding:7px 8px}
 .saved .row div{flex:1;min-width:0;display:flex;flex-direction:column}
 .saved .row b{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -186,6 +195,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2px 0}
   .seg button .t{display:none}
   .status{margin-left:0}
   .panel{max-height:46vh}
+  .tabs button{font-size:12px;padding:10px 2px}
   .panel.collapsed .pbody{display:none}
   .coords{display:none}
 }
@@ -252,6 +262,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2px 0}
       <button type="button" role="tab" data-tab="add" aria-selected="false">장비 추가</button>
       <button type="button" role="tab" data-tab="props" aria-selected="true">속성</button>
       <button type="button" role="tab" data-tab="list" aria-selected="false">장비 목록</button>
+      <button type="button" role="tab" data-tab="analysis" aria-selected="false">분석</button>
       <button type="button" role="tab" data-tab="setup" aria-selected="false">설정·저장</button>
     </nav>
     <div class="pbody">
@@ -271,6 +282,7 @@ hr{border:0;border-top:1px solid var(--line);margin:2px 0}
       </section>
       <section class="pane" data-pane="props" id="propsPane"></section>
       <section class="pane" data-pane="list" id="listPane" hidden></section>
+      <section class="pane" data-pane="analysis" id="anaPane" hidden></section>
       <section class="pane" data-pane="setup" id="setupPane" hidden>
         <div class="group">
           <h2>주방 크기 (내부 치수)</h2>
@@ -396,82 +408,11 @@ const LIB = [
   ['구조 · 기타', [['wall', '벽 1000', 1000, 100], ['column', '기둥', 400, 400], ['door', '문 900', 900, 900], ['door', '문 800', 800, 800], ['zone', '구역 표시', 2000, 1500], ['table', '테이블', 800, 600], ['chair', '의자', 450, 450], ['locker', '락커', 900, 450], ['box', '기타 장비', 600, 600]]],
 ];
 
-/* ---------- default layout traced from the supplied drawing ---------- */
-const DEFAULT_ROOM = { w: 10200, h: 8250 };
-const DEFAULT_UNDER = { show: true, opacity: 0.35, x: -175, y: -172, w: 10424, h: 8705, custom: false };
-function mk(type, name, x, y, w, h, rot = 0, extra = {}) { return { id: uid(), type, name, x, y, w, h, rot, ...extra }; }
-function defaultItems() {
-  return [
-    // structure: staff room + partition
-    mk('wall', '벽', 1600, 1550, 200, 100), mk('wall', '벽', 2450, 1550, 950, 100), mk('wall', '벽', 4050, 1550, 200, 100),
-    mk('wall', '벽', 1600, 1650, 100, 3080), mk('wall', '벽', 4150, 1650, 100, 3970), mk('wall', '벽', 1600, 5520, 2550, 100),
-    mk('wall', '벽', 1700, 3250, 2450, 100), mk('wall', '벽', 2900, 1650, 100, 1600),
-    mk('wall', '파티션', 5400, 2920, 120, 3630), mk('wall', '파티션', 5400, 6550, 1000, 100),
-    mk('column', '기둥·설비', 0, 6800, 700, 1450),
-    // doors
-    mk('door', '휴게실 문', 1700, 4730, 790, 790, 270),
-    mk('door', '탈의실 문', 1800, 1650, 650, 650, 0), mk('door', '탈의실 문', 3400, 1650, 650, 650, 0, { flip: true }),
-    mk('door', '출입구', 730, 7370, 880, 880, 180), mk('door', '출입구', 5200, 7400, 850, 850, 180, { flip: true }),
-    mk('door', '냉장실 문', 5230, 600, 800, 800, 90), mk('door', '냉동실 문', 7840, 600, 800, 800, 90),
-    // zones
-    mk('zone', '탈의실 1', 1700, 1650, 1200, 1600), mk('zone', '탈의실 2', 3000, 1650, 1150, 1600), mk('zone', '휴게실', 1700, 3350, 2450, 2170),
-    // walk-ins
-    mk('walkin', '워크인 냉장실', 6030, 0, 2610, 2050), mk('walkin', '워크인 냉동실', 8640, 0, 1560, 2050),
-    // left wall line (front faces right)
-    mk('shelf', '벽선반', 0, 0, 450, 1900, 270),
-    mk('sink', '1조 싱크대', 0, 1950, 700, 600, 270, { n: 1 }),
-    mk('worktable', '세척 투입대', 0, 2650, 700, 500, 270),
-    mk('dishwasher', '식기세척기', 0, 3150, 700, 650, 270),
-    mk('worktable', '세척 배출대', 0, 3800, 700, 900, 270),
-    mk('worktable', '작업대', 0, 4700, 700, 650, 270),
-    mk('sink', '2조 싱크대', 0, 5350, 700, 1400, 270, { n: 2 }),
-    mk('hood', '후드 (세척)', 0, 2650, 1100, 2050),
-    // top wall line (front faces down)
-    mk('fridgeTable', '테이블 냉장고', 1050, 0, 900, 650, 0),
-    mk('worktable', '작업대', 1950, 0, 900, 650, 0),
-    mk('worktable', '작업대', 2850, 0, 1150, 650, 0),
-    mk('sink', '1조 싱크대', 4000, 0, 700, 650, 0, { n: 1 }),
-    mk('worktable', '작업대', 4700, 0, 1100, 650, 0),
-    // staff room contents
-    mk('locker', '락커', 1700, 2820, 1200, 430, 180), mk('locker', '락커', 3000, 2820, 1150, 430, 180),
-    mk('table', '테이블', 3590, 3450, 550, 1950, 90),
-    mk('chair', '의자', 3060, 3700, 450, 450, 270), mk('chair', '의자', 3060, 4600, 450, 450, 270),
-    mk('shelf', '선반', 4250, 1900, 450, 3650, 270),
-    // counter under the staff room
-    mk('sink', '1조 싱크대', 1600, 5620, 700, 800, 0, { n: 1 }),
-    mk('worktable', '작업대', 2300, 5620, 1050, 800, 0),
-    mk('kettle', '전기밥솥', 3350, 5620, 450, 800, 0),
-    mk('fridgeTable', '테이블 냉장고', 3800, 5620, 800, 800, 0),
-    mk('worktable', '작업대', 4600, 5620, 800, 800, 0),
-    // partition corner
-    mk('handsink', '손세척대', 5520, 3150, 400, 450, 270),
-    mk('oven', '스팀 컨벡션 오븐', 5520, 4100, 850, 1200, 270),
-    mk('hood', '후드', 5520, 3850, 1350, 1650),
-    mk('worktable', '작업대', 5520, 5600, 1000, 850, 270),
-    // island (back to back)
-    mk('fridgeTable', '아일랜드 냉장작업대', 7100, 2740, 750, 3910, 90),
-    mk('fridgeTable', '아일랜드 냉장작업대', 7850, 2740, 750, 3910, 270),
-    // cooking line on the right wall (front faces left)
-    mk('worktable', '작업대', 9500, 2400, 700, 750, 90),
-    mk('range', '가스렌지 (다구)', 9500, 3150, 700, 2400, 90, { n: 10 }),
-    mk('worktable', '작업대', 9500, 5550, 700, 450, 90),
-    mk('fryer', '튀김기 2조', 9500, 6000, 700, 600, 90, { n: 2 }),
-    mk('griddle', '그리들', 9500, 6600, 700, 600, 90),
-    mk('hood', '후드 (조리)', 9100, 2200, 1100, 3400), mk('hood', '후드 (조리)', 9100, 5600, 1100, 1850),
-    // bottom wall line (front faces up)
-    mk('icemaker', '제빙기', 1650, 7550, 650, 700, 180),
-    mk('fridge', '소형 냉장고', 2300, 7550, 450, 700, 180, { n: 1 }),
-    mk('range', '간택기', 2750, 7550, 450, 700, 180, { n: 1 }),
-    mk('worktable', '작업대', 3200, 7550, 700, 700, 180),
-    mk('sink', '1조 싱크대', 3900, 7550, 500, 700, 180, { n: 1 }),
-    mk('fridgeTable', '테이블 냉장고', 4400, 7550, 800, 700, 180),
-    mk('worktable', '작업대', 6100, 7550, 750, 700, 180),
-    mk('sink', '2조 싱크대', 6850, 7550, 900, 700, 180, { n: 2 }),
-    mk('range', '가스렌지 5구', 7750, 7550, 950, 700, 180, { n: 5 }),
-    mk('worktable', '작업대', 8700, 7550, 800, 700, 180),
-    mk('sink', '1조 싱크대', 9500, 7550, 700, 700, 180, { n: 1 }),
-  ];
-}
+/* ---------- default layout: generated by analysis/trace.py from the supplied drawing ---------- */
+const TRACE = {"room":{"w":10640,"h":8210},"under":{"show":true,"opacity":0.35,"x":-198,"y":-132,"w":10848,"h":8673,"custom":false},"scale":{"sx":15.193,"sy":32.979},"items":[{"type":"wall","name":"벽","x":1630,"y":1550,"w":150,"h":3230,"rot":0},{"type":"wall","name":"벽","x":4300,"y":1550,"w":150,"h":4190,"rot":0},{"type":"wall","name":"벽","x":1630,"y":5570,"w":2820,"h":170,"rot":0},{"type":"wall","name":"벽","x":1630,"y":1550,"w":220,"h":130,"rot":0},{"type":"wall","name":"벽","x":2540,"y":1550,"w":980,"h":130,"rot":0},{"type":"wall","name":"벽","x":4210,"y":1550,"w":240,"h":130,"rot":0},{"type":"wall","name":"칸막이","x":1780,"y":3300,"w":2520,"h":130,"rot":0},{"type":"wall","name":"칸막이","x":2950,"y":1680,"w":150,"h":1620,"rot":0},{"type":"wall","name":"파티션","x":5590,"y":2870,"w":140,"h":3690,"rot":0},{"type":"wall","name":"파티션","x":5590,"y":6460,"w":1050,"h":100,"rot":0},{"type":"wall","name":"벽 (출입구 옆)","x":1630,"y":7320,"w":150,"h":890,"rot":0},{"type":"column","name":"기둥·설비","x":0,"y":6830,"w":740,"h":1380,"rot":0},{"type":"door","name":"휴게실 문","x":1780,"y":4780,"w":790,"h":790,"rot":270},{"type":"door","name":"탈의실 문","x":1850,"y":1680,"w":690,"h":690,"rot":0},{"type":"door","name":"탈의실 문","x":3520,"y":1680,"w":690,"h":690,"rot":0,"flip":true},{"type":"door","name":"출입구","x":740,"y":7320,"w":890,"h":890,"rot":180},{"type":"door","name":"출입구","x":5420,"y":7390,"w":820,"h":820,"rot":180,"flip":true},{"type":"door","name":"냉장실 문","x":5470,"y":630,"w":790,"h":790,"rot":90},{"type":"door","name":"냉동실 문","x":8160,"y":590,"w":800,"h":800,"rot":90},{"type":"zone","name":"탈의실 1","x":1780,"y":1680,"w":1170,"h":1620,"rot":0},{"type":"zone","name":"탈의실 2","x":3100,"y":1680,"w":1200,"h":1620,"rot":0},{"type":"zone","name":"휴게실","x":1780,"y":3430,"w":2520,"h":2140,"rot":0},{"type":"walkin","name":"워크인 냉장실","x":6260,"y":0,"w":2630,"h":2010,"rot":0},{"type":"walkin","name":"워크인 냉동실","x":8960,"y":0,"w":1600,"h":2010,"rot":0},{"type":"shelf","name":"벽선반","x":0,"y":0,"w":440,"h":2010,"rot":270},{"type":"sink","name":"1조 싱크대","x":0,"y":2010,"w":740,"h":660,"rot":270,"n":1},{"type":"worktable","name":"세척 투입대","x":0,"y":2670,"w":740,"h":500,"rot":270},{"type":"dishwasher","name":"식기세척기","x":0,"y":3170,"w":740,"h":560,"rot":270},{"type":"worktable","name":"작업대","x":0,"y":3730,"w":740,"h":520,"rot":270},{"type":"dishwasher","name":"세척 장비 (확인)","x":0,"y":4250,"w":740,"h":470,"rot":270},{"type":"hood","name":"후드 (세척)","x":0,"y":2700,"w":1120,"h":2020,"rot":0},{"type":"worktable","name":"작업대","x":0,"y":4720,"w":740,"h":990,"rot":270},{"type":"sink","name":"싱크대 (원형)","x":0,"y":5710,"w":740,"h":490,"rot":270,"n":1},{"type":"worktable","name":"작업대","x":0,"y":6200,"w":740,"h":630,"rot":270},{"type":"fridgeTable","name":"테이블 냉장고","x":1090,"y":0,"w":920,"h":680,"rot":0},{"type":"worktable","name":"작업대","x":2010,"y":0,"w":910,"h":680,"rot":0},{"type":"worktable","name":"작업대","x":2920,"y":0,"w":1200,"h":680,"rot":0},{"type":"sink","name":"1조 싱크대","x":4120,"y":0,"w":700,"h":680,"rot":0,"n":1},{"type":"worktable","name":"작업대","x":4820,"y":0,"w":1240,"h":680,"rot":0},{"type":"locker","name":"락커","x":1780,"y":2840,"w":1170,"h":460,"rot":180},{"type":"locker","name":"락커","x":3100,"y":2840,"w":1200,"h":460,"rot":180},{"type":"table","name":"테이블","x":3720,"y":3430,"w":580,"h":1950,"rot":90},{"type":"chair","name":"의자","x":3180,"y":3590,"w":300,"h":570,"rot":270},{"type":"chair","name":"의자","x":3180,"y":4580,"w":300,"h":560,"rot":270},{"type":"shelf","name":"선반","x":4450,"y":1950,"w":440,"h":3690,"rot":270},{"type":"sink","name":"1조 싱크대","x":1630,"y":5740,"w":760,"h":820,"rot":0,"n":1},{"type":"worktable","name":"작업대","x":2390,"y":5740,"w":1060,"h":820,"rot":0},{"type":"kettle","name":"전기밥솥 (확인)","x":3450,"y":5740,"w":420,"h":820,"rot":0},{"type":"fridgeTable","name":"테이블 냉장고","x":3870,"y":5740,"w":950,"h":820,"rot":0},{"type":"worktable","name":"작업대","x":4820,"y":5740,"w":770,"h":820,"rot":0},{"type":"handsink","name":"손세척대","x":5730,"y":3200,"w":330,"h":460,"rot":270},{"type":"oven","name":"가열 장비 (확인)","x":5730,"y":4090,"w":910,"h":1450,"rot":270},{"type":"hood","name":"후드","x":5770,"y":3890,"w":1360,"h":1650,"rot":0},{"type":"worktable","name":"작업대","x":5730,"y":5610,"w":910,"h":850,"rot":270},{"type":"fridgeTable","name":"아일랜드 냉장작업대","x":7430,"y":2670,"w":760,"h":3930,"rot":90},{"type":"fridgeTable","name":"아일랜드 냉장작업대","x":8190,"y":2670,"w":760,"h":3930,"rot":270},{"type":"worktable","name":"작업대","x":9850,"y":2340,"w":790,"h":790,"rot":90},{"type":"range","name":"가스렌지 (다구)","x":9850,"y":3130,"w":790,"h":2610,"rot":90,"n":14},{"type":"worktable","name":"작업대","x":9850,"y":5740,"w":790,"h":300,"rot":90},{"type":"griddle","name":"그리들 (확인)","x":9850,"y":6040,"w":790,"h":1280,"rot":90},{"type":"hood","name":"후드 (조리)","x":9440,"y":2210,"w":1200,"h":3430,"rot":0},{"type":"hood","name":"후드 (조리)","x":9440,"y":5640,"w":1200,"h":1950,"rot":0},{"type":"icemaker","name":"제빙기","x":1780,"y":7490,"w":640,"h":720,"rot":180},{"type":"fridge","name":"냉장고","x":2420,"y":7490,"w":510,"h":720,"rot":180,"n":1},{"type":"range","name":"가스렌지","x":2930,"y":7490,"w":370,"h":720,"rot":180,"n":2},{"type":"worktable","name":"작업대","x":3300,"y":7490,"w":820,"h":720,"rot":180},{"type":"handsink","name":"손세척대","x":4120,"y":7490,"w":480,"h":720,"rot":180},{"type":"sink","name":"1조 싱크대","x":4600,"y":7490,"w":640,"h":720,"rot":180,"n":1},{"type":"worktable","name":"작업대","x":5240,"y":7490,"w":180,"h":720,"rot":180},{"type":"worktable","name":"작업대","x":6260,"y":7490,"w":870,"h":720,"rot":180},{"type":"sink","name":"1조 싱크대","x":7130,"y":7490,"w":950,"h":720,"rot":180,"n":1},{"type":"range","name":"가스렌지 5구","x":8080,"y":7490,"w":990,"h":720,"rot":180,"n":5},{"type":"worktable","name":"작업대","x":9070,"y":7490,"w":780,"h":720,"rot":180},{"type":"handsink","name":"손세척대","x":9850,"y":7490,"w":440,"h":720,"rot":180},{"type":"worktable","name":"작업대","x":10290,"y":7490,"w":350,"h":720,"rot":180}],"dims":[{"label":"섬 작업대 폭 1,500","label_mm":1500,"drawn_mm":1519,"diff_mm":19},{"label":"왼쪽 통로 900","label_mm":900,"drawn_mm":881,"diff_mm":-19},{"label":"선반~파티션 통로 709","label_mm":709,"drawn_mm":706,"diff_mm":-3},{"label":"파티션 장비~섬 통로 800","label_mm":800,"drawn_mm":790,"diff_mm":-10},{"label":"섬~조리라인 통로 900","label_mm":900,"drawn_mm":896,"diff_mm":-4},{"label":"워크인 깊이 2,050","label_mm":2050,"drawn_mm":2028,"diff_mm":-22},{"label":"워크인~파티션 870","label_mm":870,"drawn_mm":874,"diff_mm":4},{"label":"워크인~섬 690","label_mm":690,"drawn_mm":660,"diff_mm":-30},{"label":"섬 작업대 길이 3,910","label_mm":3910,"drawn_mm":3924,"diff_mm":14},{"label":"섬~아래 작업대 890","label_mm":890,"drawn_mm":890,"diff_mm":0},{"label":"위 작업대~휴게실 벽 900","label_mm":900,"drawn_mm":890,"diff_mm":-10},{"label":"휴게실 작업대~아래 작업대 910","label_mm":910,"drawn_mm":923,"diff_mm":13}]};
+const DEFAULT_ROOM = { ...TRACE.room };
+const DEFAULT_UNDER = { ...TRACE.under };
+function defaultItems() { return TRACE.items.map(i => ({ ...JSON.parse(JSON.stringify(i)), id: uid() })); }
 
 /* ---------- state ---------- */
 const DEFAULT_CFG = { grid: 50, magnet: true, checks: true, aisleMin: 800, labels: true, sizes: true };
@@ -497,7 +438,7 @@ function redo() { if (!redoStack.length) return; undoStack.push(snap()); restore
 function updateHistoryBtns() { $('#undo').disabled = !undoStack.length; $('#redo').disabled = !redoStack.length; }
 
 /* ---------- persistence (this browser) ---------- */
-const LS_STATE = 'klp.state.v1', LS_UNDER = 'klp.underimg.v1', LS_SAVES = 'klp.saves.v1';
+const LS_STATE = 'klp.state.v2', LS_UNDER = 'klp.underimg.v1', LS_SAVES = 'klp.saves.v1';
 const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
 const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
 let saveTimer = 0;
@@ -565,7 +506,7 @@ function symbol(it, Lw, D, P) {
     case 'icemaker': { const i = m * 0.14; s = base() + rect(x0 + i, y0 + i, Lw - 2 * i, D - 2 * i, stroke(1)) + `<path d="M0 ${n1(-m * 0.22)}L${n1(m * 0.22)} 0L0 ${n1(m * 0.22)}L${n1(-m * 0.22)} 0Z" ${stroke(1)}/>` + front(); break; }
     case 'range': {
       const n = clamp(Math.round(it.n || Math.max(1, Math.round(Lw / 450)) * (D >= 650 && Lw >= 900 ? 2 : 1)), 1, 24);
-      const rows = (n >= 4 && D >= 600 && Lw / Math.ceil(n / 2) >= 380) ? 2 : 1; const cols = Math.ceil(n / rows);
+      const rows = (n >= 4 && D >= 600 && Lw / Math.ceil(n / 2) >= 300) ? 2 : 1; const cols = Math.ceil(n / rows);
       const cw = Lw / cols, ch = D * 0.86 / rows, oy = y0 + D * 0.04; s = base(0.1);
       let k = 0;
       for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { if (k++ >= n) break; const cx = x0 + cw * (q + 0.5), cy = oy + ch * (r + 0.5), rr = Math.min(cw, ch) * 0.33; s += `<circle cx="${n1(cx)}" cy="${n1(cy)}" r="${n1(rr)}" ${stroke(1.1)}/><circle cx="${n1(cx)}" cy="${n1(cy)}" r="${n1(rr * 0.5)}" ${stroke(0.8)}/>`; }
@@ -766,6 +707,7 @@ function renderAll() {
   const ly = layersSVG(pal, ctx);
   L.zone.innerHTML = ly.zone; L.items.innerHTML = ly.items; L.over.innerHTML = ly.over;
   computeChecks();
+  if (curTab === 'analysis') { analyze(); renderAnalysis(); }
   renderOverlay(); renderStatus();
 }
 let fullTimer = 0;
@@ -798,6 +740,7 @@ function renderOverlay() {
     if (d > 1) { const fs = 13 / s; o += `<text x="${n1((a.x + b.x) / 2)}" y="${n1((a.y + b.y) / 2 - fs * 0.6)}" font-size="${n1(fs)}" text-anchor="middle" font-family="${MONO}" font-weight="500" fill="${col}" stroke="${P.canvas}" stroke-width="${n1(4 / s)}" paint-order="stroke">${fmt(d)} mm</text>`; }
   }
   if (drag && drag.kind === 'marquee') { const r = normRect(drag.a, drag.b); o += `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${P.sel}" fill-opacity=".08" stroke="${P.sel}" stroke-width="1" stroke-dasharray="4 3"/>`; }
+  if (curTab === 'analysis' && ANA && !drag) o += analysisSVG(P, s);
   L.overlay.innerHTML = o;
   placeQbar();
 }
@@ -1068,6 +1011,226 @@ document.addEventListener('keydown', e => {
 });
 document.addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; svg.classList.remove('tool-hand'); if (mode === 'hand') svg.classList.add('tool-hand'); } });
 
+
+/* ============================================================
+   Analysis — working space in front of each unit, hood coverage,
+   door swings and walking routes (A* on a 100 mm grid)
+   ============================================================ */
+let ANA = null;
+const HOT = new Set(['range', 'fryer', 'griddle', 'oven', 'kettle']);
+const needsHood = it => HOT.has(it.type) && !/밥솥/.test(it.name);
+const hasFront = it => layerOf(it) === 'floor' && !['walkin', 'table', 'chair', 'bin', 'box'].includes(it.type);
+const DIRV = { 0: [0, 1], 90: [-1, 0], 180: [0, -1], 270: [1, 0] };
+const HOOD_OVERHANG = 150;
+function frontEdge(it) {
+  const r = (((it.rot || 0) % 360) + 360) % 360, [dx, dy] = DIRV[r] || [0, 1];
+  if (r === 0) return { ax: it.x, ay: it.y + it.h, bx: it.x + it.w, by: it.y + it.h, dx, dy };
+  if (r === 180) return { ax: it.x, ay: it.y, bx: it.x + it.w, by: it.y, dx, dy };
+  if (r === 90) return { ax: it.x, ay: it.y, bx: it.x, by: it.y + it.h, dx, dy };
+  return { ax: it.x + it.w, ay: it.y, bx: it.x + it.w, by: it.y + it.h, dx, dy };
+}
+function frontClear(it) {
+  const f = frontEdge(it), W = S.room.w, H = S.room.h, m = 60;
+  let d, band, by = null;
+  if (f.dy) {
+    const x0 = f.ax + m, x1 = f.bx - m, y = f.ay; d = f.dy > 0 ? H - y : y;
+    for (const o of S.items) {
+      if (o === it || !solid(o) || o.x >= x1 || o.x + o.w <= x0) continue;
+      if (f.dy > 0 && o.y >= y - 1 && o.y - y < d) { d = o.y - y; by = o; }
+      if (f.dy < 0 && o.y + o.h <= y + 1 && y - o.y - o.h < d) { d = y - o.y - o.h; by = o; }
+    }
+    band = { x: f.ax, y: f.dy > 0 ? y : y - d, w: f.bx - f.ax, h: d };
+  } else {
+    const y0 = f.ay + m, y1 = f.by - m, x = f.ax; d = f.dx > 0 ? W - x : x;
+    for (const o of S.items) {
+      if (o === it || !solid(o) || o.y >= y1 || o.y + o.h <= y0) continue;
+      if (f.dx > 0 && o.x >= x - 1 && o.x - x < d) { d = o.x - x; by = o; }
+      if (f.dx < 0 && o.x + o.w <= x + 1 && x - o.x - o.w < d) { d = x - o.x - o.w; by = o; }
+    }
+    band = { x: f.dx > 0 ? x : x - d, y: f.ay, w: d, h: f.by - f.ay };
+  }
+  return { d: Math.max(0, Math.round(d)), band, by };
+}
+function hoodCheck(it) {
+  const hoods = S.items.filter(o => o.type === 'hood');
+  const inH = (x, y, h) => x >= h.x - 1 && x <= h.x + h.w + 1 && y >= h.y - 1 && y <= h.y + h.h + 1;
+  const N = 12; let inn = 0;
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) { const x = it.x + it.w * (i + .5) / N, y = it.y + it.h * (j + .5) / N; if (hoods.some(h => inH(x, y, h))) inn++; }
+  const f = frontEdge(it); let over = Infinity;
+  for (let k = 1; k < 8; k++) {
+    const t = k / 8, px = f.ax + (f.bx - f.ax) * t, py = f.ay + (f.by - f.ay) * t; let best = -1;
+    for (const h of hoods) { if (!inH(px, py, h)) continue; const e = f.dx > 0 ? h.x + h.w - px : f.dx < 0 ? px - h.x : f.dy > 0 ? h.y + h.h - py : py - h.y; best = Math.max(best, e); }
+    over = Math.min(over, best);
+  }
+  return { cover: inn / (N * N), over: Math.round(over) };
+}
+function doorSamples(d) {
+  const [Lw, D] = spec(d), cx = d.x + d.w / 2, cy = d.y + d.h / 2, a = (d.rot || 0) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a), pts = [];
+  for (let i = 1; i <= 6; i++) for (let j = 0; j <= 8; j++) {
+    const r = Lw * i / 6 * 0.97, t = j / 8 * Math.PI / 2; let lx = -Lw / 2 + r * Math.cos(t); const ly = -D / 2 + 25 + r * Math.sin(t);
+    if (d.flip) lx = -lx; pts.push([cx + lx * c - ly * s, cy + lx * s + ly * c]);
+  }
+  return pts;
+}
+function doorOpening(d) { // the opening segment on the wall, in plan coordinates
+  const [Lw, D] = spec(d), cx = d.x + d.w / 2, cy = d.y + d.h / 2, a = (d.rot || 0) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  const tf = (lx, ly) => [cx + lx * c - ly * s, cy + lx * s + ly * c];
+  return [tf(-Lw / 2, -D / 2), tf(Lw / 2, -D / 2)];
+}
+
+/* --- walking grid --- */
+function buildNav() {
+  const cell = 100, rad = 150, W = S.room.w, H = S.room.h, nx = Math.ceil(W / cell), ny = Math.ceil(H / cell);
+  const hard = new Uint8Array(nx * ny), soft = new Uint8Array(nx * ny);
+  const mark = (arr, x0, y0, x1, y1, pad = rad) => {
+    const i0 = Math.max(0, Math.floor((x0 - pad) / cell)), i1 = Math.min(nx - 1, Math.floor((x1 + pad) / cell));
+    const j0 = Math.max(0, Math.floor((y0 - pad) / cell)), j1 = Math.min(ny - 1, Math.floor((y1 + pad) / cell));
+    for (let j = j0; j <= j1; j++) for (let i = i0; i <= i1; i++) { const cx = (i + .5) * cell, cy = (j + .5) * cell; if (cx > x0 - pad && cx < x1 + pad && cy > y0 - pad && cy < y1 + pad) arr[j * nx + i] = 1; }
+  };
+  mark(soft, -1000, -1000, W + 1000, 0); mark(soft, -1000, H, W + 1000, H + 1000); mark(soft, -1000, -1000, 0, H + 1000); mark(soft, W, -1000, W + 1000, H + 1000);
+  for (const o of S.items) {
+    if (!solid(o)) continue;
+    if (o.type === 'walkin') { const t = 100; mark(soft, o.x, o.y, o.x + o.w, o.y + t); mark(soft, o.x, o.y + o.h - t, o.x + o.w, o.y + o.h); mark(soft, o.x, o.y, o.x + t, o.y + o.h); mark(soft, o.x + o.w - t, o.y, o.x + o.w, o.y + o.h); }
+    else if (o.type === 'wall') mark(soft, o.x, o.y, o.x + o.w, o.y + o.h);
+    else mark(hard, o.x, o.y, o.x + o.w, o.y + o.h);
+  }
+  for (const d of S.items) {
+    if (d.type !== 'door') continue;
+    const [[ax, ay], [bx, by]] = doorOpening(d), x0 = Math.min(ax, bx), x1 = Math.max(ax, bx), y0 = Math.min(ay, by), y1 = Math.max(ay, by), across = rad + 260;
+    const r = Math.abs(bx - ax) > Math.abs(by - ay) ? [x0 + 120, y0 - across, x1 - 120, y1 + across] : [x0 - across, y0 + 120, x1 + across, y1 - 120];
+    for (let j = 0; j < ny; j++) for (let i = 0; i < nx; i++) { const cx = (i + .5) * cell, cy = (j + .5) * cell; if (cx > r[0] && cx < r[2] && cy > r[1] && cy < r[3]) soft[j * nx + i] = 0; }
+  }
+  const g = new Uint8Array(nx * ny); for (let k = 0; k < g.length; k++) g[k] = hard[k] | soft[k];
+  return { g, nx, ny, cell };
+}
+function nearestFree(nav, p) {
+  const { g, nx, ny, cell } = nav; const si = clamp(Math.floor(p.x / cell), 0, nx - 1), sj = clamp(Math.floor(p.y / cell), 0, ny - 1);
+  if (!g[sj * nx + si]) return sj * nx + si;
+  const seen = new Uint8Array(nx * ny), q = [sj * nx + si]; seen[q[0]] = 1;
+  for (let h = 0; h < q.length && h < 40000; h++) { const k = q[h], i = k % nx, j = (k / nx) | 0; for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) { const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= nx || b >= ny) continue; const n = b * nx + a; if (seen[n]) continue; if (!g[n]) return n; seen[n] = 1; q.push(n); } }
+  return -1;
+}
+function astar(nav, s0, t0) {
+  const { g, nx, ny } = nav, N = nx * ny, G = new Float64Array(N).fill(Infinity), from = new Int32Array(N).fill(-1), closed = new Uint8Array(N);
+  const ti = t0 % nx, tj = (t0 / nx) | 0, hfn = k => { const dx = Math.abs(k % nx - ti), dy = Math.abs(((k / nx) | 0) - tj); return (dx + dy) + (Math.SQRT2 - 2) * Math.min(dx, dy); };
+  const heap = []; const push = (k, f) => { heap.push([f, k]); let i = heap.length - 1; while (i > 0) { const p = (i - 1) >> 1; if (heap[p][0] <= heap[i][0]) break; [heap[p], heap[i]] = [heap[i], heap[p]]; i = p; } };
+  const pop = () => { const top = heap[0], last = heap.pop(); if (heap.length) { heap[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < heap.length && heap[l][0] < heap[m][0]) m = l; if (r < heap.length && heap[r][0] < heap[m][0]) m = r; if (m === i) break; [heap[m], heap[i]] = [heap[i], heap[m]]; i = m; } } return top[1]; };
+  G[s0] = 0; push(s0, hfn(s0));
+  while (heap.length) {
+    const k = pop(); if (closed[k]) continue; closed[k] = 1; if (k === t0) break;
+    const i = k % nx, j = (k / nx) | 0;
+    for (let dj = -1; dj <= 1; dj++) for (let di = -1; di <= 1; di++) {
+      if (!di && !dj) continue; const a = i + di, b = j + dj; if (a < 0 || b < 0 || a >= nx || b >= ny) continue; const n = b * nx + a;
+      if (g[n] || closed[n]) continue; if (di && dj && (g[j * nx + a] || g[b * nx + i])) continue;
+      const c = G[k] + (di && dj ? Math.SQRT2 : 1); if (c < G[n]) { G[n] = c; from[n] = k; push(n, c + hfn(n)); }
+    }
+  }
+  if (!closed[t0]) return null;
+  const path = []; for (let k = t0; k !== -1; k = from[k]) path.push(k); return path.reverse();
+}
+function smoothPath(nav, ks) {
+  const { g, nx, cell } = nav, P = ks.map(k => ({ x: (k % nx + .5) * cell, y: (((k / nx) | 0) + .5) * cell }));
+  const clear = (a, b) => { const n = Math.ceil(Math.hypot(b.x - a.x, b.y - a.y) / (cell / 3)); for (let t = 1; t < n; t++) { const x = a.x + (b.x - a.x) * t / n, y = a.y + (b.y - a.y) * t / n; if (g[Math.floor(y / cell) * nx + Math.floor(x / cell)]) return false; } return true; };
+  const out = [P[0]]; let i = 0;
+  while (i < P.length - 1) { let j = P.length - 1; while (j > i + 1 && !clear(P[i], P[j])) j--; out.push(P[j]); i = j; }
+  return out;
+}
+const plen = pts => pts.reduce((a, p, i) => i ? a + Math.hypot(p.x - pts[i - 1].x, p.y - pts[i - 1].y) : 0, 0);
+function stationPoint(it) {
+  if (it.type === 'walkin' || it.type === 'door' || !hasFront(it)) return { x: it.x + it.w / 2, y: it.y + it.h / 2 };
+  const f = frontEdge(it); return { x: (f.ax + f.bx) / 2 + f.dx * 350, y: (f.ay + f.by) / 2 + f.dy * 350 };
+}
+const ROLES = [
+  ['in', '입고 (출입구)', it => it.type === 'door'],
+  ['cold', '냉장 보관', it => ['walkin', 'fridge', 'fridgeTable'].includes(it.type)],
+  ['prep', '전처리 (싱크)', it => ['sink', 'worktable', 'fridgeTable'].includes(it.type)],
+  ['cook', '조리 (화구)', it => HOT.has(it.type)],
+  ['wash', '세척', it => ['dishwasher', 'sink'].includes(it.type)],
+];
+const LEGS = [['in', 'cold', '입고 → 냉장 보관', 'accent'], ['cold', 'prep', '냉장 보관 → 전처리', 'cold'], ['prep', 'cook', '전처리 → 조리', 'hot'], ['cook', 'wash', '조리 → 세척 (도구 회수)', 'wash']];
+function autoStations() {
+  const st = {}, items = S.items, dist = (a, b) => { const p = stationPoint(a), q = stationPoint(b); return Math.hypot(p.x - q.x, p.y - q.y); };
+  st.cold = (items.find(i => i.type === 'walkin' && /냉장/.test(i.name)) || items.find(i => i.type === 'walkin') || items.find(i => i.type === 'fridge'))?.id;
+  const ins = items.filter(i => i.type === 'door' && /출입/.test(i.name)), cold = byId(st.cold);
+  if (cold && ins.length) ins.sort((a, b) => dist(a, cold) - dist(b, cold));
+  st.in = (ins[0] || items.find(i => i.type === 'door'))?.id;
+  const ranges = items.filter(i => i.type === 'range').sort((a, b) => b.w * b.h - a.w * a.h); st.cook = (ranges[0] || items.find(i => HOT.has(i.type)))?.id;
+  const cook = byId(st.cook), sinks = items.filter(i => i.type === 'sink');
+  if (cook && sinks.length) st.prep = sinks.sort((a, b) => dist(a, cook) - dist(b, cook))[0].id;
+  st.wash = items.find(i => i.type === 'dishwasher')?.id;
+  return st;
+}
+function segX(p1, p2, p3, p4) { const d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x); if (Math.abs(d) < 1e-9) return false; const t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d, u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d; return t > 0.02 && t < 0.98 && u > 0.02 && u < 0.98; }
+function analyze() {
+  const min = S.cfg.aisleMin;
+  const fronts = S.items.filter(hasFront).map(it => ({ it, ...frontClear(it) })).filter(f => f.d < min).sort((a, b) => a.d - b.d);
+  const hoods = S.items.filter(needsHood).map(it => ({ it, ...hoodCheck(it) })).filter(h => h.cover < 0.999 || h.over < HOOD_OVERHANG).sort((a, b) => a.cover - b.cover || a.over - b.over);
+  const doors = [];
+  for (const d of S.items.filter(i => i.type === 'door')) { const pts = doorSamples(d), hit = S.items.filter(o => solid(o) && o.type !== 'wall' && o.type !== 'walkin' && pts.some(([x, y]) => x > o.x + 20 && x < o.x + o.w - 20 && y > o.y + 20 && y < o.y + o.h - 20)); if (hit.length) doors.push({ d, hit }); }
+  // routes
+  const auto = autoStations(); const cfgSt = S.cfg.stations || {}; const st = {};
+  for (const [k] of ROLES) st[k] = byId(cfgSt[k]) ? cfgSt[k] : auto[k];
+  const nav = buildNav(); const legs = [];
+  for (const [a, b, label, col] of LEGS) {
+    const A = byId(st[a]), B = byId(st[b]); if (!A || !B) { legs.push({ label, col, a, b, missing: true }); continue; }
+    const pa = stationPoint(A), pb = stationPoint(B), s0 = nearestFree(nav, pa), t0 = nearestFree(nav, pb);
+    const ks = s0 >= 0 && t0 >= 0 ? astar(nav, s0, t0) : null;
+    if (!ks) { legs.push({ label, col, a, b, blocked: true, pa, pb }); continue; }
+    const pts = [pa, ...smoothPath(nav, ks), pb]; legs.push({ label, col, a, b, pts, len: plen(pts), straight: Math.hypot(pb.x - pa.x, pb.y - pa.y) });
+  }
+  const dirty = legs[3], crosses = [];
+  if (dirty && dirty.pts) for (const L2 of [legs[1], legs[2]]) { if (!L2 || !L2.pts) continue; let n = 0; for (let i = 1; i < dirty.pts.length; i++) for (let j = 1; j < L2.pts.length; j++) if (segX(dirty.pts[i - 1], dirty.pts[i], L2.pts[j - 1], L2.pts[j])) n++; if (n) crosses.push({ leg: L2.label, n }); }
+  ANA = { fronts, hoods, doors, legs, st, crosses, total: legs.reduce((a, l) => a + (l.len || 0), 0) };
+  return ANA;
+}
+function analysisSVG(P, s) {
+  let o = '';
+  for (const f of ANA.fronts) if (f.band.w > 0 && f.band.h > 0) o += `<rect x="${n1(f.band.x)}" y="${n1(f.band.y)}" width="${n1(f.band.w)}" height="${n1(f.band.h)}" fill="${P.danger}" fill-opacity=".14" stroke="${P.danger}" stroke-width="1" stroke-dasharray="3 3"/>`;
+  for (const h of ANA.hoods) o += `<rect x="${h.it.x}" y="${h.it.y}" width="${h.it.w}" height="${h.it.h}" fill="none" stroke="${P.warn}" stroke-width="2.4" stroke-dasharray="6 3"/>`;
+  for (const d of ANA.doors) { const [Lw, D] = spec(d.d); o += `<g transform="translate(${n1(d.d.x + d.d.w / 2)} ${n1(d.d.y + d.d.h / 2)}) rotate(${d.d.rot || 0})${d.d.flip ? ' scale(-1 1)' : ''}"><path d="M${n1(-Lw / 2)} ${n1(-D / 2)}L${n1(Lw / 2)} ${n1(-D / 2)}A${n1(Lw)} ${n1(Lw)} 0 0 1 ${n1(-Lw / 2)} ${n1(-D / 2 + Lw)}Z" fill="${P.danger}" fill-opacity=".22" stroke="${P.danger}" stroke-width="1.2"/></g>`; }
+  ANA.legs.forEach((l, i) => {
+    if (!l.pts) return; const c = P[l.col] || P.accent;
+    o += `<polyline points="${l.pts.map(p => n1(p.x) + ',' + n1(p.y)).join(' ')}" fill="none" stroke="${P.canvas}" stroke-width="6" stroke-linejoin="round" stroke-linecap="round" opacity=".9"/>`;
+    o += `<polyline points="${l.pts.map(p => n1(p.x) + ',' + n1(p.y)).join(' ')}" fill="none" stroke="${c}" stroke-width="3" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="${i === 3 ? '7 5' : 'none'}"/>`;
+    const m = l.pts[Math.floor(l.pts.length / 2)], r = 9 / s;
+    o += `<circle cx="${n1(m.x)}" cy="${n1(m.y)}" r="${n1(r)}" fill="${c}" stroke="${P.canvas}" stroke-width="2"/><text x="${n1(m.x)}" y="${n1(m.y + r * 0.42)}" font-size="${n1(r * 1.15)}" text-anchor="middle" font-weight="700" fill="#fff" font-family="${MONO}">${i + 1}</text>`;
+  });
+  const roleCol = { in: 'accent', cold: 'cold', prep: 'wash', cook: 'hot', wash: 'wash' };
+  for (const [k, label] of ROLES) { const it = byId(ANA.st[k]); if (!it) continue; const p = stationPoint(it), r = 6 / s; o += `<circle cx="${n1(p.x)}" cy="${n1(p.y)}" r="${n1(r)}" fill="${P.canvas}" stroke="${P[roleCol[k]]}" stroke-width="2.5"/>`; }
+  return o;
+}
+function renderAnalysis() {
+  if (curTab !== 'analysis' || !ANA) return;
+  const pane = $('#anaPane'); if (pane.contains(document.activeElement) && document.activeElement.tagName === 'SELECT') return;
+  const A = ANA, m = v => (v / 1000).toFixed(1);
+  const legRows = A.legs.map((l, i) => `<button type="button" class="issue" data-focus="${[l.a, l.b].map(k => A.st[k]).filter(Boolean).join(',')}"><b><span class="legno" style="background:var(--${l.col})">${i + 1}</span>${l.label}</b><span>${l.len ? `${m(l.len)} m${l.straight > 400 && l.len / l.straight > 1.35 ? ` · 우회 ×${(l.len / l.straight).toFixed(1)}` : ''}` : l.missing ? '장비 없음' : '길 막힘'}</span></button>`).join('');
+  const opts = (k, test) => S.items.filter(test).map(it => `<option value="${it.id}"${A.st[k] === it.id ? ' selected' : ''}>${esc(it.name)} · ${(it.x / 1000).toFixed(1)}, ${(it.y / 1000).toFixed(1)} m</option>`).join('');
+  const roleCol = { in: 'accent', cold: 'cold', prep: 'wash', cook: 'hot', wash: 'wash' };
+  const front = A.fronts.length ? A.fronts.map(f => `<button type="button" class="issue ${f.d < 600 ? 'bad' : 'warn'}" data-focus="${f.it.id}"><b>${esc(f.it.name)}</b><span>앞 ${fmt(f.d)} mm${f.by ? ` · ${esc(f.by.name)}까지` : ' · 벽까지'}</span></button>`).join('') : `<p class="hint">모든 장비 앞에 ${fmt(S.cfg.aisleMin)} mm 이상 비어 있습니다.</p>`;
+  const hood = A.hoods.length ? A.hoods.map(h => `<button type="button" class="issue ${h.cover < 0.999 ? 'bad' : 'warn'}" data-focus="${h.it.id}"><b>${esc(h.it.name)}</b><span>${h.cover < 0.999 ? `후드 밖 ${Math.round((1 - h.cover) * 100)}%` : `앞쪽 여유 ${fmt(Math.max(0, h.over))} mm`}</span></button>`).join('') : `<p class="hint">가열 장비가 모두 후드 아래에 있고 앞쪽으로 ${HOOD_OVERHANG} mm 이상 덮입니다.</p>`;
+  const door = A.doors.length ? A.doors.map(d => `<button type="button" class="issue bad" data-focus="${[d.d.id, ...d.hit.map(h => h.id)].join(',')}"><b>${esc(d.d.name)}</b><span>${d.hit.map(h => esc(h.name)).join(', ')}에 걸림</span></button>`).join('') : `<p class="hint">문이 열리는 자리에 장비가 없습니다.</p>`;
+  const dims = (TRACE.dims || []).map(r => `<tr><td>${esc(r.label)}</td><td class="n">${fmt(r.label_mm)}</td><td class="n">${fmt(r.drawn_mm)}</td><td class="n">${r.diff_mm > 0 ? '+' : ''}${r.diff_mm}</td></tr>`).join('');
+  pane.innerHTML = `
+    <div class="group"><h2>한눈에</h2><div class="chips">
+      <span class="pill ${A.fronts.length ? 'danger' : 'ok'}"><i></i>앞 공간 부족 ${A.fronts.length}</span>
+      <span class="pill ${A.hoods.length ? 'warn' : 'ok'}"><i></i>후드 ${A.hoods.length}</span>
+      <span class="pill ${A.doors.length ? 'danger' : 'ok'}"><i></i>문 간섭 ${A.doors.length}</span>
+      <span class="pill ok" style="color:var(--ink)"><i style="background:var(--accent)"></i>동선 ${m(A.total)} m</span></div>
+      <p class="hint">도면 위 빨간 띠는 앞 공간이 모자란 곳, 주황 점선은 후드 문제, 빨간 부채꼴은 문이 장비에 걸리는 곳입니다. 줄을 누르면 도면에서 찾아 줍니다.</p></div>
+    <div class="group"><h2>동선 · 실제 걷는 거리</h2>
+      <p class="hint">장비를 피해 100 mm 격자로 길을 찾았습니다 (사람 폭 300 mm 가정). 장비를 옮기면 바로 다시 계산됩니다.</p>
+      <div class="roles">${ROLES.map(([k, label, test]) => `<span><i style="background:var(--${roleCol[k]})"></i>${label}</span><select data-role="${k}">${opts(k, test)}</select>`).join('')}</div>
+      <div class="group">${legRows}</div>
+      ${A.crosses.length ? `<p class="hint" style="color:var(--warn)">세척으로 가는 길(4, 점선)이 ${A.crosses.map(c => `'${c.leg}' 길과 ${c.n}번`).join(', ')} 겹칩니다. 깨끗한 식재료와 사용한 도구가 엇갈리는 지점입니다.</p>` : `<p class="hint">세척으로 가는 길(4)이 식재료 길(2·3)과 엇갈리지 않습니다.</p>`}</div>
+    <div class="group"><h2>장비 앞 작업 공간 (&lt; ${fmt(S.cfg.aisleMin)} mm)</h2>${front}</div>
+    <div class="group"><h2>가열 장비와 후드</h2>${hood}</div>
+    <div class="group"><h2>문 열림</h2>${door}</div>
+    ${dims ? `<div class="group"><h2>받은 도면 치수 검증</h2><p class="hint">도면에 적힌 치수 ${TRACE.dims.length}개를 그림에서 다시 재 본 값입니다. 축척 가로 ${TRACE.scale.sx} · 세로 ${TRACE.scale.sy} mm/px로 맞췄고, 1px 오차는 가로 15 mm · 세로 33 mm입니다.</p>
+      <div class="tablewrap"><table><thead><tr><th>치수</th><th class="n">표기</th><th class="n">그림</th><th class="n">차이</th></tr></thead><tbody>${dims}</tbody></table></div></div>` : ''}`;
+}
+$('#anaPane').addEventListener('click', e => { const b = e.target.closest('[data-focus]'); if (!b || !b.dataset.focus) return; sel = new Set(b.dataset.focus.split(',').filter(id => byId(id))); if (sel.size) focusBox(bbox(selItems())); selectionChanged(); });
+$('#anaPane').addEventListener('change', e => { const k = e.target.dataset.role; if (!k) return; S.cfg.stations = { ...(S.cfg.stations || {}), [k]: e.target.value }; persist(); analyze(); e.target.blur(); renderAnalysis(); renderOverlay(); });
+
 /* ============================================================
    Panel
    ============================================================ */
@@ -1078,6 +1241,7 @@ function openTab(t, expand) {
   $$('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== t);
   if (expand) $('#panel').classList.remove('collapsed');
   if (t === 'list') renderList(); if (t === 'setup') renderSetup(); if (t === 'props') renderProps();
+  if (t === 'analysis') { analyze(); renderAnalysis(); } renderOverlay();
 }
 $('.tabs').addEventListener('click', e => {
   const b = e.target.closest('[data-tab]'); if (!b) return;
@@ -1085,7 +1249,7 @@ $('.tabs').addEventListener('click', e => {
   if (b.dataset.tab === curTab && matchMedia('(max-width: 860px)').matches) { panel.classList.toggle('collapsed'); return; }
   panel.classList.remove('collapsed'); openTab(b.dataset.tab);
 });
-function renderPanels() { if (curTab === 'props') renderProps(); if (curTab === 'list') renderList(); if (curTab === 'setup') renderSetup(); }
+function renderPanels() { if (curTab === 'props') renderProps(); if (curTab === 'list') renderList(); if (curTab === 'setup') renderSetup(); if (curTab === 'analysis') renderAnalysis(); }
 
 /* ---------- library ---------- */
 function miniSVG(type, Lw, D, extra) {
