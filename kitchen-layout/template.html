@@ -108,6 +108,21 @@ button.pill{cursor:pointer}
 .floatcard .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .toast{position:absolute;top:12px;left:50%;transform:translate(-50%,-6px);background:var(--ink);color:var(--canvas);padding:8px 14px;border-radius:9px;font-size:13px;opacity:0;transition:opacity .18s, transform .18s;pointer-events:none;z-index:5;max-width:calc(100% - 24px);text-align:center}
 .toast.show{opacity:1;transform:translate(-50%,0)}
+#gl{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+#gl.grabbing{cursor:grabbing}
+.v3bar{position:absolute;top:12px;right:12px;display:flex;gap:6px;z-index:3}
+.v3bar .btn{box-shadow:0 4px 14px -8px rgba(0,0,0,.35)}
+.v3bar .btn.on{background:var(--ink);border-color:var(--ink);color:var(--canvas)}
+.v3hint{position:absolute;right:12px;bottom:12px;font:500 11.5px/1.3 var(--font-mono);color:var(--muted);pointer-events:none;text-align:right}
+.cap3d{position:absolute;left:12px;bottom:12px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:10px 12px;width:min(300px, calc(100% - 24px));box-shadow:0 10px 30px -14px rgba(0,0,0,.4);display:flex;flex-direction:column;gap:2px;z-index:3;font-size:13px}
+.cap3d .r{display:flex;align-items:center;gap:6px;min-height:26px;opacity:.28;transition:opacity .45s cubic-bezier(.25,.8,.25,1)}
+.cap3d .r.in{opacity:1}
+.cap3d .r .t{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cap3d .r .v{margin-left:auto;padding-left:10px;font-size:12.5px}
+.cap3d .r.tot{border-top:1px solid var(--line);margin-top:4px;padding-top:6px;font-weight:600}
+.cap3d .r.tot .t{color:var(--muted);font-weight:500}
+body.is3d .seg.only2d{display:none}
+@media (prefers-reduced-motion: reduce){ .cap3d .r{transition:none} }
 
 /* ---------- panel ---------- */
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
@@ -176,7 +191,7 @@ tfoot td{font-weight:600;border-bottom:0}
 .issue.bad span{color:var(--danger)} .issue.warn span{color:var(--warn)}
 .roles{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 10px;align-items:center;font-size:13px}
 .roles i{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
-.legno{display:inline-flex;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;font:600 11px var(--font-mono);color:#fff;margin-right:6px}
+.legno{display:inline-flex;flex:none;width:18px;height:18px;border-radius:50%;align-items:center;justify-content:center;font:600 11px var(--font-mono);color:#fff;margin-right:6px}
 .saved .row{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:9px;padding:7px 8px}
 .saved .row div{flex:1;min-width:0;display:flex;flex-direction:column}
 .saved .row b{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -208,7 +223,11 @@ hr{border:0;border-top:1px solid var(--line);margin:2px 0}
   <header class="bar">
     <div class="brand"><span class="eyebrow">Kitchen Layout</span><h1>주방 배치 플래너</h1></div>
     <div class="tools">
-      <div class="seg" role="group" aria-label="도구">
+      <div class="seg" role="group" aria-label="보기">
+        <button type="button" id="v2d" class="on" title="평면도로 편집">2D</button>
+        <button type="button" id="v3d" title="입체로 보기">3D</button>
+      </div>
+      <div class="seg only2d" role="group" aria-label="도구">
         <button type="button" data-mode="select" class="on" title="선택 · 이동 (V)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 2l9.5 5.2-4.2 1.1L6.4 13z"/></svg><span class="t">선택</span></button>
         <button type="button" data-mode="hand" title="화면 이동 (H · 스페이스 누른 채 드래그)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 8V3.5a1 1 0 012 0V7m0-4.5a1 1 0 012 0V7m0-3.5a1 1 0 012 0V8m0-2.5a1 1 0 012 0V10c0 2.5-1.8 4.5-4.3 4.5H8.2C6.6 14.5 5.4 13.6 4.6 12L3 9a1 1 0 011.7-1z"/></svg><span class="t">이동</span></button>
         <button type="button" data-mode="measure" title="거리 재기 (M)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="5" width="13" height="6" rx="1"/><path d="M4.5 5v2.5M7 5v1.8M9.5 5v2.5M12 5v1.8"/></svg><span class="t">재기</span></button>
@@ -217,12 +236,12 @@ hr{border:0;border-top:1px solid var(--line);margin:2px 0}
         <button type="button" id="undo" title="실행 취소 (Ctrl+Z)" aria-label="실행 취소"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.5L2.5 6.5l3 3"/><path d="M2.5 6.5H10a3.5 3.5 0 010 7H7"/></svg></button>
         <button type="button" id="redo" title="다시 실행 (Ctrl+Shift+Z)" aria-label="다시 실행"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 3.5l3 3-3 3"/><path d="M13.5 6.5H6a3.5 3.5 0 000 7h3"/></svg></button>
       </div>
-      <div class="seg" role="group" aria-label="확대">
+      <div class="seg only2d" role="group" aria-label="확대">
         <button type="button" id="zoomOut" title="축소" aria-label="축소"><svg viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 8h9"/></svg></button>
         <button type="button" id="zoomLbl" title="전체 보기 (F)">100%</button>
         <button type="button" id="zoomIn" title="확대" aria-label="확대"><svg viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 8h9M8 3.5v9"/></svg></button>
       </div>
-      <div class="seg" role="group" aria-label="밑그림">
+      <div class="seg only2d" role="group" aria-label="밑그림">
         <button type="button" id="underBtn" title="원본 도면 밑그림 표시"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="11" rx="1"/><path d="M1.5 9.5l3.5-3 3 2.5 2.5-2 4 3.5"/></svg><span class="t">밑그림</span></button>
       </div>
       <div class="status" id="status"></div>
@@ -254,6 +273,13 @@ hr{border:0;border-top:1px solid var(--line);margin:2px 0}
       </div>
       <div class="row"><button type="button" class="btn primary" id="calibApply" hidden>적용</button><button type="button" class="btn" id="calibCancel">취소</button></div>
     </div>
+    <canvas id="gl" hidden></canvas>
+    <div class="v3bar" id="v3bar" hidden>
+      <button type="button" class="btn" id="showBtn"><svg viewBox="0 0 16 16" fill="currentColor"><path id="showIco" d="M5 3.2v9.6L12.6 8z"/></svg><span id="showLbl">동선 쇼</span></button>
+      <button type="button" class="btn" id="v3Cut" title="벽을 1.1 m 높이에서 잘라 안이 보이게 합니다">벽 실제 높이</button>
+      <button type="button" class="btn" id="v3Reset">처음 시점</button>
+    </div>
+    <div class="cap3d" id="cap3d" hidden></div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </main>
 
@@ -700,6 +726,7 @@ function renderUnder() {
   el.setAttribute('x', u.x); el.setAttribute('y', u.y); el.setAttribute('width', Math.max(10, u.w)); el.setAttribute('height', Math.max(10, u.h)); el.setAttribute('opacity', u.opacity);
 }
 function renderAll() {
+  if (V3.on) { computeChecks(); if (curTab === 'analysis') { analyze(); renderAnalysis(); } renderStatus(); return; }
   pal = readPalette();
   const ctx = { s: scale() };
   renderUnder();
@@ -936,7 +963,7 @@ svg.addEventListener('pointerleave', () => { $('#coords').textContent = ''; });
 /* ---------- quick bar ---------- */
 function placeQbar() {
   const q = $('#qbar'); const list = selItems();
-  if (!list.length || drag || mode !== 'select') { q.hidden = true; return; }
+  if (!list.length || drag || mode !== 'select' || V3.on) { q.hidden = true; return; }
   const gb = bbox(list), s = scale();
   q.hidden = false;
   const qw = q.offsetWidth || 260, qh = q.offsetHeight || 40, sw = stage.clientWidth, sh = stage.clientHeight;
@@ -953,8 +980,8 @@ $('#qbar').addEventListener('click', e => {
 /* ============================================================
    Edits
    ============================================================ */
-function changed(skipCheckpoint) { persist(); renderAll(); renderPanels(); updateHistoryBtns(); }
-function selectionChanged() { renderOverlay(); renderProps(); renderListHighlight(); }
+function changed(skipCheckpoint) { persist(); renderAll(); renderPanels(); updateHistoryBtns(); schedule3D(); }
+function selectionChanged() { renderOverlay(); renderProps(); renderListHighlight(); if (V3.on) update3DSel(); }
 
 function rotateItem(it) {
   const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
@@ -1004,6 +1031,8 @@ document.addEventListener('keydown', e => {
   if (k === 'delete' || k === 'backspace') { e.preventDefault(); deleteSel(); return; }
   if (k === 'escape') { if (mode !== 'select') setMode('select'); else { sel.clear(); selectionChanged(); } return; }
   if (k === 'r') { rotateSel(); return; }
+  if (k === '3') { enter3D(); return; } if (k === '2') { if (V3.on) exit3D(); return; }
+  if (V3.on) { if (k === 'escape') { sel.clear(); selectionChanged(); } if (k === 'r' || k === 'delete' || k === 'backspace' || k.startsWith('arrow')) { } else return; }
   if (k === 'v') setMode('select'); if (k === 'h') setMode('hand'); if (k === 'm') setMode('measure'); if (k === 'f') { fit(); renderAll(); }
   const step = (S.cfg.grid || 10) * (e.shiftKey ? 10 : 1);
   const map = { arrowleft: [-step, 0], arrowright: [step, 0], arrowup: [0, -step], arrowdown: [0, step] };
@@ -1562,6 +1591,307 @@ $('#expPng').addEventListener('click', async () => {
   cv.toBlob(b => { if (b) offerFile(`주방배치도_${stamp()}.png`, b, 'image/png'); else toast('이미지를 만들지 못했습니다'); }, 'image/png');
 });
 
+/* ============================================================
+   3D view and route show (three.js r128, loaded on first use)
+   Plan mm (x, y) -> world metres (X, Z), Y up.
+   ============================================================ */
+const V3 = { cut: true, on: false, T: null, r: null, scene: null, cam: null, root: null, selG: null, routeG: null, pick: [], fade: [], burners: {}, target: null, sph: { r: 14, th: -1.05, ph: 0.92 }, show: null, raf: 0, userCam: false, ptr: new Map(), drag: null };
+const MM = 0.001, LOOP = 13.8, CUT = 1100;
+const H3 = { worktable: 850, sink: 850, handsink: 850, dishwasher: 1450, fridge: 1900, fridgeTable: 850, walkin: 2300, icemaker: 1100, range: 850, fryer: 900, griddle: 900, oven: 1700, kettle: 950, hood: 400, shelf: 1800, overshelf: 300, bin: 700, table: 720, chair: 850, locker: 1800, box: 850, wall: 2400, column: 2600, door: 2050, zone: 0 };
+const reduceMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+let threeP = null;
+function loadThree() {
+  if (window.THREE) return Promise.resolve(window.THREE);
+  if (!threeP) threeP = new Promise((ok, bad) => { const s = document.createElement('script'); s.src = 'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js'; s.onload = () => window.THREE ? ok(window.THREE) : bad(); s.onerror = () => { threeP = null; bad(); }; (document.head || document.body).appendChild(s); });
+  return threeP;
+}
+function localToPlan(it, lx, ly) {
+  const [Lw, D] = spec(it), cx = it.x + it.w / 2, cy = it.y + it.h / 2, a = (it.rot || 0) * Math.PI / 180, c = Math.cos(a), s = Math.sin(a);
+  if (it.flip) lx = -lx; return [cx + lx * c - ly * s, cy + lx * s + ly * c];
+}
+
+async function enter3D() {
+  if (V3.on) return;
+  V3.on = true; document.body.classList.add('is3d');
+  $('#v2d').classList.remove('on'); $('#v3d').classList.add('on');
+  svg.hidden = true; $('#gl').hidden = false; $('#qbar').hidden = true; $('#v3bar').hidden = false; $('.hud').hidden = true;
+  if (mode !== 'select') setMode('select');
+  try { V3.T = await loadThree(); } catch { toast('3D 화면을 불러오지 못했습니다. 인터넷 연결을 확인하고 다시 눌러 주세요'); exit3D(); return; }
+  if (!V3.on) return;
+  if (!V3.r) init3D();
+  resize3D(); build3D(); if (!V3.target) reset3D();
+  cancelAnimationFrame(V3.raf); V3.raf = requestAnimationFrame(loop3D);
+}
+function exit3D() {
+  V3.on = false; stopShow(); cancelAnimationFrame(V3.raf); document.body.classList.remove('is3d');
+  $('#v3d').classList.remove('on'); $('#v2d').classList.add('on');
+  $('#gl').hidden = true; svg.hidden = false; $('#v3bar').hidden = true; $('.hud').hidden = false;
+  requestAnimationFrame(() => { applyVB(); renderAll(); });
+}
+function init3D() {
+  const T = V3.T, cv = $('#gl');
+  const r = new T.WebGLRenderer({ canvas: cv, antialias: true, preserveDrawingBuffer: true });
+  r.setPixelRatio(Math.min(devicePixelRatio || 1, 2)); r.shadowMap.enabled = true; r.shadowMap.type = T.PCFSoftShadowMap; r.outputEncoding = T.sRGBEncoding;
+  V3.r = r; V3.scene = new T.Scene(); V3.cam = new T.PerspectiveCamera(38, 1, 0.05, 200);
+  new ResizeObserver(() => { if (V3.on) resize3D(); }).observe(stage);
+  cv.addEventListener('pointerdown', down3D); cv.addEventListener('pointermove', move3D); cv.addEventListener('pointerup', up3D); cv.addEventListener('pointercancel', up3D);
+  cv.addEventListener('wheel', e => { e.preventDefault(); V3.sph.r = clamp(V3.sph.r * Math.exp(e.deltaY * (e.deltaMode === 1 ? 0.04 : 0.0012)), 2.5, 45); V3.userCam = true; }, { passive: false });
+  cv.addEventListener('contextmenu', e => e.preventDefault());
+}
+function resize3D() { const w = stage.clientWidth, h = stage.clientHeight; if (!w || !h || !V3.r) return; V3.r.setSize(w, h, false); V3.cam.aspect = w / h; V3.cam.updateProjectionMatrix(); }
+function reset3D() {
+  const W = S.room.w * MM, H = S.room.h * MM, asp = (stage.clientWidth || 4) / (stage.clientHeight || 3);
+  // distance that fits the room's diagonal in the narrower field of view
+  const vf = 38 * Math.PI / 180, hf = 2 * Math.atan(Math.tan(vf / 2) * asp), f = Math.min(vf, hf), diag = Math.hypot(W, H);
+  V3.target = { x: W / 2, y: 0, z: H / 2 + (asp < 1 ? H * 0.2 : 0) }; V3.sph = { r: clamp(diag * (asp < 1 ? 0.5 : 0.45) / Math.tan(f / 2), 6, 45), th: Math.PI / 2 - 0.3, ph: asp < 1 ? 0.5 : 0.68 }; V3.userCam = false;
+}
+function camPos() { const { r, th, ph } = V3.sph, t = V3.target; return { x: t.x + r * Math.sin(ph) * Math.cos(th), y: t.y + r * Math.cos(ph), z: t.z + r * Math.sin(ph) * Math.sin(th) }; }
+
+/* --- materials --- */
+function mats3D(P, dark) {
+  const T = V3.T, std = (color, o = {}) => new T.MeshStandardMaterial({ color, roughness: 0.55, metalness: 0, ...o });
+  return {
+    steel: std(dark ? 0x8E979F : 0xB9C1C8, { metalness: 0.55, roughness: 0.38 }), top: std(dark ? 0xB7BFC6 : 0xE3E7EA, { metalness: 0.45, roughness: 0.3 }),
+    white: std(dark ? 0xC9CFD4 : 0xF4F6F7, { roughness: 0.62 }), dark: std(0x2A2F34, { roughness: 0.7 }), iron: std(0x1D2125, { roughness: 0.5, metalness: 0.3 }),
+    glass: std(0x1E2830, { roughness: 0.15, metalness: 0.2 }), wood: std(dark ? 0x8A6E52 : 0xC8A57E, { roughness: 0.7 }), seat: std(dark ? 0x56606A : 0x7D8893),
+    wall: std(dark ? 0x3B434A : 0xEDE8E1, { roughness: 0.9 }), column: std(dark ? 0x4A5259 : 0xD6D2CB, { roughness: 0.95 }), panel: std(dark ? 0xAEB6BD : 0xF7F8F8, { roughness: 0.5 }),
+    door: std(dark ? 0x6F7A84 : 0xD9DEE2, { roughness: 0.6 }), locker: std(dark ? 0x56636E : 0xA9B6C1, { roughness: 0.5, metalness: 0.2 }),
+    hood: std(dark ? 0x9AA3AB : 0xC5CCD2, { metalness: 0.6, roughness: 0.3, transparent: true, opacity: 0.55, depthWrite: false }),
+    cut: new T.MeshBasicMaterial({ color: new T.Color(P.struct) }),
+    cat: k => std(new T.Color(P[k] || P.work), { roughness: 0.5, emissive: new T.Color(P[k] || P.work), emissiveIntensity: 0.15 }),
+  };
+}
+function floorTexture(dark) {
+  const T = V3.T, c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = dark ? '#272D31' : '#E6E2DC'; g.fillRect(0, 0, 128, 128); g.fillStyle = dark ? '#1F2428' : '#D3CEC7'; g.fillRect(0, 0, 128, 3); g.fillRect(0, 0, 3, 128);
+  const t = new T.CanvasTexture(c); t.wrapS = t.wrapT = T.RepeatWrapping; t.repeat.set(S.room.w / 300, S.room.h / 300); t.anisotropy = 4; t.encoding = T.sRGBEncoding; return t;
+}
+
+/* --- geometry helpers --- */
+function box3(g, x0, z0, x1, z1, y0, y1, mat, o = {}) {
+  const T = V3.T, w = Math.max(Math.abs(x1 - x0), 1) * MM, d = Math.max(Math.abs(z1 - z0), 1) * MM, h = Math.max(y1 - y0, 1) * MM;
+  const m = new T.Mesh(new T.BoxGeometry(w, h, d), mat); m.position.set((x0 + x1) / 2 * MM, (y0 + y1) / 2 * MM, (z0 + z1) / 2 * MM);
+  m.castShadow = o.cast !== false; m.receiveShadow = true; g.add(m); return m;
+}
+function lbox(g, it, lx0, ly0, lx1, ly1, y0, y1, mat, o) { const [a, b] = localToPlan(it, lx0, ly0), [c, d] = localToPlan(it, lx1, ly1); return box3(g, Math.min(a, c), Math.min(b, d), Math.max(a, c), Math.max(b, d), y0, y1, mat, o); }
+function cyl3(g, it, lx, ly, r, y0, y1, mat, seg = 20) { const T = V3.T, [x, z] = localToPlan(it, lx, ly), m = new T.Mesh(new T.CylinderGeometry(r * MM, r * MM, (y1 - y0) * MM, seg), mat); m.position.set(x * MM, (y0 + y1) / 2 * MM, z * MM); m.castShadow = true; m.receiveShadow = true; g.add(m); return m; }
+
+function item3D(it, M, P) {
+  const T = V3.T, g = new T.Group(), [Lw, D] = spec(it), x0 = -Lw / 2, y0 = -D / 2, mn = Math.min(Lw, D);
+  let H = (it.height && !['hood', 'door', 'wall', 'zone'].includes(it.type)) ? it.height : (H3[it.type] ?? 850);
+  const counter = (body = M.steel) => { lbox(g, it, x0, y0, -x0, -y0, 0, H - 40, body); lbox(g, it, x0 - 10, y0, -x0 + 10, -y0 + 15, H - 40, H, M.top); };
+  const front = () => { if (Lw > 120) lbox(g, it, x0 + Lw * 0.06, D / 2 - 55, -x0 - Lw * 0.06, D / 2 - 18, H, H + 5, M.cat(catOf(it)), { cast: false }); };
+  const seams = (k, h0, h1) => { for (let j = 1; j < k; j++) { const x = x0 + j * Lw / k; lbox(g, it, x - 6, D / 2, x + 6, D / 2 + 6, h0, h1, M.dark, { cast: false }); } };
+  switch (it.type) {
+    case 'worktable': case 'box': counter(); front(); break;
+    case 'sink': case 'handsink': {
+      counter(); const n = it.type === 'handsink' ? 1 : clamp(Math.round(it.n || (Lw >= 1500 ? 3 : Lw >= 1000 ? 2 : 1)), 1, 6);
+      const mg = Math.min(70, Lw * 0.08), gp = Math.min(60, Lw * 0.05), bw = (Lw - 2 * mg - (n - 1) * gp) / n, bh = D * 0.6, by = y0 + D * 0.14;
+      for (let k = 0; k < n; k++) { const bx = x0 + mg + k * (bw + gp); lbox(g, it, bx, by, bx + bw, by + bh, H - 2, H + 2, M.dark, { cast: false }); }
+      cyl3(g, it, 0, y0 + D * 0.07, 18, H, H + 260, M.top, 10); front(); break;
+    }
+    case 'range': {
+      counter(M.steel); const n = clamp(Math.round(it.n || Math.max(1, Math.round(Lw / 450)) * (D >= 650 && Lw >= 900 ? 2 : 1)), 1, 24);
+      const rows = (n >= 4 && D >= 600 && Lw / Math.ceil(n / 2) >= 300) ? 2 : 1, cols = Math.ceil(n / rows), cw = Lw / cols, ch = D * 0.86 / rows, oy = y0 + D * 0.04;
+      const flame = new T.MeshStandardMaterial({ color: 0x1D2125, roughness: 0.5, emissive: new T.Color(0xFF4A12), emissiveIntensity: 0 }); V3.burners[it.id] = flame;
+      let k = 0; for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { if (k++ >= n) break; const rr = Math.min(cw, ch) * 0.3; cyl3(g, it, x0 + cw * (q + .5), oy + ch * (r + .5), rr, H, H + 30, flame); }
+      front(); break;
+    }
+    case 'fryer': { counter(); const k = clamp(Math.round(it.n || Math.max(1, Math.round(Lw / 420))), 1, 6), gp = Lw * 0.06 / k, bw = (Lw - gp * (k + 1)) / k; for (let j = 0; j < k; j++) { const bx = x0 + gp + j * (bw + gp); lbox(g, it, bx, y0 + D * 0.1, bx + bw, y0 + D * 0.76, H - 2, H + 3, M.iron, { cast: false }); } front(); break; }
+    case 'griddle': counter(); lbox(g, it, x0 + mn * 0.06, y0 + mn * 0.06, -x0 - mn * 0.06, y0 + D * 0.78, H, H + 12, M.iron); front(); break;
+    case 'fridgeTable': counter(); seams(clamp(Math.round(it.n || Math.max(1, Math.round(Lw / 600))), 1, 10), 90, H - 70); front(); break;
+    case 'fridge': lbox(g, it, x0, y0, -x0, -y0, 0, H, M.white); seams(clamp(Math.round(it.n || Math.max(1, Math.round(Lw / 620))), 1, 8), 120, H - 40); front(); break;
+    case 'icemaker': lbox(g, it, x0, y0, -x0, -y0, 0, H, M.white); lbox(g, it, x0 + Lw * 0.15, D / 2, -x0 - Lw * 0.15, D / 2 + 8, H * 0.45, H * 0.85, M.dark, { cast: false }); break;
+    case 'dishwasher': counter(); lbox(g, it, x0 + 30, y0 + 30, -x0 - 30, -y0 - 30, H, 1450, M.steel); lbox(g, it, x0 + 60, D / 2 - 30, -x0 - 60, D / 2 - 22, H + 80, 1400, M.dark, { cast: false }); break;
+    case 'oven': lbox(g, it, x0, y0, -x0, -y0, 0, H, M.steel); lbox(g, it, x0 + Lw * 0.1, D / 2, -x0 - Lw * 0.2, D / 2 + 8, H * 0.35, H * 0.85, M.glass, { cast: false }); break;
+    case 'kettle': lbox(g, it, x0, y0, -x0, -y0, 0, 520, M.steel); cyl3(g, it, 0, 0, mn * 0.38, 520, H, M.top, 28); break;
+    case 'hood': {
+      if (!V3.cut) { lbox(g, it, x0, y0, -x0, -y0, 1950, 2350, M.hood, { cast: false }); break; }
+      const e = new T.LineSegments(new T.EdgesGeometry(new T.BoxGeometry(it.w * MM, 0.4, it.h * MM)), new T.LineBasicMaterial({ color: new T.Color(P.hood), transparent: true, opacity: 0.75 }));
+      e.position.set((it.x + it.w / 2) * MM, 2.15, (it.y + it.h / 2) * MM); g.add(e);
+      lbox(g, it, x0, y0, -x0, -y0, 1950, 2350, new T.MeshBasicMaterial({ visible: false }), { cast: false }); break;
+    }
+    case 'overshelf': lbox(g, it, x0, y0, -x0, -y0, 1500, 1530, M.top); break;
+    case 'shelf': {
+      for (const h of [150, 600, 1050, 1500]) lbox(g, it, x0, y0, -x0, -y0, h, h + 30, M.top);
+      const k = Math.max(1, Math.round(Lw / 900)); for (let j = 0; j <= k; j++) { const x = x0 + j * Lw / k - (j === k ? 30 : 0); lbox(g, it, x, y0, x + 30, y0 + 30, 0, H, M.steel); lbox(g, it, x, -y0 - 30, x + 30, -y0, 0, H, M.steel); }
+      break;
+    }
+    case 'bin': cyl3(g, it, 0, 0, mn * 0.45, 0, H, M.seat, 24); break;
+    case 'table': lbox(g, it, x0, y0, -x0, -y0, H - 30, H, M.wood); for (const [a, b] of [[x0 + 40, y0 + 40], [-x0 - 80, y0 + 40], [x0 + 40, -y0 - 80], [-x0 - 80, -y0 - 80]]) lbox(g, it, a, b, a + 40, b + 40, 0, H - 30, M.dark); break;
+    case 'chair': lbox(g, it, x0 + 20, y0 + 20, -x0 - 20, -y0 - 20, 420, 460, M.seat); lbox(g, it, x0 + 30, y0 + 10, -x0 - 30, y0 + 50, 460, 850, M.seat); lbox(g, it, -20, -20, 20, 20, 0, 420, M.dark); break;
+    case 'locker': lbox(g, it, x0, y0, -x0, -y0, 0, H, M.locker); seams(Math.max(1, Math.round(Lw / 300)), 40, H - 40); break;
+    case 'wall': case 'column': { const h = V3.cut ? CUT : H, m = lbox(g, it, x0, y0, -x0, -y0, 0, h, (it.type === 'wall' ? M.wall : M.column).clone()); V3.fade.push({ m, x0: it.x, z0: it.y, x1: it.x + it.w, z1: it.y + it.h }); if (V3.cut) lbox(g, it, x0, y0, -x0, -y0, h, h + 12, M.cut, { cast: false }); break; }
+    case 'door': { lbox(g, it, x0 + 15, y0 + 20, x0 + 55, y0 + Lw, 0, V3.cut ? CUT : H, M.door); break; }
+    case 'zone': { const m = new T.Mesh(new T.PlaneGeometry(it.w * MM, it.h * MM), new T.MeshBasicMaterial({ color: new T.Color(P.zone), transparent: true, opacity: 0.1, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set((it.x + it.w / 2) * MM, 0.004, (it.y + it.h / 2) * MM); g.add(m); break; }
+    case 'walkin': {
+      const t = 100, ph = V3.cut ? CUT : H; const sides = [[x0, y0, -x0, y0 + t], [x0, -y0 - t, -x0, -y0], [x0, y0, x0 + t, -y0], [-x0 - t, y0, -x0, -y0]];
+      for (const [a, b, c, d] of sides) { const mat = M.panel.clone(), m = lbox(g, it, a, b, c, d, 0, ph, mat); if (V3.cut) lbox(g, it, a, b, c, d, ph, ph + 12, M.cut, { cast: false }); const [p, q] = localToPlan(it, a, b), [r, s] = localToPlan(it, c, d); V3.fade.push({ m, x0: Math.min(p, r), z0: Math.min(q, s), x1: Math.max(p, r), z1: Math.max(q, s) }); }
+      const sd = Math.min(420, (D - 2 * t) * 0.24);
+      for (const [b, d] of [[y0 + t, y0 + t + sd], [-y0 - t - sd, -y0 - t]]) for (const h of (V3.cut ? [200, 700] : [200, 700, 1200, 1700])) lbox(g, it, x0 + t + 40, b, -x0 - t - 40, d, h, h + 25, M.top, { cast: false });
+      break;
+    }
+    default: counter(); front();
+  }
+  g.traverse(o => { if (o.isMesh) o.userData.id = it.id; });
+  return g;
+}
+
+function build3D() {
+  if (!V3.r) return;
+  const T = V3.T, P = readPalette(), dark = matchMedia('(prefers-color-scheme: dark)').matches && document.documentElement.dataset.theme !== 'light' || document.documentElement.dataset.theme === 'dark';
+  const sc = V3.scene; if (V3.root) { sc.remove(V3.root); V3.root.traverse(o => { if (o.geometry) o.geometry.dispose(); }); }
+  sc.clear(); V3.fade = []; V3.burners = {}; V3.pick = [];
+  sc.background = new T.Color(P.canvas);
+  const W = S.room.w, H = S.room.h, root = new T.Group(); V3.root = root; sc.add(root);
+  const hemi = new T.HemisphereLight(0xffffff, dark ? 0x303840 : 0xB8C2CA, dark ? 0.55 : 0.7); sc.add(hemi);
+  const sun = new T.DirectionalLight(0xffffff, dark ? 0.75 : 0.85); sun.position.set(W * MM * 0.15, 11, -H * MM * 0.35); sun.target.position.set(W * MM / 2, 0, H * MM / 2);
+  sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048); const sh = sun.shadow.camera, ext = Math.max(W, H) * MM * 0.75; sh.left = -ext; sh.right = ext; sh.top = ext; sh.bottom = -ext; sh.near = 1; sh.far = 40; sun.shadow.bias = -0.0006; sun.shadow.radius = 3;
+  sc.add(sun); sc.add(sun.target);
+  const M = mats3D(P, dark); V3.M = M;
+  const ground = new T.Mesh(new T.PlaneGeometry(200, 200), new T.MeshBasicMaterial({ color: new T.Color(P.canvas) })); ground.rotation.x = -Math.PI / 2; ground.position.y = -0.003; root.add(ground);
+  const floor = new T.Mesh(new T.PlaneGeometry(W * MM, H * MM), new T.MeshStandardMaterial({ map: floorTexture(dark), roughness: 0.85 })); floor.rotation.x = -Math.PI / 2; floor.position.set(W * MM / 2, 0, H * MM / 2); floor.receiveShadow = true; root.add(floor);
+  const t = 150, wh = V3.cut ? CUT : 2400;
+  for (const [a, b, c, d] of [[-t, -t, W + t, 0], [-t, H, W + t, H + t], [-t, 0, 0, H], [W, 0, W + t, H]]) { const m = box3(root, a, b, c, d, 0, wh, M.wall.clone()); V3.fade.push({ m, x0: a, z0: b, x1: c, z1: d }); if (V3.cut) box3(root, a, b, c, d, wh, wh + 12, M.cut, { cast: false }); }
+  for (const it of S.items) { const g = item3D(it, M, P); root.add(g); g.traverse(o => { if (o.isMesh && o.userData.id) V3.pick.push(o); }); }
+  V3.selG = new T.Group(); root.add(V3.selG); V3.routeG = new T.Group(); root.add(V3.routeG);
+  update3DSel();
+  if (V3.show) startShow(true);
+}
+let b3T = 0;
+function schedule3D() { if (!V3.on) return; clearTimeout(b3T); b3T = setTimeout(build3D, 120); }
+function update3DSel() {
+  if (!V3.selG) return; const T = V3.T, P = readPalette(); V3.selG.clear();
+  for (const it of selItems()) {
+    const h = (it.height || H3[it.type] || 850) + 30, y0 = it.type === 'hood' ? 1950 : 0, y1 = it.type === 'hood' ? 2380 : h;
+    const geo = new T.EdgesGeometry(new T.BoxGeometry(it.w * MM + 0.03, (y1 - y0) * MM, it.h * MM + 0.03));
+    const ln = new T.LineSegments(geo, new T.LineBasicMaterial({ color: new T.Color(P.sel) })); ln.position.set((it.x + it.w / 2) * MM, (y0 + y1) / 2 * MM, (it.y + it.h / 2) * MM); V3.selG.add(ln);
+  }
+}
+
+/* --- camera input --- */
+function down3D(e) {
+  const cv = $('#gl'); try { cv.setPointerCapture(e.pointerId); } catch { }
+  V3.ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (V3.ptr.size === 2) { const [a, b] = [...V3.ptr.values()]; V3.drag = { kind: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, r0: V3.sph.r, c0: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, t0: { ...V3.target } }; return; }
+  V3.drag = { kind: (e.button === 2 || e.shiftKey || e.button === 1) ? 'pan' : 'orbit', sx: e.clientX, sy: e.clientY, lx: e.clientX, ly: e.clientY, moved: 0, shift: e.shiftKey };
+}
+function panBy(dx, dy) {
+  const k = V3.sph.r * 0.0016, th = V3.sph.th, rx = -Math.sin(th), rz = Math.cos(th), fx = -Math.cos(th), fz = -Math.sin(th);
+  V3.target.x = clamp(V3.target.x - (dx * rx - dy * fx) * k, -2, S.room.w * MM + 2); V3.target.z = clamp(V3.target.z - (dx * rz - dy * fz) * k, -2, S.room.h * MM + 2);
+}
+function move3D(e) {
+  if (V3.ptr.has(e.pointerId)) V3.ptr.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  const d = V3.drag; if (!d) return;
+  if (d.kind === 'pinch') { const v = [...V3.ptr.values()]; if (v.length < 2) return; const [a, b] = v; V3.sph.r = clamp(d.r0 * d.d0 / (Math.hypot(a.x - b.x, a.y - b.y) || 1), 2.5, 45); const c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }; V3.target = { ...d.t0 }; panBy(c.x - d.c0.x, c.y - d.c0.y); V3.userCam = true; return; }
+  const dx = e.clientX - d.lx, dy = e.clientY - d.ly; d.lx = e.clientX; d.ly = e.clientY; d.moved += Math.abs(dx) + Math.abs(dy);
+  if (d.moved < 4) return; V3.userCam = true; $('#gl').classList.add('grabbing');
+  if (d.kind === 'orbit') { V3.sph.th += dx * 0.0065; V3.sph.ph = clamp(V3.sph.ph - dy * 0.005, 0.12, 1.42); }
+  else panBy(dx, dy);
+}
+function up3D(e) {
+  V3.ptr.delete(e.pointerId); const d = V3.drag; $('#gl').classList.remove('grabbing');
+  if (!d || d.kind === 'pinch') { if (V3.ptr.size < 2) V3.drag = null; return; }
+  V3.drag = null; if (d.moved >= 6) return;
+  const T = V3.T, r = $('#gl').getBoundingClientRect(), ray = new T.Raycaster();
+  ray.setFromCamera(new T.Vector2((e.clientX - r.left) / r.width * 2 - 1, -(e.clientY - r.top) / r.height * 2 + 1), V3.cam);
+  const hits = ray.intersectObjects(V3.pick, false).filter(h => h.object.material.opacity !== 0.15);
+  const solidHit = hits.find(h => byId(h.object.userData.id)?.type !== 'hood'), hit = solidHit || hits[0];
+  if (!hit) { if (!d.shift) { sel.clear(); selectionChanged(); } return; }
+  const id = hit.object.userData.id; if (d.shift) { sel.has(id) ? sel.delete(id) : sel.add(id); } else sel = new Set([id]);
+  selectionChanged(); if (e.pointerType === 'touch') openTab('props', true);
+}
+
+/* --- per-frame --- */
+function segHitsRect(ax, az, bx, bz, r) {
+  let t0 = 0, t1 = 1; const dx = bx - ax, dz = bz - az;
+  for (const [p, d, lo, hi] of [[ax, dx, r.x0, r.x1], [az, dz, r.z0, r.z1]]) {
+    if (Math.abs(d) < 1e-9) { if (p < lo || p > hi) return false; continue; }
+    let u = (lo - p) / d, v = (hi - p) / d; if (u > v) [u, v] = [v, u]; t0 = Math.max(t0, u); t1 = Math.min(t1, v); if (t0 > t1) return false;
+  }
+  return true;
+}
+const ease = t => t <= 0 ? 0 : t >= 1 ? 1 : (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+const easeOut = t => t <= 0 ? 0 : t >= 1 ? 1 : 1 - Math.pow(1 - t, 3);
+function loop3D(now) {
+  if (!V3.on) return;
+  if (V3.show) tickShow(now);
+  const c = camPos(); V3.cam.position.set(c.x, c.y, c.z); V3.cam.lookAt(V3.target.x, 0.6, V3.target.z);
+  const cx = c.x / MM, cz = c.z / MM, tx = V3.target.x / MM, tz = V3.target.z / MM, low = V3.sph.ph > 0.5;
+  for (const f of V3.fade) { const hide = low && segHitsRect(cx, cz, tx, tz, { x0: f.x0 - 50, z0: f.z0 - 50, x1: f.x1 + 50, z1: f.z1 + 50 }); const op = hide ? 0.15 : 1; if (f.m.material.opacity !== op) { f.m.material.transparent = op < 1; f.m.material.opacity = op; f.m.material.depthWrite = op === 1; f.m.castShadow = op === 1; } }
+  V3.r.render(V3.scene, V3.cam);
+  V3.raf = requestAnimationFrame(loop3D);
+}
+
+/* --- route show: four legs drawn in turn, the longest leg is the payoff --- */
+function ribbon(pts, width, color, dashed, y) {
+  const T = V3.T, S2 = [];
+  for (let i = 1; i < pts.length; i++) { const a = pts[i - 1], b = pts[i], L = Math.hypot(b.x - a.x, b.y - a.y), n = Math.max(1, Math.ceil(L / 40)); for (let k = (i === 1 ? 0 : 1); k <= n; k++) S2.push({ x: a.x + (b.x - a.x) * k / n, y: a.y + (b.y - a.y) * k / n }); }
+  const pos = [], idx = [], ofs = [0]; let dist = 0;
+  S2.forEach((p, i) => { const q = S2[Math.min(i + 1, S2.length - 1)], o = S2[Math.max(i - 1, 0)], tx = q.x - o.x, ty = q.y - o.y, l = Math.hypot(tx, ty) || 1, nx = -ty / l * width / 2, ny = tx / l * width / 2; pos.push((p.x + nx) * MM, y, (p.y + ny) * MM, (p.x - nx) * MM, y, (p.y - ny) * MM); });
+  for (let i = 1; i < S2.length; i++) { dist += Math.hypot(S2[i].x - S2[i - 1].x, S2[i].y - S2[i - 1].y); if (!dashed || Math.floor(dist / 260) % 2 === 0) { const a = (i - 1) * 2; idx.push(a, a + 1, a + 2, a + 1, a + 3, a + 2); } ofs.push(idx.length); }
+  const geo = new T.BufferGeometry(); geo.setAttribute('position', new T.Float32BufferAttribute(pos, 3)); geo.setIndex(idx); geo.setDrawRange(0, 0);
+  const m = new T.Mesh(geo, new T.MeshBasicMaterial({ color: new T.Color(color), side: T.DoubleSide, polygonOffset: true, polygonOffsetFactor: -2, depthWrite: false })); m.renderOrder = 2;
+  return { m, ofs, samples: S2 };
+}
+function crossPoint(A, B) {
+  for (let i = 1; i < A.length; i++) for (let j = 1; j < B.length; j++) { const p1 = A[i - 1], p2 = A[i], p3 = B[j - 1], p4 = B[j], d = (p2.x - p1.x) * (p4.y - p3.y) - (p2.y - p1.y) * (p4.x - p3.x); if (Math.abs(d) < 1e-9) continue; const t = ((p3.x - p1.x) * (p4.y - p3.y) - (p3.y - p1.y) * (p4.x - p3.x)) / d, u = ((p3.x - p1.x) * (p2.y - p1.y) - (p3.y - p1.y) * (p2.x - p1.x)) / d; if (t > 0.02 && t < 0.98 && u > 0.02 && u < 0.98) return { x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t }; }
+  return null;
+}
+function startShow(rebuild) {
+  if (!V3.r) return; const T = V3.T, P = readPalette(); analyze();
+  V3.routeG.clear();
+  const legs = ANA.legs.map((l, i) => {
+    if (!l.pts) return null; const col = P[l.col] || P.accent, under = ribbon(l.pts, 230, P.canvas, false, 0.008), top = ribbon(l.pts, 120, col, i === 3, 0.011);
+    V3.routeG.add(under.m); V3.routeG.add(top.m);
+    const ring = (p) => { const m = new T.Mesh(new T.RingGeometry(0.15, 0.24, 40), new T.MeshBasicMaterial({ color: new T.Color(col), side: T.DoubleSide, depthWrite: false })); m.rotation.x = -Math.PI / 2; m.position.set(p.x * MM, 0.014, p.y * MM); m.scale.setScalar(0.001); m.renderOrder = 3; V3.routeG.add(m); return m; };
+    const tip = new T.Mesh(new T.SphereGeometry(0.09, 20, 14), new T.MeshBasicMaterial({ color: new T.Color(col) })); tip.visible = false; V3.routeG.add(tip);
+    return { l, under, top, a: ring(l.pts[0]), b: ring(l.pts[l.pts.length - 1]), tip };
+  });
+  let cross = null; if (ANA.legs[3]?.pts && ANA.legs[1]?.pts) { const p = crossPoint(ANA.legs[3].pts, ANA.legs[1].pts); if (p) { cross = new T.Mesh(new T.RingGeometry(0.2, 0.3, 48), new T.MeshBasicMaterial({ color: new T.Color(P.danger), transparent: true, side: T.DoubleSide, depthWrite: false })); cross.rotation.x = -Math.PI / 2; cross.position.set(p.x * MM, 0.016, p.y * MM); cross.scale.setScalar(0.001); cross.renderOrder = 4; V3.routeG.add(cross); } }
+  const t0 = rebuild && V3.show ? V3.show.t0 : performance.now();
+  V3.show = { t0, legs, cross, cook: ANA.st.cook, th0: V3.show?.th0 ?? V3.sph.th };
+  buildCaption(); $('#showBtn').classList.add('on'); $('#showLbl').textContent = '쇼 멈추기'; $('#showIco').setAttribute('d', 'M4 4h8v8H4z');
+  if (reduceMotion()) V3.show.still = true;
+}
+function stopShow() {
+  if (!V3.show) return; V3.show = null; if (V3.routeG) V3.routeG.clear();
+  for (const k in V3.burners) V3.burners[k].emissiveIntensity = 0;
+  $('#cap3d').hidden = true; $('#showBtn').classList.remove('on'); $('#showLbl').textContent = '동선 쇼'; $('#showIco').setAttribute('d', 'M5 3.2v9.6L12.6 8z');
+}
+function buildCaption() {
+  const c = $('#cap3d'); c.hidden = false;
+  c.innerHTML = ANA.legs.map((l, i) => `<div class="r" data-i="${i}"><span class="legno" style="background:var(--${l.col})">${i + 1}</span><span class="t">${l.label}</span><span class="v mono" data-v="${i}">${l.len ? '0.0 m' : '–'}</span></div>`).join('')
+    + `<div class="r tot" data-i="4"><span class="t">${ANA.crosses.length ? '세척 길이 식재료 길과 엇갈림' : '총 걷는 거리'}</span><span class="v mono">${(ANA.total / 1000).toFixed(1)} m</span></div>`;
+}
+// timeline (s): leg i draws [S_i, S_i+DRAW]; payoff holds; reverse-stagger exit; seam.
+const SHOW_S = [0.5, 3.1, 5.7, 8.3], DRAW = 1.9, EXIT = 12.4;
+function tickShow(now) {
+  const sh = V3.show; let t = sh.still ? 11.5 : ((now - sh.t0) / 1000) % LOOP;
+  if (!V3.userCam && !sh.still) V3.sph.th = sh.th0 + 0.1 * Math.sin(2 * Math.PI * t / LOOP);
+  const rows = $$('#cap3d .r');
+  sh.legs.forEach((g, i) => {
+    let p = ease((t - SHOW_S[i]) / DRAW); const out = EXIT + (3 - i) * 0.07, q = 1 - ease((t - out) / 0.45); p = Math.min(p, q);
+    const set = (rb) => { const k = Math.round(p * (rb.ofs.length - 1)); rb.m.geometry.setDrawRange(0, rb.ofs[k]); return k; };
+    if (g) {
+      const k = set(g.top); set(g.under);
+      const pa = easeOut((t - SHOW_S[i]) / 0.45), pb = easeOut((t - SHOW_S[i] - DRAW + 0.15) / 0.45), s = (v) => Math.max(0.001, Math.min(v, q) * (1 + 0.18 * Math.sin(Math.PI * Math.min(v, 1))));
+      g.a.scale.setScalar(s(pa)); g.b.scale.setScalar(s(pb));
+      const drawing = p > 0 && p < 1 && t < out; g.tip.visible = drawing; if (drawing) { const sp = g.top.samples[Math.min(g.top.samples.length - 1, Math.round(p * (g.top.samples.length - 1)))]; g.tip.position.set(sp.x * MM, 0.09, sp.y * MM); }
+      const v = rows[i]?.querySelector('[data-v]'); if (v) v.textContent = (g.l.len * Math.min(1, ease((t - SHOW_S[i]) / DRAW)) / 1000).toFixed(1) + ' m';
+    }
+    rows[i]?.classList.toggle('in', t >= SHOW_S[i] && t < out + 0.1);
+  });
+  rows[4]?.classList.toggle('in', t >= SHOW_S[3] + DRAW && t < EXIT + 0.35);
+  const fl = V3.burners[sh.cook]; if (fl) fl.emissiveIntensity = 0.85 * Math.min(easeOut((t - SHOW_S[2] - DRAW + 0.2) / 0.6), 1 - ease((t - EXIT) / 0.45));
+  if (sh.cross) { const a = easeOut((t - SHOW_S[3] - DRAW) / 0.5), q = 1 - ease((t - EXIT) / 0.4); sh.cross.scale.setScalar(Math.max(0.001, Math.min(a, q))); sh.cross.material.opacity = 0.9; }
+}
+$('#v3d').addEventListener('click', enter3D);
+$('#v2d').addEventListener('click', () => { if (V3.on) exit3D(); });
+$('#showBtn').addEventListener('click', () => { if (!V3.r) return; V3.show ? stopShow() : startShow(); });
+$('#v3Cut').addEventListener('click', e => { V3.cut = !V3.cut; e.currentTarget.textContent = V3.cut ? '벽 실제 높이' : '벽 낮추기'; build3D(); });
+$('#v3Reset').addEventListener('click', () => { reset3D(); if (V3.show) V3.show.th0 = V3.sph.th; });
+
 /* ---------- toolbar ---------- */
 $$('.seg [data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
 $('#undo').addEventListener('click', undo); $('#redo').addEventListener('click', redo);
@@ -1580,8 +1910,8 @@ let toastT = 0;
 function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
 
 /* ---------- theme changes ---------- */
-matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { renderAll(); renderLib(); });
-new MutationObserver(() => { renderAll(); renderLib(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { renderAll(); renderLib(); schedule3D(); });
+new MutationObserver(() => { renderAll(); renderLib(); schedule3D(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
 
 /* ---------- boot ---------- */
 const hadLocal = loadLocal();
