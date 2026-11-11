@@ -1,0 +1,1435 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<!--wrap-end-->
+<title>Kitchen Layout Planner</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: one-screen drafting desk. Toolbar on top, plan canvas fills the room, a tabbed side panel (bottom sheet on phones). */
+:root{
+  --bg:#E9EEF0; --panel:#FFFFFF; --panel-2:#F4F7F8; --ink:#1A242C; --muted:#5B6873; --line:#D3DBE0;
+  --canvas:#FBFCFC; --grid:#EBF0F2; --grid-major:#D5DEE2;
+  --accent:#0E7A69; --accent-ink:#FFFFFF; --accent-soft:#DDF1EC;
+  --warn:#C9741C; --danger:#CF3B3B; --ok:#2E8A57;
+  --cold:#2F6DB5; --hot:#C9502A; --wash:#13879A; --work:#5F6B77; --misc:#8A6A3E;
+  --struct:#2A3137; --hood:#7A54BE; --zone:#9C7A42; --door:#46525C; --sel:#0E7A69; --magnet:#D6307F;
+  --under-filter:none;
+  --font-ui:"IBM Plex Sans KR", system-ui, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --font-mono:"IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1316; --panel:#161C20; --panel-2:#1C2328; --ink:#E3E9EC; --muted:#93A1AA; --line:#2A343A;
+    --canvas:#11171A; --grid:#182024; --grid-major:#243036;
+    --accent:#3DC3A8; --accent-ink:#04211B; --accent-soft:#163A33;
+    --warn:#E89A4A; --danger:#F06A6A; --ok:#58C08A;
+    --cold:#6EA7EA; --hot:#F0855A; --wash:#4DC2D2; --work:#9AA7B2; --misc:#CDA772;
+    --struct:#C7D0D6; --hood:#B394EA; --zone:#CCAA70; --door:#AEB9C1; --sel:#3DC3A8; --magnet:#F25CA2;
+    --under-filter:invert(1) hue-rotate(180deg);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1316; --panel:#161C20; --panel-2:#1C2328; --ink:#E3E9EC; --muted:#93A1AA; --line:#2A343A;
+  --canvas:#11171A; --grid:#182024; --grid-major:#243036;
+  --accent:#3DC3A8; --accent-ink:#04211B; --accent-soft:#163A33;
+  --warn:#E89A4A; --danger:#F06A6A; --ok:#58C08A;
+  --cold:#6EA7EA; --hot:#F0855A; --wash:#4DC2D2; --work:#9AA7B2; --misc:#CDA772;
+  --struct:#C7D0D6; --hood:#B394EA; --zone:#CCAA70; --door:#AEB9C1; --sel:#3DC3A8; --magnet:#F25CA2;
+  --under-filter:invert(1) hue-rotate(180deg);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html{height:100%}
+body{height:100%;margin:0;background:var(--bg);color:var(--ink);font:14px/1.45 var(--font-ui);-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+
+.app{height:100%;display:grid;grid-template-columns:minmax(0,1fr) 340px;grid-template-rows:auto minmax(0,1fr);gap:10px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));padding-block:10px}
+
+/* ---------- toolbar ---------- */
+.bar{grid-column:1 / -1;display:flex;align-items:center;gap:14px;flex-wrap:wrap;min-width:0}
+.brand{display:flex;flex-direction:column;line-height:1.15;margin-right:6px}
+.eyebrow{font:500 10.5px/1 var(--font-mono);letter-spacing:.14em;text-transform:uppercase;color:var(--accent)}
+.brand h1{margin:3px 0 0;font-size:17px;font-weight:700;letter-spacing:-.01em;text-wrap:balance}
+.tools{display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex:1;min-width:0}
+.seg{display:flex;background:var(--panel);border:1px solid var(--line);border-radius:9px;padding:2px;gap:2px}
+.seg button{display:flex;align-items:center;gap:6px;border:0;background:transparent;border-radius:7px;padding:6px 9px;font-size:13px;color:var(--ink);min-height:32px}
+.seg button:hover{background:var(--panel-2)}
+.seg button.on{background:var(--accent);color:var(--accent-ink)}
+.seg button:disabled{opacity:.35;cursor:default;background:transparent}
+.seg svg{width:16px;height:16px;flex:none}
+#zoomLbl{min-width:58px;justify-content:center;font-family:var(--font-mono);font-size:12.5px}
+.status{display:flex;gap:6px;margin-left:auto;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:5px 11px;font-size:12.5px;font-weight:600;border:1px solid transparent;background:var(--panel)}
+.pill i{width:8px;height:8px;border-radius:50%;background:currentColor;display:block}
+.pill.ok{color:var(--ok);border-color:color-mix(in srgb, var(--ok) 35%, transparent)}
+.pill.warn{color:var(--warn);border-color:color-mix(in srgb, var(--warn) 45%, transparent)}
+.pill.danger{color:var(--danger);border-color:color-mix(in srgb, var(--danger) 45%, transparent)}
+button.pill{cursor:pointer}
+
+/* ---------- stage ---------- */
+.stage{position:relative;min-width:0;min-height:0;background:var(--canvas);border:1px solid var(--line);border-radius:var(--r);overflow:hidden;touch-action:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block;user-select:none;-webkit-user-select:none;touch-action:none}
+#cv line,#cv rect,#cv path,#cv circle,#cv ellipse,#cv polyline,#cv polygon{vector-effect:non-scaling-stroke}
+#cv text{font-family:var(--font-ui);pointer-events:none}
+#under{filter:var(--under-filter)}
+.lib svg *{vector-effect:non-scaling-stroke}
+#cv .it{cursor:grab}
+#cv.panning,#cv.panning .it{cursor:grabbing}
+#cv.tool-hand,#cv.tool-hand .it{cursor:grab}
+#cv.tool-measure,#cv.tool-measure .it,#cv.tool-calib,#cv.tool-calib .it{cursor:crosshair}
+#cv [data-h]{cursor:nwse-resize}
+#cv [data-h="n"],#cv [data-h="s"]{cursor:ns-resize}
+#cv [data-h="e"],#cv [data-h="w"]{cursor:ew-resize}
+#cv [data-h="ne"],#cv [data-h="sw"]{cursor:nesw-resize}
+
+.hud{position:absolute;left:12px;bottom:10px;display:flex;align-items:flex-end;gap:14px;pointer-events:none;font:500 11.5px/1 var(--font-mono);color:var(--muted)}
+.scalebar{display:flex;flex-direction:column;gap:4px}
+.scalebar b{display:block;height:6px;border:1.5px solid var(--ink);border-top:0;opacity:.75}
+.coords{white-space:nowrap}
+.qbar{position:absolute;display:flex;gap:2px;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:3px;box-shadow:0 6px 18px -8px rgba(0,0,0,.35);z-index:3}
+.qbar button{border:0;background:transparent;border-radius:7px;display:flex;align-items:center;gap:5px;padding:6px 8px;font-size:12.5px;min-height:32px}
+.qbar button:hover{background:var(--panel-2)}
+.qbar button.danger{color:var(--danger)}
+.qbar svg{width:15px;height:15px}
+.floatcard{position:absolute;left:50%;transform:translateX(-50%);bottom:14px;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:12px 14px;box-shadow:0 10px 30px -12px rgba(0,0,0,.4);z-index:4;width:min(380px, calc(100% - 24px));display:flex;flex-direction:column;gap:8px}
+.floatcard p{margin:0;font-size:13px;color:var(--muted)}
+.floatcard .row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.toast{position:absolute;top:12px;left:50%;transform:translate(-50%,-6px);background:var(--ink);color:var(--canvas);padding:8px 14px;border-radius:9px;font-size:13px;opacity:0;transition:opacity .18s, transform .18s;pointer-events:none;z-index:5;max-width:calc(100% - 24px);text-align:center}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+
+/* ---------- panel ---------- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);border-bottom:1px solid var(--line);flex:none}
+.tabs button{border:0;background:transparent;padding:11px 4px;font-size:13px;font-weight:600;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+.pbody{overflow:auto;min-height:0;flex:1;padding:14px 14px 22px}
+.pane{display:flex;flex-direction:column;gap:16px}
+.pane h2{font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0;font-weight:600}
+.group{display:flex;flex-direction:column;gap:8px}
+.lib{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.lib button{display:flex;align-items:center;gap:8px;text-align:left;border:1px solid var(--line);background:var(--panel);border-radius:9px;padding:6px 8px;min-width:0}
+.lib button:hover{border-color:var(--accent);background:var(--accent-soft)}
+.lib svg{width:42px;height:30px;flex:none}
+.lib span{display:flex;flex-direction:column;min-width:0;line-height:1.2}
+.lib b{font-weight:600;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lib small{font:11px var(--font-mono);color:var(--muted)}
+.field{display:flex;flex-direction:column;gap:4px;min-width:0}
+.field>span{font-size:12px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px}
+input[type=text],input[type=number],select,textarea{width:100%;background:var(--panel-2);border:1px solid var(--line);border-radius:8px;padding:7px 9px;min-height:34px;min-width:0}
+input[type=number]{font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+textarea{min-height:60px;resize:vertical}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);outline:none;box-shadow:0 0 0 3px var(--accent-soft)}
+.unit{position:relative}
+.unit input{padding-right:34px}
+.unit::after{content:attr(data-u);position:absolute;right:9px;top:50%;transform:translateY(-50%);font:11px var(--font-mono);color:var(--muted);pointer-events:none}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 11px;font-size:13px;display:inline-flex;align-items:center;justify-content:center;gap:6px;min-height:34px}
+.btn:hover{background:var(--panel-2)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.btn.primary:hover{filter:brightness(1.05)}
+.btn.danger{color:var(--danger)}
+.btn.armed{background:var(--danger);border-color:var(--danger);color:#fff}
+.btn svg{width:15px;height:15px}
+.btnrow{display:flex;gap:6px;flex-wrap:wrap}
+.btnrow .btn{flex:1 1 auto}
+.dirs{display:grid;grid-template-columns:repeat(4,1fr);gap:4px}
+.dirs button{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:6px 2px;font-size:12px;min-height:34px}
+.dirs button.on{background:var(--accent);border-color:var(--accent);color:var(--accent-ink);font-weight:600}
+.check{display:flex;align-items:center;gap:9px;font-size:13.5px;cursor:pointer}
+.check input{width:17px;height:17px;accent-color:var(--accent)}
+.hint{font-size:12.5px;color:var(--muted);margin:0}
+.empty{border:1px dashed var(--line);border-radius:10px;padding:14px;display:flex;flex-direction:column;gap:8px}
+.empty p{margin:0}
+.kv{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;font-size:13px}
+.kv dt{color:var(--muted)}
+.kv dd{margin:0;text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+.chip i{width:10px;height:10px;border-radius:3px;display:block}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:9px}
+table{border-collapse:collapse;width:100%;font-size:12.5px}
+th,td{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+th{font-weight:600;color:var(--muted);background:var(--panel-2);font-size:11.5px}
+td.n,th.n{text-align:right;font-family:var(--font-mono);font-variant-numeric:tabular-nums}
+tbody tr{cursor:pointer}
+tbody tr:hover{background:var(--panel-2)}
+tfoot td{font-weight:600;border-bottom:0}
+.dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:1px}
+.saved{display:flex;flex-direction:column;gap:6px}
+.saved .row{display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-radius:9px;padding:7px 8px}
+.saved .row div{flex:1;min-width:0;display:flex;flex-direction:column}
+.saved .row b{font-weight:600;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.saved .row small{font:11px var(--font-mono);color:var(--muted)}
+.saved .btn{min-height:30px;padding:4px 9px;font-size:12.5px}
+details{border:1px solid var(--line);border-radius:9px;padding:8px 10px}
+details summary{cursor:pointer;font-size:13px;color:var(--muted)}
+details[open] summary{margin-bottom:8px}
+input[type=range]{width:100%;accent-color:var(--accent)}
+hr{border:0;border-top:1px solid var(--line);margin:2px 0}
+
+@media (max-width: 860px){
+  .app{grid-template-columns:minmax(0,1fr);grid-template-rows:auto minmax(0,1fr) auto;gap:8px;padding-block:8px}
+  .brand h1{font-size:15px}
+  .brand .eyebrow{display:none}
+  .seg button .t{display:none}
+  .status{margin-left:0}
+  .panel{max-height:46vh}
+  .panel.collapsed .pbody{display:none}
+  .coords{display:none}
+}
+@media (max-width: 600px){ .brand{display:none} .tools{gap:6px} .seg button{padding:6px 8px} }
+@media (prefers-reduced-motion: reduce){ .toast{transition:none} }
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <header class="bar">
+    <div class="brand"><span class="eyebrow">Kitchen Layout</span><h1>주방 배치 플래너</h1></div>
+    <div class="tools">
+      <div class="seg" role="group" aria-label="도구">
+        <button type="button" data-mode="select" class="on" title="선택 · 이동 (V)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M3 2l9.5 5.2-4.2 1.1L6.4 13z"/></svg><span class="t">선택</span></button>
+        <button type="button" data-mode="hand" title="화면 이동 (H · 스페이스 누른 채 드래그)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M5 8V3.5a1 1 0 012 0V7m0-4.5a1 1 0 012 0V7m0-3.5a1 1 0 012 0V8m0-2.5a1 1 0 012 0V10c0 2.5-1.8 4.5-4.3 4.5H8.2C6.6 14.5 5.4 13.6 4.6 12L3 9a1 1 0 011.7-1z"/></svg><span class="t">이동</span></button>
+        <button type="button" data-mode="measure" title="거리 재기 (M)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="1.5" y="5" width="13" height="6" rx="1"/><path d="M4.5 5v2.5M7 5v1.8M9.5 5v2.5M12 5v1.8"/></svg><span class="t">재기</span></button>
+      </div>
+      <div class="seg" role="group" aria-label="실행 취소">
+        <button type="button" id="undo" title="실행 취소 (Ctrl+Z)" aria-label="실행 취소"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 3.5L2.5 6.5l3 3"/><path d="M2.5 6.5H10a3.5 3.5 0 010 7H7"/></svg></button>
+        <button type="button" id="redo" title="다시 실행 (Ctrl+Shift+Z)" aria-label="다시 실행"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 3.5l3 3-3 3"/><path d="M13.5 6.5H6a3.5 3.5 0 000 7h3"/></svg></button>
+      </div>
+      <div class="seg" role="group" aria-label="확대">
+        <button type="button" id="zoomOut" title="축소" aria-label="축소"><svg viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 8h9"/></svg></button>
+        <button type="button" id="zoomLbl" title="전체 보기 (F)">100%</button>
+        <button type="button" id="zoomIn" title="확대" aria-label="확대"><svg viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M3.5 8h9M8 3.5v9"/></svg></button>
+      </div>
+      <div class="seg" role="group" aria-label="밑그림">
+        <button type="button" id="underBtn" title="원본 도면 밑그림 표시"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.4"><rect x="1.5" y="2.5" width="13" height="11" rx="1"/><path d="M1.5 9.5l3.5-3 3 2.5 2.5-2 4 3.5"/></svg><span class="t">밑그림</span></button>
+      </div>
+      <div class="status" id="status"></div>
+    </div>
+  </header>
+
+  <main class="stage" id="stage">
+    <svg id="cv" xmlns="http://www.w3.org/2000/svg" aria-label="주방 평면도" role="img">
+      <g id="lUnder"><image id="under" preserveAspectRatio="none" style="pointer-events:none"/></g>
+      <g id="lStatic"></g>
+      <g id="lZone"></g>
+      <g id="lItems"></g>
+      <g id="lOver"></g>
+      <g id="lOverlay"></g>
+    </svg>
+    <div class="hud"><div class="scalebar"><span id="sbLbl">1 m</span><b id="sbBar" style="width:60px"></b></div><span class="coords" id="coords"></span></div>
+    <div class="qbar" id="qbar" hidden>
+      <button type="button" data-q="rotate" title="90° 회전 (R)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M13 8a5 5 0 11-1.5-3.6"/><path d="M13 2.5v3h-3"/></svg>회전</button>
+      <button type="button" data-q="dup" title="복제 (Ctrl+D)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="5" y="5" width="8.5" height="8.5" rx="1.2"/><path d="M2.5 10.5v-7a1 1 0 011-1h7"/></svg>복제</button>
+      <button type="button" data-q="props" title="속성 열기"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4h11M2.5 8h11M2.5 12h7"/></svg>속성</button>
+      <button type="button" data-q="del" class="danger" title="삭제 (Delete)"><svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2.5 4.5h11M6 4.5V3h4v1.5M4 4.5l.7 9h6.6l.7-9"/></svg>삭제</button>
+    </div>
+    <div class="floatcard" id="calibBox" hidden>
+      <b id="calibTitle">축척 맞추기</b>
+      <p id="calibMsg">밑그림에서 길이를 아는 치수선의 양 끝을 이어서 드래그하세요. (예: 1,500 치수선)</p>
+      <div class="row" id="calibRow" hidden>
+        <label class="field unit" data-u="mm" style="flex:1"><span>실제 길이</span><input type="number" id="calibLen" inputmode="numeric" value="1500"></label>
+        <label class="check" style="margin-top:18px"><input type="checkbox" id="calibBoth">가로·세로 같이</label>
+      </div>
+      <div class="row"><button type="button" class="btn primary" id="calibApply" hidden>적용</button><button type="button" class="btn" id="calibCancel">취소</button></div>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </main>
+
+  <aside class="panel" id="panel">
+    <nav class="tabs" role="tablist" aria-label="패널">
+      <button type="button" role="tab" data-tab="add" aria-selected="false">장비 추가</button>
+      <button type="button" role="tab" data-tab="props" aria-selected="true">속성</button>
+      <button type="button" role="tab" data-tab="list" aria-selected="false">장비 목록</button>
+      <button type="button" role="tab" data-tab="setup" aria-selected="false">설정·저장</button>
+    </nav>
+    <div class="pbody">
+      <section class="pane" data-pane="add" hidden>
+        <p class="hint">누르면 지금 보이는 화면 가운데에 놓입니다. 놓은 뒤 끌어서 옮기고, 속성에서 크기를 바꾸세요.</p>
+        <div id="libWrap" class="pane"></div>
+        <div class="group">
+          <h2>직접 입력</h2>
+          <div class="grid2">
+            <label class="field" style="grid-column:1 / -1"><span>이름</span><input type="text" id="cName" value="특수 장비"></label>
+            <label class="field" style="grid-column:1 / -1"><span>모양</span><select id="cType"></select></label>
+            <label class="field unit" data-u="mm"><span>가로(폭)</span><input type="number" id="cL" value="900" inputmode="numeric"></label>
+            <label class="field unit" data-u="mm"><span>깊이</span><input type="number" id="cD" value="700" inputmode="numeric"></label>
+          </div>
+          <button type="button" class="btn primary" id="cAdd">배치에 추가</button>
+        </div>
+      </section>
+      <section class="pane" data-pane="props" id="propsPane"></section>
+      <section class="pane" data-pane="list" id="listPane" hidden></section>
+      <section class="pane" data-pane="setup" id="setupPane" hidden>
+        <div class="group">
+          <h2>주방 크기 (내부 치수)</h2>
+          <div class="grid2">
+            <label class="field unit" data-u="mm"><span>가로</span><input type="number" id="roomW" data-cfg="roomW" inputmode="numeric"></label>
+            <label class="field unit" data-u="mm"><span>세로</span><input type="number" id="roomH" data-cfg="roomH" inputmode="numeric"></label>
+          </div>
+        </div>
+        <div class="group">
+          <h2>배치 도움</h2>
+          <label class="field"><span>격자 맞춤</span>
+            <select id="cfgGrid" data-cfg="grid"><option value="0">끄기</option><option value="10">10 mm</option><option value="50">50 mm</option><option value="100">100 mm</option><option value="250">250 mm</option></select></label>
+          <label class="check"><input type="checkbox" id="cfgMagnet" data-cfg="magnet">다른 장비 모서리에 붙기</label>
+          <label class="check"><input type="checkbox" id="cfgChecks" data-cfg="checks">겹침 · 좁은 통로 표시</label>
+          <label class="field unit" data-u="mm"><span>최소 통로 폭 (이보다 좁으면 주황색 경고)</span><input type="number" id="cfgAisle" data-cfg="aisleMin" inputmode="numeric"></label>
+          <label class="check"><input type="checkbox" id="cfgLabels" data-cfg="labels">장비 이름 표시</label>
+          <label class="check"><input type="checkbox" id="cfgSizes" data-cfg="sizes">장비 규격(가로×깊이) 표시</label>
+        </div>
+        <div class="group">
+          <h2>원본 도면 밑그림</h2>
+          <label class="check"><input type="checkbox" id="uShow" data-u="show">밑그림 보이기</label>
+          <label class="field"><span>진하기 <b class="mono" id="uOpLbl"></b></span><input type="range" id="uOp" data-u="opacity" min="0.05" max="1" step="0.05"></label>
+          <div class="btnrow">
+            <button type="button" class="btn" id="uCalib">두 점으로 축척 맞추기</button>
+            <label class="btn" for="uFile">다른 도면 이미지 넣기</label>
+            <input type="file" id="uFile" accept="image/*" hidden>
+          </div>
+          <details>
+            <summary>밑그림 위치 · 크기 직접 입력</summary>
+            <div class="grid2">
+              <label class="field unit" data-u="mm"><span>X</span><input type="number" data-u="x" id="uX"></label>
+              <label class="field unit" data-u="mm"><span>Y</span><input type="number" data-u="y" id="uY"></label>
+              <label class="field unit" data-u="mm"><span>가로</span><input type="number" data-u="w" id="uW"></label>
+              <label class="field unit" data-u="mm"><span>세로</span><input type="number" data-u="h" id="uH"></label>
+            </div>
+            <div class="btnrow" style="margin-top:8px"><button type="button" class="btn" id="uReset">받은 도면으로 되돌리기</button></div>
+          </details>
+        </div>
+        <div class="group">
+          <h2>배치안 저장</h2>
+          <p class="hint" id="storeHint"></p>
+          <div class="row" style="display:flex;gap:6px"><input type="text" id="saveName" placeholder="예: A안 – 세척 라인 이동" style="flex:1"><button type="button" class="btn primary" id="saveBtn">저장</button></div>
+          <div class="saved" id="savedList"></div>
+        </div>
+        <div class="group">
+          <h2>파일</h2>
+          <div class="btnrow">
+            <button type="button" class="btn" id="expPng">도면 이미지 (PNG)</button>
+            <button type="button" class="btn" id="expCsv">장비 목록 (CSV)</button>
+            <button type="button" class="btn" id="expJson">배치 파일 (JSON)</button>
+            <label class="btn" for="impJson">배치 파일 불러오기</label>
+            <input type="file" id="impJson" accept=".json,application/json" hidden>
+          </div>
+        </div>
+        <div class="group">
+          <h2>처음 상태로</h2>
+          <p class="hint">받은 도면을 따라 그린 기본 배치로 돌아갑니다. 실행 취소로 되돌릴 수 있습니다.</p>
+          <button type="button" class="btn danger" id="resetBtn">기본 배치로 되돌리기</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+</div>
+
+<script>
+'use strict';
+/* ============================================================
+   Kitchen Layout Planner — plan units are millimetres.
+   Items are axis-aligned boxes {x,y,w,h} in plan space; `rot`
+   (0/90/180/270) says which side is the working front.
+   ============================================================ */
+const FLOORPLAN = "__FLOORPLAN_DATA_URI__";
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const fmt = v => Math.round(v).toLocaleString('ko-KR');
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const uid = () => Math.random().toString(36).slice(2, 9);
+const n1 = v => Math.round(v * 10) / 10;
+
+const svg = $('#cv'), stage = $('#stage');
+const L = { under: $('#under'), stat: $('#lStatic'), zone: $('#lZone'), items: $('#lItems'), over: $('#lOver'), overlay: $('#lOverlay') };
+
+/* ---------- equipment types ---------- */
+const TYPES = {
+  worktable: { label: '작업대', cat: 'work' },
+  sink: { label: '싱크대', cat: 'wash', n: '조 수' },
+  handsink: { label: '손세척대', cat: 'wash' },
+  dishwasher: { label: '식기세척기', cat: 'wash' },
+  fridge: { label: '스탠드 냉장·냉동고', cat: 'cold', n: '도어 수' },
+  fridgeTable: { label: '테이블 냉장·냉동고', cat: 'cold', n: '도어 수' },
+  walkin: { label: '워크인 냉장·냉동실', cat: 'cold' },
+  icemaker: { label: '제빙기', cat: 'cold' },
+  range: { label: '가스렌지·화구', cat: 'hot', n: '화구 수' },
+  fryer: { label: '튀김기', cat: 'hot', n: '조 수' },
+  griddle: { label: '그리들', cat: 'hot' },
+  oven: { label: '오븐', cat: 'hot' },
+  kettle: { label: '국솥·밥솥', cat: 'hot' },
+  hood: { label: '후드 (천장)', cat: 'hood', layer: 'overhead' },
+  shelf: { label: '선반', cat: 'work' },
+  overshelf: { label: '상부 선반 (벽걸이)', cat: 'work', layer: 'overhead' },
+  bin: { label: '쓰레기통', cat: 'work' },
+  table: { label: '테이블', cat: 'misc' },
+  chair: { label: '의자', cat: 'misc' },
+  locker: { label: '락커', cat: 'misc' },
+  box: { label: '기타 장비', cat: 'work' },
+  wall: { label: '벽', cat: 'struct', layer: 'struct' },
+  column: { label: '기둥·샤프트', cat: 'struct', layer: 'struct' },
+  door: { label: '문', cat: 'door', layer: 'door' },
+  zone: { label: '구역 표시', cat: 'zone', layer: 'zone' },
+};
+const CAT_NAME = { cold: '냉장·냉동', hot: '가열', wash: '세척', work: '작업·보관', misc: '휴게·기타', hood: '후드', struct: '구조', door: '문', zone: '구역' };
+const CAT_ORDER = ['cold', 'hot', 'wash', 'work', 'hood', 'misc', 'struct', 'door', 'zone'];
+const layerOf = it => (TYPES[it.type] || TYPES.box).layer || 'floor';
+const catOf = it => (TYPES[it.type] || TYPES.box).cat;
+const spec = it => (it.rot % 180 === 0) ? [it.w, it.h] : [it.h, it.w];
+
+const LIB = [
+  ['냉장 · 냉동', [['fridge', '25박스 냉장고', 700, 800, { n: 2 }], ['fridge', '45박스 냉장고', 1260, 800, { n: 4 }], ['fridge', '65박스 냉장고', 1880, 800, { n: 6 }], ['fridgeTable', '테이블 냉장고 1200', 1200, 700], ['fridgeTable', '테이블 냉장고 1500', 1500, 700], ['fridgeTable', '테이블 냉동고 1500', 1500, 700], ['fridgeTable', '밧드 냉장고 1500', 1500, 700], ['icemaker', '제빙기', 600, 700], ['walkin', '워크인 냉장실', 2400, 2000], ['walkin', '워크인 냉동실', 1600, 2000]]],
+  ['가열', [['range', '간택기 (1구)', 500, 600, { n: 1 }], ['range', '가스렌지 2구', 900, 600, { n: 2 }], ['range', '가스렌지 3구', 1350, 600, { n: 3 }], ['range', '중화렌지 2구', 1800, 900, { n: 2 }], ['fryer', '튀김기 1조', 400, 600, { n: 1 }], ['fryer', '튀김기 2조', 800, 600, { n: 2 }], ['griddle', '그리들', 900, 600], ['oven', '스팀 컨벡션 오븐', 900, 800], ['kettle', '국솥', 900, 900], ['kettle', '전기밥솥', 450, 450], ['hood', '후드', 2000, 1100]]],
+  ['세척', [['sink', '1조 싱크대', 600, 700, { n: 1 }], ['sink', '2조 싱크대', 1200, 700, { n: 2 }], ['sink', '3조 싱크대', 1800, 700, { n: 3 }], ['handsink', '손세척대', 450, 400], ['dishwasher', '도어형 식기세척기', 650, 700], ['worktable', '세척 작업대', 1200, 700]]],
+  ['작업 · 보관', [['worktable', '작업대 600', 600, 700], ['worktable', '작업대 900', 900, 700], ['worktable', '작업대 1200', 1200, 700], ['worktable', '작업대 1500', 1500, 700], ['worktable', '작업대 1800', 1800, 700], ['shelf', '선반 900', 900, 450], ['shelf', '선반 1200', 1200, 450], ['overshelf', '상부 선반', 1200, 350], ['worktable', '배식대 (패스)', 1500, 600], ['bin', '쓰레기통', 500, 500]]],
+  ['구조 · 기타', [['wall', '벽 1000', 1000, 100], ['column', '기둥', 400, 400], ['door', '문 900', 900, 900], ['door', '문 800', 800, 800], ['zone', '구역 표시', 2000, 1500], ['table', '테이블', 800, 600], ['chair', '의자', 450, 450], ['locker', '락커', 900, 450], ['box', '기타 장비', 600, 600]]],
+];
+
+/* ---------- default layout traced from the supplied drawing ---------- */
+const DEFAULT_ROOM = { w: 10200, h: 8250 };
+const DEFAULT_UNDER = { show: true, opacity: 0.35, x: -175, y: -172, w: 10424, h: 8705, custom: false };
+function mk(type, name, x, y, w, h, rot = 0, extra = {}) { return { id: uid(), type, name, x, y, w, h, rot, ...extra }; }
+function defaultItems() {
+  return [
+    // structure: staff room + partition
+    mk('wall', '벽', 1600, 1550, 200, 100), mk('wall', '벽', 2450, 1550, 950, 100), mk('wall', '벽', 4050, 1550, 200, 100),
+    mk('wall', '벽', 1600, 1650, 100, 3080), mk('wall', '벽', 4150, 1650, 100, 3970), mk('wall', '벽', 1600, 5520, 2550, 100),
+    mk('wall', '벽', 1700, 3250, 2450, 100), mk('wall', '벽', 2900, 1650, 100, 1600),
+    mk('wall', '파티션', 5400, 2920, 120, 3630), mk('wall', '파티션', 5400, 6550, 1000, 100),
+    mk('column', '기둥·설비', 0, 6800, 700, 1450),
+    // doors
+    mk('door', '휴게실 문', 1700, 4730, 790, 790, 270),
+    mk('door', '탈의실 문', 1800, 1650, 650, 650, 0), mk('door', '탈의실 문', 3400, 1650, 650, 650, 0, { flip: true }),
+    mk('door', '출입구', 730, 7370, 880, 880, 180), mk('door', '출입구', 5200, 7400, 850, 850, 180, { flip: true }),
+    mk('door', '냉장실 문', 5230, 600, 800, 800, 90), mk('door', '냉동실 문', 7840, 600, 800, 800, 90),
+    // zones
+    mk('zone', '탈의실 1', 1700, 1650, 1200, 1600), mk('zone', '탈의실 2', 3000, 1650, 1150, 1600), mk('zone', '휴게실', 1700, 3350, 2450, 2170),
+    // walk-ins
+    mk('walkin', '워크인 냉장실', 6030, 0, 2610, 2050), mk('walkin', '워크인 냉동실', 8640, 0, 1560, 2050),
+    // left wall line (front faces right)
+    mk('shelf', '벽선반', 0, 0, 450, 1900, 270),
+    mk('sink', '1조 싱크대', 0, 1950, 700, 600, 270, { n: 1 }),
+    mk('worktable', '세척 투입대', 0, 2650, 700, 500, 270),
+    mk('dishwasher', '식기세척기', 0, 3150, 700, 650, 270),
+    mk('worktable', '세척 배출대', 0, 3800, 700, 900, 270),
+    mk('worktable', '작업대', 0, 4700, 700, 650, 270),
+    mk('sink', '2조 싱크대', 0, 5350, 700, 1400, 270, { n: 2 }),
+    mk('hood', '후드 (세척)', 0, 2650, 1100, 2050),
+    // top wall line (front faces down)
+    mk('fridgeTable', '테이블 냉장고', 1050, 0, 900, 650, 0),
+    mk('worktable', '작업대', 1950, 0, 900, 650, 0),
+    mk('worktable', '작업대', 2850, 0, 1150, 650, 0),
+    mk('sink', '1조 싱크대', 4000, 0, 700, 650, 0, { n: 1 }),
+    mk('worktable', '작업대', 4700, 0, 1100, 650, 0),
+    // staff room contents
+    mk('locker', '락커', 1700, 2820, 1200, 430, 180), mk('locker', '락커', 3000, 2820, 1150, 430, 180),
+    mk('table', '테이블', 3590, 3450, 550, 1950, 90),
+    mk('chair', '의자', 3060, 3700, 450, 450, 270), mk('chair', '의자', 3060, 4600, 450, 450, 270),
+    mk('shelf', '선반', 4250, 1900, 450, 3650, 270),
+    // counter under the staff room
+    mk('sink', '1조 싱크대', 1600, 5620, 700, 800, 0, { n: 1 }),
+    mk('worktable', '작업대', 2300, 5620, 1050, 800, 0),
+    mk('kettle', '전기밥솥', 3350, 5620, 450, 800, 0),
+    mk('fridgeTable', '테이블 냉장고', 3800, 5620, 800, 800, 0),
+    mk('worktable', '작업대', 4600, 5620, 800, 800, 0),
+    // partition corner
+    mk('handsink', '손세척대', 5520, 3150, 400, 450, 270),
+    mk('oven', '스팀 컨벡션 오븐', 5520, 4100, 850, 1200, 270),
+    mk('hood', '후드', 5520, 3850, 1350, 1650),
+    mk('worktable', '작업대', 5520, 5600, 1000, 850, 270),
+    // island (back to back)
+    mk('fridgeTable', '아일랜드 냉장작업대', 7100, 2740, 750, 3910, 90),
+    mk('fridgeTable', '아일랜드 냉장작업대', 7850, 2740, 750, 3910, 270),
+    // cooking line on the right wall (front faces left)
+    mk('worktable', '작업대', 9500, 2400, 700, 750, 90),
+    mk('range', '가스렌지 (다구)', 9500, 3150, 700, 2400, 90, { n: 10 }),
+    mk('worktable', '작업대', 9500, 5550, 700, 450, 90),
+    mk('fryer', '튀김기 2조', 9500, 6000, 700, 600, 90, { n: 2 }),
+    mk('griddle', '그리들', 9500, 6600, 700, 600, 90),
+    mk('hood', '후드 (조리)', 9100, 2200, 1100, 3400), mk('hood', '후드 (조리)', 9100, 5600, 1100, 1850),
+    // bottom wall line (front faces up)
+    mk('icemaker', '제빙기', 1650, 7550, 650, 700, 180),
+    mk('fridge', '소형 냉장고', 2300, 7550, 450, 700, 180, { n: 1 }),
+    mk('range', '간택기', 2750, 7550, 450, 700, 180, { n: 1 }),
+    mk('worktable', '작업대', 3200, 7550, 700, 700, 180),
+    mk('sink', '1조 싱크대', 3900, 7550, 500, 700, 180, { n: 1 }),
+    mk('fridgeTable', '테이블 냉장고', 4400, 7550, 800, 700, 180),
+    mk('worktable', '작업대', 6100, 7550, 750, 700, 180),
+    mk('sink', '2조 싱크대', 6850, 7550, 900, 700, 180, { n: 2 }),
+    mk('range', '가스렌지 5구', 7750, 7550, 950, 700, 180, { n: 5 }),
+    mk('worktable', '작업대', 8700, 7550, 800, 700, 180),
+    mk('sink', '1조 싱크대', 9500, 7550, 700, 700, 180, { n: 1 }),
+  ];
+}
+
+/* ---------- state ---------- */
+const DEFAULT_CFG = { grid: 50, magnet: true, checks: true, aisleMin: 800, labels: true, sizes: true };
+const S = { room: { ...DEFAULT_ROOM }, items: [], cfg: { ...DEFAULT_CFG }, under: { ...DEFAULT_UNDER } };
+let underData = FLOORPLAN;           // current underlay image (data URI)
+let sel = new Set();
+let mode = 'select';
+let vb = { x: 0, y: 0, w: 12000, h: 9000 };
+let drag = null, measure = null, guides = [];
+let spaceDown = false;
+let undoStack = [], redoStack = [];
+let checks = { cols: [], aisles: [] };
+let issueCursor = 0;
+let pal = {};
+
+const byId = id => S.items.find(i => i.id === id);
+const selItems = () => S.items.filter(i => sel.has(i.id));
+const snap = () => JSON.stringify({ room: S.room, items: S.items });
+function checkpoint(prev) { undoStack.push(prev ?? snap()); if (undoStack.length > 120) undoStack.shift(); redoStack = []; updateHistoryBtns(); }
+function restore(str) { const o = JSON.parse(str); S.room = o.room; S.items = o.items; sel = new Set([...sel].filter(id => byId(id))); }
+function undo() { if (!undoStack.length) return; redoStack.push(snap()); restore(undoStack.pop()); changed(true); }
+function redo() { if (!redoStack.length) return; undoStack.push(snap()); restore(redoStack.pop()); changed(true); }
+function updateHistoryBtns() { $('#undo').disabled = !undoStack.length; $('#redo').disabled = !redoStack.length; }
+
+/* ---------- persistence (this browser) ---------- */
+const LS_STATE = 'klp.state.v1', LS_UNDER = 'klp.underimg.v1', LS_SAVES = 'klp.saves.v1';
+const lsGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
+const lsSet = (k, v) => { try { localStorage.setItem(k, v); return true; } catch { return false; } };
+let saveTimer = 0;
+function persist() { clearTimeout(saveTimer); saveTimer = setTimeout(() => lsSet(LS_STATE, JSON.stringify({ room: S.room, items: S.items, cfg: S.cfg, under: S.under })), 250); }
+function loadLocal() {
+  try {
+    const raw = lsGet(LS_STATE); if (!raw) return false;
+    const o = JSON.parse(raw); if (!o || !Array.isArray(o.items)) return false;
+    S.room = o.room || { ...DEFAULT_ROOM }; S.items = o.items; S.cfg = { ...DEFAULT_CFG, ...(o.cfg || {}) }; S.under = { ...DEFAULT_UNDER, ...(o.under || {}) };
+    if (S.under.custom) { const d = lsGet(LS_UNDER); if (d) underData = d; else { S.under = { ...DEFAULT_UNDER }; } }
+    return true;
+  } catch { return false; }
+}
+
+/* ---------- palette ---------- */
+const TOKS = ['bg', 'panel', 'ink', 'muted', 'line', 'canvas', 'grid', 'grid-major', 'accent', 'warn', 'danger', 'ok', 'cold', 'hot', 'wash', 'work', 'misc', 'struct', 'hood', 'zone', 'door', 'sel', 'magnet'];
+const LIGHT = { bg: '#E9EEF0', panel: '#FFFFFF', ink: '#1A242C', muted: '#5B6873', line: '#D3DBE0', canvas: '#FFFFFF', grid: '#EEF2F4', gridMajor: '#D9E1E5', accent: '#0E7A69', warn: '#C9741C', danger: '#CF3B3B', ok: '#2E8A57', cold: '#2F6DB5', hot: '#C9502A', wash: '#13879A', work: '#5F6B77', misc: '#8A6A3E', struct: '#2A3137', hood: '#7A54BE', zone: '#9C7A42', door: '#46525C', sel: '#0E7A69', magnet: '#D6307F' };
+function readPalette() {
+  const cs = getComputedStyle(document.documentElement); const p = {};
+  for (const t of TOKS) p[t.replace(/-(\w)/g, (_, c) => c.toUpperCase())] = cs.getPropertyValue('--' + t).trim();
+  return p;
+}
+
+/* ============================================================
+   SVG drawing
+   ============================================================ */
+const MONO = "IBM Plex Mono, ui-monospace, Menlo, monospace";
+function symbol(it, Lw, D, P) {
+  const c = P[catOf(it)] || P.work;
+  const x0 = -Lw / 2, y0 = -D / 2, m = Math.min(Lw, D);
+  const rect = (x, y, w, h, extra = '') => `<rect x="${n1(x)}" y="${n1(y)}" width="${n1(Math.max(w, 1))}" height="${n1(Math.max(h, 1))}" ${extra}/>`;
+  const ln = (a, b, cc, d, w = 1, extra = '') => `<line x1="${n1(a)}" y1="${n1(b)}" x2="${n1(cc)}" y2="${n1(d)}" stroke="${c}" stroke-width="${w}" ${extra}/>`;
+  const base = (fo = 0.12) => rect(x0, y0, Lw, D, `fill="${c}" fill-opacity="${fo}" stroke="${c}" stroke-width="1.3"`);
+  const front = () => { const y = D / 2 - Math.min(45, D * 0.07); return ln(x0 + Lw * 0.1, y, -x0 - Lw * 0.1, y, 2.6, 'stroke-linecap="round"'); };
+  const stroke = (w = 1, extra = '') => `fill="none" stroke="${c}" stroke-width="${w}" ${extra}`;
+  let s = '';
+  switch (it.type) {
+    case 'worktable': { const i = Math.min(70, m * 0.1); s = base() + rect(x0 + i, y0 + i, Lw - 2 * i, D - 2 * i, stroke(0.8, 'stroke-dasharray="4 3"')) + front(); break; }
+    case 'sink': {
+      const n = clamp(Math.round(it.n || (Lw >= 1500 ? 3 : Lw >= 1000 ? 2 : 1)), 1, 6);
+      const mg = Math.min(70, Lw * 0.08), g = Math.min(60, Lw * 0.05);
+      const bw = (Lw - 2 * mg - (n - 1) * g) / n, bh = D * 0.6, by = y0 + D * 0.14;
+      s = base();
+      for (let k = 0; k < n; k++) { const bx = x0 + mg + k * (bw + g); s += rect(bx, by, bw, bh, `rx="${n1(Math.min(50, bw * 0.15))}" fill="${P.canvas}" fill-opacity=".7" ${stroke(1.1)}`) + `<circle cx="${n1(bx + bw / 2)}" cy="${n1(by + bh / 2)}" r="${n1(Math.min(30, bw * 0.08))}" ${stroke(1)}/>`; }
+      s += front(); break;
+    }
+    case 'handsink': s = base() + `<ellipse cx="0" cy="${n1(D * 0.05)}" rx="${n1(Lw * 0.32)}" ry="${n1(D * 0.27)}" ${stroke(1.1)}/>` + front(); break;
+    case 'dishwasher': { const i = m * 0.1; s = base() + rect(x0 + i, y0 + i, Lw - 2 * i, D - 2 * i, stroke(1)) + ln(x0 + i, y0 + i, -x0 - i, -y0 - i, 0.7) + ln(-x0 - i, y0 + i, x0 + i, -y0 - i, 0.7) + `<circle cx="0" cy="0" r="${n1(m * 0.14)}" fill="${P.canvas}" ${stroke(1)}/>` + front(); break; }
+    case 'fridge': {
+      const k = clamp(Math.round(it.n || Math.max(1, Math.round(Lw / 620))), 1, 8); s = base(0.14);
+      for (let j = 1; j < k; j++) { const x = x0 + j * Lw / k; s += ln(x, y0 + D * 0.12, x, -y0, 1); }
+      s += ln(x0, -y0 - D * 0.12, -x0, -y0 - D * 0.12, 0.8) + front(); break;
+    }
+    case 'fridgeTable': {
+      const k = clamp(Math.round(it.n || Math.max(1, Math.round(Lw / 600))), 1, 10); s = base(0.12) + ln(x0, y0 + D * 0.16, -x0, y0 + D * 0.16, 0.7, 'stroke-dasharray="3 3"');
+      for (let j = 1; j < k; j++) { const x = x0 + j * Lw / k; s += ln(x, -y0 - D * 0.42, x, -y0, 1); }
+      s += front(); break;
+    }
+    case 'walkin': {
+      const t = Math.min(100, m * 0.06); const sd = Math.min(420, (D - 2 * t) * 0.24);
+      s = rect(x0, y0, Lw, D, `fill="${c}" fill-opacity=".05" stroke="${c}" stroke-width="1.8"`) + rect(x0 + t, y0 + t, Lw - 2 * t, D - 2 * t, stroke(1))
+        + rect(x0 + t, y0 + t, Lw - 2 * t, sd, stroke(0.8, 'stroke-dasharray="5 3"')) + rect(x0 + t, -y0 - t - sd, Lw - 2 * t, sd, stroke(0.8, 'stroke-dasharray="5 3"'));
+      break;
+    }
+    case 'icemaker': { const i = m * 0.14; s = base() + rect(x0 + i, y0 + i, Lw - 2 * i, D - 2 * i, stroke(1)) + `<path d="M0 ${n1(-m * 0.22)}L${n1(m * 0.22)} 0L0 ${n1(m * 0.22)}L${n1(-m * 0.22)} 0Z" ${stroke(1)}/>` + front(); break; }
+    case 'range': {
+      const n = clamp(Math.round(it.n || Math.max(1, Math.round(Lw / 450)) * (D >= 650 && Lw >= 900 ? 2 : 1)), 1, 24);
+      const rows = (n >= 4 && D >= 600 && Lw / Math.ceil(n / 2) >= 380) ? 2 : 1; const cols = Math.ceil(n / rows);
+      const cw = Lw / cols, ch = D * 0.86 / rows, oy = y0 + D * 0.04; s = base(0.1);
+      let k = 0;
+      for (let r = 0; r < rows; r++) for (let q = 0; q < cols; q++) { if (k++ >= n) break; const cx = x0 + cw * (q + 0.5), cy = oy + ch * (r + 0.5), rr = Math.min(cw, ch) * 0.33; s += `<circle cx="${n1(cx)}" cy="${n1(cy)}" r="${n1(rr)}" ${stroke(1.1)}/><circle cx="${n1(cx)}" cy="${n1(cy)}" r="${n1(rr * 0.5)}" ${stroke(0.8)}/>`; }
+      s += front(); break;
+    }
+    case 'fryer': {
+      const k = clamp(Math.round(it.n || Math.max(1, Math.round(Lw / 420))), 1, 6); const g = Lw * 0.06 / k, bw = (Lw - g * (k + 1)) / k; s = base(0.1);
+      for (let j = 0; j < k; j++) { const bx = x0 + g + j * (bw + g), by = y0 + D * 0.1, bh = D * 0.66; s += rect(bx, by, bw, bh, stroke(1)); for (let q = 1; q < 5; q++) s += ln(bx + bw * 0.12, by + bh * q / 5, bx + bw * 0.88, by + bh * q / 5, 0.6); }
+      s += front(); break;
+    }
+    case 'griddle': { const i = m * 0.08; s = base(0.1) + rect(x0 + i, y0 + i, Lw - 2 * i, D * 0.78 - i, stroke(1)); const st = Math.max(60, (D * 0.78) / 7); for (let y = y0 + i + st; y < y0 + D * 0.78 - st * 0.4; y += st) s += ln(x0 + i * 2, y, -x0 - i * 2, y, 0.6); s += front(); break; }
+    case 'oven': { const i = m * 0.1; s = base() + rect(x0 + i, y0 + i, Lw - 2 * i, D - 2.6 * i, stroke(1)) + `<circle cx="0" cy="${n1(-D * 0.04)}" r="${n1(m * 0.2)}" ${stroke(1)}/><circle cx="0" cy="${n1(-D * 0.04)}" r="${n1(m * 0.06)}" ${stroke(1)}/>` + front(); break; }
+    case 'kettle': s = base() + `<circle cx="0" cy="0" r="${n1(m * 0.38)}" ${stroke(1.1)}/><circle cx="0" cy="0" r="${n1(m * 0.22)}" ${stroke(0.8)}/>` + front(); break;
+    case 'hood': case 'overshelf': {
+      const hit = rect(x0, y0, Lw, D, 'fill="none" stroke="transparent" stroke-width="12" pointer-events="stroke"');
+      s = rect(x0, y0, Lw, D, `fill="${c}" fill-opacity=".04" stroke="${c}" stroke-width="1.3" stroke-dasharray="8 5" pointer-events="none"`);
+      if (it.type === 'hood') s += ln(x0, y0, -x0, -y0, 0.8, 'stroke-dasharray="8 5" pointer-events="none"') + ln(-x0, y0, x0, -y0, 0.8, 'stroke-dasharray="8 5" pointer-events="none"');
+      else s += ln(x0, 0, -x0, 0, 0.8, 'stroke-dasharray="8 5" pointer-events="none"');
+      s += hit; break;
+    }
+    case 'shelf': { const k = Math.max(1, Math.round(Lw / 900)); s = base(0.07); for (let j = 0; j < k; j++) { const a = x0 + j * Lw / k, b = a + Lw / k; s += ln(a, y0, b, -y0, 0.7) + ln(b, y0, a, -y0, 0.7) + (j ? ln(a, y0, a, -y0, 1) : ''); } break; }
+    case 'bin': s = rect(x0, y0, Lw, D, `rx="${n1(m * 0.2)}" fill="${c}" fill-opacity=".1" stroke="${c}" stroke-width="1.2"`) + ln(x0 + m * .25, y0 + m * .25, -x0 - m * .25, -y0 - m * .25, 0.8) + ln(-x0 - m * .25, y0 + m * .25, x0 + m * .25, -y0 - m * .25, 0.8); break;
+    case 'table': s = rect(x0, y0, Lw, D, `rx="${n1(Math.min(40, m * 0.08))}" fill="${c}" fill-opacity=".1" stroke="${c}" stroke-width="1.2"`); break;
+    case 'chair': s = rect(x0, y0, Lw, D, `rx="${n1(m * 0.22)}" fill="${c}" fill-opacity=".1" stroke="${c}" stroke-width="1.1"`) + ln(x0 + Lw * 0.15, y0 + D * 0.12, -x0 - Lw * 0.15, y0 + D * 0.12, 2.6, 'stroke-linecap="round"'); break;
+    case 'locker': { const k = Math.max(1, Math.round(Lw / 300)); s = base(0.1); for (let j = 1; j < k; j++) { const x = x0 + j * Lw / k; s += ln(x, y0, x, -y0, 0.9); } s += front(); break; }
+    case 'wall': s = rect(x0, y0, Lw, D, `fill="${P.struct}" stroke="none"`); break;
+    case 'column': s = rect(x0, y0, Lw, D, `fill="${P.struct}" fill-opacity=".14" stroke="${P.struct}" stroke-width="1.4"`) + ln(x0, y0, -x0, -y0, 0.8) + ln(-x0, y0, x0, -y0, 0.8); break;
+    case 'door': {
+      const r = Lw, cd = P.door;
+      s = rect(x0, y0 - 160, Lw, 160, `fill="${P.canvas}" stroke="none"`)
+        + `<path d="M${n1(-x0)} ${n1(y0)}A${n1(r)} ${n1(r)} 0 0 1 ${n1(x0)} ${n1(y0 + r)}" fill="none" stroke="${cd}" stroke-width="1" stroke-dasharray="3 3"/>`
+        + `<path d="M${n1(-x0)} ${n1(y0)}A${n1(r)} ${n1(r)} 0 0 1 ${n1(x0)} ${n1(y0 + r)}" fill="none" stroke="transparent" stroke-width="12" pointer-events="stroke"/>`
+        + rect(x0, y0, Math.min(45, Lw * 0.06), r, `fill="${cd}" stroke="${cd}" stroke-width="1"`)
+        + rect(x0, y0 - 160, Lw, 160, 'fill="transparent" stroke="none"')
+        + `<line x1="${n1(x0)}" y1="${n1(y0)}" x2="${n1(-x0)}" y2="${n1(y0)}" stroke="${cd}" stroke-width="1"/>`;
+      break;
+    }
+    case 'zone': s = rect(x0, y0, Lw, D, `fill="${c}" fill-opacity=".06" stroke="${c}" stroke-width="1" stroke-dasharray="2 4" pointer-events="none"`) + rect(x0, y0, Lw, D, 'fill="none" stroke="transparent" stroke-width="10" pointer-events="stroke"'); break;
+    default: { const i = m * 0.12; s = base() + ln(x0 + i, y0 + i, -x0 - i, -y0 - i, 0.7) + ln(-x0 - i, y0 + i, x0 + i, -y0 - i, 0.7) + front(); }
+  }
+  return s;
+}
+
+function labelSVG(it, P, ctx) {
+  const lay = layerOf(it); const s = ctx.s;
+  if (it.type === 'wall' || it.type === 'door' || !S.cfg.labels) return '';
+  const halo = `stroke="${P.canvas}" stroke-width="${n1(3.2 / s)}" stroke-linejoin="round" paint-order="stroke"`;
+  if (lay === 'zone' || lay === 'overhead') {
+    const fs = clamp(Math.min(it.w, it.h) * 0.09, 70, 140); if (fs * s < 5) return '';
+    const c = P[catOf(it)];
+    return `<text x="${n1(-it.w / 2 + fs * 0.45)}" y="${n1(-it.h / 2 + fs * 1.25)}" font-size="${n1(fs)}" font-weight="600" fill="${c}" ${halo}>${esc(it.name)}</text>`;
+  }
+  const vertical = it.h > it.w * 1.25;
+  const along = (vertical ? it.h : it.w) * 0.86, across = vertical ? it.w : it.h;
+  const units = [...String(it.name)].reduce((a, ch) => a + (ch.charCodeAt(0) > 0x2e80 ? 1 : 0.6), 0) || 1;
+  let fs = Math.min(along / units, across * 0.3, 190); fs = Math.max(fs, 50);
+  if (fs * s < 5.5) return '';
+  const [Lw, D] = spec(it);
+  const fs2 = fs * 0.66; const showDim = S.cfg.sizes && across > fs * 2.75 && fs2 * s >= 5;
+  const y1 = showDim ? -fs * 0.08 : fs * 0.36;
+  let t = `<g${vertical ? ' transform="rotate(-90)"' : ''}>`;
+  t += `<text x="0" y="${n1(y1)}" font-size="${n1(fs)}" text-anchor="middle" font-weight="600" fill="${P.ink}" ${halo}>${esc(it.name)}</text>`;
+  if (showDim) t += `<text x="0" y="${n1(y1 + fs2 * 1.3)}" font-size="${n1(fs2)}" text-anchor="middle" fill="${P.muted}" font-family="${MONO}" ${halo}>${Lw}×${D}</text>`;
+  return t + '</g>';
+}
+
+function itemSVG(it, P, ctx) {
+  const [Lw, D] = spec(it); const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+  return `<g class="it" data-id="${it.id}" transform="translate(${n1(cx)} ${n1(cy)})"><g transform="rotate(${it.rot || 0})${it.flip ? ' scale(-1 1)' : ''}">${symbol(it, Lw, D, P)}</g>${labelSVG(it, P, ctx)}</g>`;
+}
+
+function dimSVG(x1, y1, x2, y2, text, color, P, s, opt = {}) {
+  const fs = (opt.fs || 11.5) / s, tk = 5 / s, horiz = Math.abs(x2 - x1) >= Math.abs(y2 - y1);
+  let o = `<line x1="${n1(x1)}" y1="${n1(y1)}" x2="${n1(x2)}" y2="${n1(y2)}" stroke="${color}" stroke-width="${opt.w || 1.1}"${opt.dash ? ' stroke-dasharray="4 3"' : ''}/>`;
+  if (horiz) o += `<line x1="${n1(x1)}" y1="${n1(y1 - tk)}" x2="${n1(x1)}" y2="${n1(y1 + tk)}" stroke="${color}" stroke-width="1.1"/><line x1="${n1(x2)}" y1="${n1(y2 - tk)}" x2="${n1(x2)}" y2="${n1(y2 + tk)}" stroke="${color}" stroke-width="1.1"/>`;
+  else o += `<line x1="${n1(x1 - tk)}" y1="${n1(y1)}" x2="${n1(x1 + tk)}" y2="${n1(y1)}" stroke="${color}" stroke-width="1.1"/><line x1="${n1(x2 - tk)}" y1="${n1(y2)}" x2="${n1(x2 + tk)}" y2="${n1(y2)}" stroke="${color}" stroke-width="1.1"/>`;
+  const mx = (x1 + x2) / 2, my = (y1 + y2) / 2;
+  const tr = horiz ? `translate(${n1(mx)} ${n1(my - fs * 0.45)})` : `translate(${n1(mx - fs * 0.45)} ${n1(my)}) rotate(-90)`;
+  o += `<text transform="${tr}" font-size="${n1(fs)}" text-anchor="middle" font-family="${MONO}" font-weight="500" fill="${color}" stroke="${P.canvas}" stroke-width="${n1(3.5 / s)}" stroke-linejoin="round" paint-order="stroke">${text}</text>`;
+  return o;
+}
+
+function staticSVG(P, ctx) {
+  const { w: W, h: H } = S.room, s = ctx.s, t = 150; let o = '';
+  // grid
+  if (ctx.grid !== false) {
+    const minor = 100 * s >= 7 ? 100 : 500 * s >= 7 ? 500 : 0;
+    if (minor) for (let x = minor; x < W; x += minor) if (x % 1000) o += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="${P.grid}" stroke-width="1"/>`;
+    if (minor) for (let y = minor; y < H; y += minor) if (y % 1000) o += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="${P.grid}" stroke-width="1"/>`;
+    for (let x = 1000; x < W; x += 1000) o += `<line x1="${x}" y1="0" x2="${x}" y2="${H}" stroke="${P.gridMajor}" stroke-width="1"/>`;
+    for (let y = 1000; y < H; y += 1000) o += `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="${P.gridMajor}" stroke-width="1"/>`;
+  }
+  // outer walls
+  o += `<path d="M${-t} ${-t}H${W + t}V${H + t}H${-t}Z M0 0V${H}H${W}V0Z" fill="${P.struct}" fill-rule="evenodd"/>`;
+  // overall dimensions
+  const off = Math.max(520, 34 / s), fs = Math.max(150, 12 / s);
+  o += dimSVG(0, -off, W, -off, fmt(W), P.muted, P, s, { fs: fs * s });
+  o += dimSVG(-off, 0, -off, H, fmt(H), P.muted, P, s, { fs: fs * s });
+  o += `<line x1="0" y1="${-off + 120}" x2="0" y2="${-t - 40}" stroke="${P.muted}" stroke-width=".8"/><line x1="${W}" y1="${-off + 120}" x2="${W}" y2="${-t - 40}" stroke="${P.muted}" stroke-width=".8"/>`;
+  o += `<line x1="${-off + 120}" y1="0" x2="${-t - 40}" y2="0" stroke="${P.muted}" stroke-width=".8"/><line x1="${-off + 120}" y1="${H}" x2="${-t - 40}" y2="${H}" stroke="${P.muted}" stroke-width=".8"/>`;
+  return o;
+}
+
+function layersSVG(P, ctx) {
+  const zone = [], items = [], over = [];
+  const order = { struct: 0, floor: 1, door: 2 };
+  const sorted = [...S.items].sort((a, b) => (order[layerOf(a)] ?? 1) - (order[layerOf(b)] ?? 1));
+  for (const it of sorted) { const l = layerOf(it); const s = itemSVG(it, P, ctx); if (l === 'zone') zone.push(s); else if (l === 'overhead') over.push(s); else items.push(s); }
+  return { zone: zone.join(''), items: items.join(''), over: over.join('') };
+}
+
+/* ---------- geometry checks ---------- */
+const solid = it => { const l = layerOf(it); return l === 'floor' || l === 'struct'; };
+function computeChecks() {
+  const cols = [], aisles = [];
+  const arr = S.items.filter(solid);
+  const W = S.room.w, H = S.room.h;
+  const kitchen = arr.filter(i => catOf(i) !== 'misc');
+  for (let i = 0; i < arr.length; i++) for (let j = i + 1; j < arr.length; j++) {
+    const a = arr[i], b = arr[j]; if (layerOf(a) === 'struct' && layerOf(b) === 'struct') continue;
+    const ix = Math.min(a.x + a.w, b.x + b.w) - Math.max(a.x, b.x), iy = Math.min(a.y + a.h, b.y + b.h) - Math.max(a.y, b.y);
+    if (ix > 2 && iy > 2) cols.push({ a: a.id, b: b.id, x: Math.max(a.x, b.x), y: Math.max(a.y, b.y), w: ix, h: iy });
+  }
+  const min = S.cfg.aisleMin, low = 400;
+  const walls = [{ id: '_l', x: -100, y: 0, w: 100, h: H }, { id: '_r', x: W, y: 0, w: 100, h: H }, { id: '_t', x: 0, y: -100, w: W, h: 100 }, { id: '_b', x: 0, y: H, w: W, h: 100 }];
+  const all = kitchen.concat(walls);
+  const blocked = (rx, ry, rw, rh, a, b) => all.some(c => c !== a && c !== b && c.x < rx + rw - 1 && c.x + c.w > rx + 1 && c.y < ry + rh - 1 && c.y + c.h > ry + 1);
+  for (let i = 0; i < all.length; i++) for (let j = i + 1; j < all.length; j++) {
+    const a = all[i], b = all[j];
+    if (a.id[0] === '_' && b.id[0] === '_') continue;
+    const oy0 = Math.max(a.y, b.y), oy1 = Math.min(a.y + a.h, b.y + b.h);
+    if (oy1 - oy0 > 150) {
+      const [l, r] = a.x < b.x ? [a, b] : [b, a]; const g = r.x - (l.x + l.w);
+      if (g >= low && g < min && !blocked(l.x + l.w, oy0, g, oy1 - oy0, a, b)) aisles.push({ a: a.id, b: b.id, x1: l.x + l.w, x2: r.x, y1: (oy0 + oy1) / 2, y2: (oy0 + oy1) / 2, g });
+    }
+    const ox0 = Math.max(a.x, b.x), ox1 = Math.min(a.x + a.w, b.x + b.w);
+    if (ox1 - ox0 > 150) {
+      const [t, d] = a.y < b.y ? [a, b] : [b, a]; const g = d.y - (t.y + t.h);
+      if (g >= low && g < min && !blocked(ox0, t.y + t.h, ox1 - ox0, g, a, b)) aisles.push({ a: a.id, b: b.id, x1: (ox0 + ox1) / 2, x2: (ox0 + ox1) / 2, y1: t.y + t.h, y2: d.y, g });
+    }
+  }
+  checks = { cols, aisles };
+}
+
+function bbox(list) {
+  if (!list.length) return null;
+  let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+  for (const i of list) { x0 = Math.min(x0, i.x); y0 = Math.min(y0, i.y); x1 = Math.max(x1, i.x + i.w); y1 = Math.max(y1, i.y + i.h); }
+  return { x: x0, y: y0, w: x1 - x0, h: y1 - y0 };
+}
+
+function clearances(b) {
+  // nearest solid obstacle in four directions from box b
+  const others = S.items.filter(i => solid(i) && !sel.has(i.id));
+  const W = S.room.w, H = S.room.h, res = [];
+  const ovY = i => i.y < b.y + b.h - 1 && i.y + i.h > b.y + 1, ovX = i => i.x < b.x + b.w - 1 && i.x + i.w > b.x + 1;
+  let L = { v: 0, i: null }, R = { v: W, i: null }, T = { v: 0, i: null }, B = { v: H, i: null };
+  for (const i of others) {
+    if (ovY(i)) { if (i.x + i.w <= b.x + 1 && i.x + i.w > L.v) L = { v: i.x + i.w, i }; if (i.x >= b.x + b.w - 1 && i.x < R.v) R = { v: i.x, i }; }
+    if (ovX(i)) { if (i.y + i.h <= b.y + 1 && i.y + i.h > T.v) T = { v: i.y + i.h, i }; if (i.y >= b.y + b.h - 1 && i.y < B.v) B = { v: i.y, i }; }
+  }
+  const midY = o => o.i ? (Math.max(b.y, o.i.y) + Math.min(b.y + b.h, o.i.y + o.i.h)) / 2 : b.y + b.h / 2;
+  const midX = o => o.i ? (Math.max(b.x, o.i.x) + Math.min(b.x + b.w, o.i.x + o.i.w)) / 2 : b.x + b.w / 2;
+  if (b.x - L.v > 1) res.push({ x1: L.v, y1: midY(L), x2: b.x, y2: midY(L), g: b.x - L.v });
+  if (R.v - (b.x + b.w) > 1) res.push({ x1: b.x + b.w, y1: midY(R), x2: R.v, y2: midY(R), g: R.v - b.x - b.w });
+  if (b.y - T.v > 1) res.push({ x1: midX(T), y1: T.v, x2: midX(T), y2: b.y, g: b.y - T.v });
+  if (B.v - (b.y + b.h) > 1) res.push({ x1: midX(B), y1: b.y + b.h, x2: midX(B), y2: B.v, g: B.v - b.y - b.h });
+  return res;
+}
+
+/* ============================================================
+   Rendering (live canvas)
+   ============================================================ */
+const scale = () => (svg.clientWidth || 1) / vb.w;
+function applyVB() {
+  svg.setAttribute('viewBox', `${n1(vb.x)} ${n1(vb.y)} ${n1(vb.w)} ${n1(vb.h)}`);
+  $('#zoomLbl').textContent = Math.round(scale() / baseScale() * 100) + '%';
+  updateScaleBar(); placeQbar();
+}
+function baseScale() { const r = fitRect(); return Math.min((svg.clientWidth || 1) / r.w, (svg.clientHeight || 1) / r.h); }
+function updateScaleBar() {
+  const s = scale(); const target = 90 / s; const steps = [100, 200, 250, 500, 1000, 2000, 5000];
+  const len = steps.find(v => v >= target * 0.7) || 5000;
+  $('#sbBar').style.width = Math.round(len * s) + 'px'; $('#sbLbl').textContent = len >= 1000 ? (len / 1000) + ' m' : len + ' mm';
+}
+function renderUnder() {
+  const u = S.under, el = L.under;
+  if (!u.show) { el.setAttribute('display', 'none'); $('#underBtn').classList.remove('on'); return; }
+  el.removeAttribute('display'); $('#underBtn').classList.add('on');
+  if (el.getAttribute('href') !== underData) el.setAttribute('href', underData);
+  el.setAttribute('x', u.x); el.setAttribute('y', u.y); el.setAttribute('width', Math.max(10, u.w)); el.setAttribute('height', Math.max(10, u.h)); el.setAttribute('opacity', u.opacity);
+}
+function renderAll() {
+  pal = readPalette();
+  const ctx = { s: scale() };
+  renderUnder();
+  L.stat.innerHTML = staticSVG(pal, ctx);
+  const ly = layersSVG(pal, ctx);
+  L.zone.innerHTML = ly.zone; L.items.innerHTML = ly.items; L.over.innerHTML = ly.over;
+  computeChecks();
+  renderOverlay(); renderStatus();
+}
+let fullTimer = 0;
+function scheduleFull() { clearTimeout(fullTimer); fullTimer = setTimeout(renderAll, 110); }
+
+function renderOverlay() {
+  const P = pal, s = scale(); let o = '';
+  if (S.cfg.checks) {
+    for (const c of checks.cols) o += `<rect x="${c.x}" y="${c.y}" width="${c.w}" height="${c.h}" fill="${P.danger}" fill-opacity=".28" stroke="${P.danger}" stroke-width="1.6"/>`;
+    if (!drag) for (const a of checks.aisles) o += dimSVG(a.x1, a.y1, a.x2, a.y2, fmt(a.g), P.warn, P, s, { w: 1.6 });
+  }
+  const list = selItems();
+  for (const it of list) o += `<rect x="${it.x}" y="${it.y}" width="${it.w}" height="${it.h}" fill="none" stroke="${P.sel}" stroke-width="2"${it.locked ? ' stroke-dasharray="6 4"' : ''}/>`;
+  const gb = bbox(list);
+  if (gb && list.length > 1) o += `<rect x="${gb.x}" y="${gb.y}" width="${gb.w}" height="${gb.h}" fill="none" stroke="${P.sel}" stroke-width="1" stroke-dasharray="3 3"/>`;
+  if (gb && (!drag || drag.kind === 'move' || drag.kind === 'resize')) {
+    for (const d of clearances(gb)) { const warn = S.cfg.checks && d.g >= 400 && d.g < S.cfg.aisleMin; o += dimSVG(d.x1, d.y1, d.x2, d.y2, fmt(d.g), warn ? P.warn : P.sel, P, s, { dash: true }); }
+  }
+  if (list.length === 1 && !list[0].locked && (!drag || drag.kind === 'resize')) {
+    const it = list[0], hs = 9 / s, pts = { nw: [it.x, it.y], n: [it.x + it.w / 2, it.y], ne: [it.x + it.w, it.y], e: [it.x + it.w, it.y + it.h / 2], se: [it.x + it.w, it.y + it.h], s: [it.x + it.w / 2, it.y + it.h], sw: [it.x, it.y + it.h], w: [it.x, it.y + it.h / 2] };
+    for (const [k, [x, y]] of Object.entries(pts)) o += `<rect data-h="${k}" x="${n1(x - hs / 2)}" y="${n1(y - hs / 2)}" width="${n1(hs)}" height="${n1(hs)}" fill="${P.canvas}" stroke="${P.sel}" stroke-width="1.6"/>`;
+  }
+  for (const g of guides) {
+    if (g.x !== undefined) o += `<line x1="${g.x}" y1="${vb.y}" x2="${g.x}" y2="${vb.y + vb.h}" stroke="${P.magnet}" stroke-width="1" stroke-dasharray="5 4"/>`;
+    else o += `<line x1="${vb.x}" y1="${g.y}" x2="${vb.x + vb.w}" y2="${g.y}" stroke="${P.magnet}" stroke-width="1" stroke-dasharray="5 4"/>`;
+  }
+  if (measure) {
+    const { a, b } = measure, d = Math.hypot(b.x - a.x, b.y - a.y), col = mode === 'calib' ? P.magnet : P.accent;
+    o += `<line x1="${n1(a.x)}" y1="${n1(a.y)}" x2="${n1(b.x)}" y2="${n1(b.y)}" stroke="${col}" stroke-width="2"/><circle cx="${n1(a.x)}" cy="${n1(a.y)}" r="${n1(4 / s)}" fill="${col}"/><circle cx="${n1(b.x)}" cy="${n1(b.y)}" r="${n1(4 / s)}" fill="${col}"/>`;
+    if (d > 1) { const fs = 13 / s; o += `<text x="${n1((a.x + b.x) / 2)}" y="${n1((a.y + b.y) / 2 - fs * 0.6)}" font-size="${n1(fs)}" text-anchor="middle" font-family="${MONO}" font-weight="500" fill="${col}" stroke="${P.canvas}" stroke-width="${n1(4 / s)}" paint-order="stroke">${fmt(d)} mm</text>`; }
+  }
+  if (drag && drag.kind === 'marquee') { const r = normRect(drag.a, drag.b); o += `<rect x="${r.x}" y="${r.y}" width="${r.w}" height="${r.h}" fill="${P.sel}" fill-opacity=".08" stroke="${P.sel}" stroke-width="1" stroke-dasharray="4 3"/>`; }
+  L.overlay.innerHTML = o;
+  placeQbar();
+}
+
+function renderStatus() {
+  const el = $('#status'); const nc = checks.cols.length, na = checks.aisles.length;
+  if (!S.cfg.checks) { el.innerHTML = ''; return; }
+  let h = '';
+  if (nc) h += `<button type="button" class="pill danger" data-issue="cols" title="눌러서 위치 보기"><i></i>겹침 ${nc}</button>`;
+  if (na) h += `<button type="button" class="pill warn" data-issue="aisles" title="눌러서 위치 보기"><i></i>좁은 통로 ${na}</button>`;
+  if (!nc && !na) h = `<span class="pill ok"><i></i>겹침·통로 문제 없음</span>`;
+  el.innerHTML = h;
+}
+
+function updateItemEls(list) {
+  for (const it of list) { const el = svg.querySelector(`.it[data-id="${it.id}"]`); if (el) el.setAttribute('transform', `translate(${n1(it.x + it.w / 2)} ${n1(it.y + it.h / 2)})`); }
+}
+
+/* ---------- view ---------- */
+function fitRect() { const m = 900; return { x: -m - 200, y: -m, w: S.room.w + 2 * m + 200, h: S.room.h + 2 * m }; }
+function fit() {
+  const r = fitRect(), cw = svg.clientWidth || 800, ch = svg.clientHeight || 600;
+  const s = Math.min(cw / r.w, ch / r.h); vb.w = cw / s; vb.h = ch / s; vb.x = r.x + (r.w - vb.w) / 2; vb.y = r.y + (r.h - vb.h) / 2;
+  applyVB();
+}
+function zoomAt(p, f) {
+  const nw = clamp(vb.w / f, 600, 80000); const k = vb.w / nw;
+  vb.x = p.x - (p.x - vb.x) / k; vb.y = p.y - (p.y - vb.y) / k; vb.w = nw; vb.h = nw * (svg.clientHeight / svg.clientWidth || 0.75); applyVB();
+}
+function center() { return { x: vb.x + vb.w / 2, y: vb.y + vb.h / 2 }; }
+function focusBox(b) {
+  const cw = svg.clientWidth, ch = svg.clientHeight; const m = 1200;
+  const s = clamp(Math.min(cw / (b.w + 2 * m), ch / (b.h + 2 * m)), baseScale(), baseScale() * 6);
+  vb.w = cw / s; vb.h = ch / s; vb.x = b.x + b.w / 2 - vb.w / 2; vb.y = b.y + b.h / 2 - vb.h / 2; applyVB(); renderAll();
+}
+new ResizeObserver(() => { const cw = svg.clientWidth, ch = svg.clientHeight; if (!cw || !ch) return; if (!vb._init) { vb._init = true; fit(); renderAll(); renderPanels(); return; } const c = center(); vb.h = vb.w * ch / cw; vb.y = c.y - vb.h / 2; applyVB(); scheduleFull(); }).observe(svg);
+
+/* ============================================================
+   Pointer interaction
+   ============================================================ */
+const pts = new Map();
+const toMM = e => { const r = svg.getBoundingClientRect(), s = scale(); return { x: vb.x + (e.clientX - r.left) / s, y: vb.y + (e.clientY - r.top) / s }; };
+const normRect = (a, b) => ({ x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), w: Math.abs(b.x - a.x), h: Math.abs(b.y - a.y) });
+function edgeTargets() {
+  const xs = [0, S.room.w], ys = [0, S.room.h];
+  for (const it of S.items) { if (sel.has(it.id) || layerOf(it) === 'door') continue; xs.push(it.x, it.x + it.w); ys.push(it.y, it.y + it.h); }
+  return { xs, ys };
+}
+function bestSnap(edges, targets, tol) {
+  let best = null;
+  for (const e of edges) for (const t of targets) { const d = t - e; if (Math.abs(d) <= tol && (!best || Math.abs(d) < Math.abs(best.d))) best = { d, t }; }
+  return best;
+}
+const gridSnap = v => S.cfg.grid ? Math.round(v / S.cfg.grid) * S.cfg.grid : Math.round(v);
+function snapEdge(v, targets, tol, guideAxis) {
+  if (S.cfg.magnet) { const b = bestSnap([v], targets, tol); if (b) { guides.push({ [guideAxis]: b.t }); return b.t; } }
+  return gridSnap(v);
+}
+function snapPoint(p) {
+  const T = edgeTargets(), tol = 8 / scale(); const q = { ...p };
+  const bx = bestSnap([p.x], T.xs, tol), by = bestSnap([p.y], T.ys, tol);
+  if (bx) q.x = bx.t; if (by) q.y = by.t; return q;
+}
+
+function setMode(m) {
+  if (mode === 'calib' && m !== 'calib') hideCalib();
+  mode = m; measure = null;
+  $$('.seg [data-mode]').forEach(b => b.classList.toggle('on', b.dataset.mode === m || (m === 'calib' && b.dataset.mode === 'measure')));
+  svg.classList.remove('tool-hand', 'tool-measure', 'tool-calib'); if (m !== 'select') svg.classList.add('tool-' + m);
+  renderOverlay();
+}
+
+svg.addEventListener('pointerdown', e => {
+  if (e.pointerType === 'mouse' && e.button > 2) return;
+  try { svg.setPointerCapture(e.pointerId); } catch { }
+  pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (pts.size === 2) {
+    if (drag && (drag.kind === 'move' || drag.kind === 'resize') && drag.moved) { changed(); }
+    const [a, b] = [...pts.values()]; drag = { kind: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y) || 1, c0: { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, vb0: { ...vb } }; guides = []; renderOverlay(); return;
+  }
+  if (pts.size > 2) return;
+  const p = toMM(e), touch = e.pointerType === 'touch';
+  if (e.button === 1 || e.button === 2 || mode === 'hand' || spaceDown) { startPan(e, false); e.preventDefault(); return; }
+  if (mode === 'measure' || mode === 'calib') { const q = mode === 'calib' ? p : snapPoint(p); measure = { a: q, b: q }; drag = { kind: 'measure' }; renderOverlay(); return; }
+  const h = e.target.closest('[data-h]');
+  if (h && sel.size === 1) {
+    const it = selItems()[0];
+    checkpointPending = snap();
+    drag = { kind: 'resize', h: h.dataset.h, it, r0: { x: it.x, y: it.y, w: it.w, h: it.h }, sx: e.clientX, sy: e.clientY, moved: false, T: edgeTargets() };
+    return;
+  }
+  const g = e.target.closest('.it');
+  if (g) {
+    const id = g.dataset.id;
+    if (e.shiftKey || e.metaKey || e.ctrlKey) { sel.has(id) ? sel.delete(id) : sel.add(id); selectionChanged(); drag = null; return; }
+    if (!sel.has(id)) { sel = new Set([id]); selectionChanged(); }
+    const movable = selItems().filter(i => !i.locked);
+    drag = { kind: 'move', sx: e.clientX, sy: e.clientY, start: movable.map(i => ({ it: i, x: i.x, y: i.y })), gb: bbox(movable), moved: false, T: edgeTargets(), tapId: id };
+    return;
+  }
+  if (touch) { startPan(e, true); return; }
+  drag = { kind: 'marquee', a: p, b: p, add: e.shiftKey };
+});
+let checkpointPending = null;
+function startPan(e, tapClear) { drag = { kind: 'pan', sx: e.clientX, sy: e.clientY, vb0: { ...vb }, moved: false, tapClear }; svg.classList.add('panning'); }
+
+svg.addEventListener('pointermove', e => {
+  if (pts.has(e.pointerId)) pts.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (e.pointerType === 'mouse') { const p = toMM(e); $('#coords').textContent = `X ${fmt(p.x)} · Y ${fmt(p.y)} mm`; }
+  if (!drag) return;
+  const s = scale();
+  if (drag.kind === 'pinch') {
+    const v = [...pts.values()]; if (v.length < 2) return; const [a, b] = v;
+    const f = Math.hypot(a.x - b.x, a.y - b.y) / drag.d0, c = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }, r = svg.getBoundingClientRect();
+    const s0 = svg.clientWidth / drag.vb0.w; const mx = drag.vb0.x + (drag.c0.x - r.left) / s0, my = drag.vb0.y + (drag.c0.y - r.top) / s0;
+    const nw = clamp(drag.vb0.w / f, 600, 80000), s1 = svg.clientWidth / nw;
+    vb.w = nw; vb.h = nw * svg.clientHeight / svg.clientWidth; vb.x = mx - (c.x - r.left) / s1; vb.y = my - (c.y - r.top) / s1; applyVB(); return;
+  }
+  if (drag.kind === 'pan') {
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy; if (Math.hypot(dx, dy) > 4) drag.moved = true;
+    vb.x = drag.vb0.x - dx / s; vb.y = drag.vb0.y - dy / s; applyVB(); return;
+  }
+  if (drag.kind === 'move') {
+    const dx = e.clientX - drag.sx, dy = e.clientY - drag.sy;
+    if (!drag.moved) { if (Math.hypot(dx, dy) < (e.pointerType === 'touch' ? 8 : 4) || !drag.start.length) return; drag.moved = true; checkpoint(); $('#qbar').hidden = true; }
+    guides = []; const gb = drag.gb, tol = 7 / s;
+    let nx = gb.x + dx / s, ny = gb.y + dy / s;
+    const bx = S.cfg.magnet ? bestSnap([nx, nx + gb.w], drag.T.xs, tol) : null;
+    if (bx) { nx += bx.d; guides.push({ x: bx.t }); } else nx = gridSnap(nx);
+    const by = S.cfg.magnet ? bestSnap([ny, ny + gb.h], drag.T.ys, tol) : null;
+    if (by) { ny += by.d; guides.push({ y: by.t }); } else ny = gridSnap(ny);
+    const ddx = nx - gb.x, ddy = ny - gb.y;
+    for (const st of drag.start) { st.it.x = Math.round(st.x + ddx); st.it.y = Math.round(st.y + ddy); }
+    updateItemEls(drag.start.map(st => st.it)); computeChecksLite(); renderOverlay(); return;
+  }
+  if (drag.kind === 'resize') {
+    const dx = (e.clientX - drag.sx) / s, dy = (e.clientY - drag.sy) / s, h = drag.h, r0 = drag.r0, it = drag.it, tol = 7 / s, MIN = 50;
+    if (!drag.moved) { if (Math.hypot(dx * s, dy * s) < 3) return; drag.moved = true; checkpoint(checkpointPending); }
+    guides = [];
+    let x0 = r0.x, y0 = r0.y, x1 = r0.x + r0.w, y1 = r0.y + r0.h;
+    if (h.includes('w')) x0 = Math.min(snapEdge(r0.x + dx, drag.T.xs, tol, 'x'), x1 - MIN);
+    if (h.includes('e')) x1 = Math.max(snapEdge(x1 + dx, drag.T.xs, tol, 'x'), x0 + MIN);
+    if (h.includes('n')) y0 = Math.min(snapEdge(r0.y + dy, drag.T.ys, tol, 'y'), y1 - MIN);
+    if (h.includes('s')) y1 = Math.max(snapEdge(y1 + dy, drag.T.ys, tol, 'y'), y0 + MIN);
+    it.x = Math.round(x0); it.y = Math.round(y0); it.w = Math.round(x1 - x0); it.h = Math.round(y1 - y0);
+    const el = svg.querySelector(`.it[data-id="${it.id}"]`); if (el) el.outerHTML = itemSVG(it, pal, { s });
+    computeChecksLite(); renderOverlay(); return;
+  }
+  if (drag.kind === 'marquee') { drag.b = toMM(e); renderOverlay(); return; }
+  if (drag.kind === 'measure') {
+    let b = mode === 'calib' ? toMM(e) : snapPoint(toMM(e)); const a = measure.a;
+    if (!e.altKey) { const ddx = Math.abs(b.x - a.x), ddy = Math.abs(b.y - a.y); if (ddy < ddx * 0.15) b.y = a.y; else if (ddx < ddy * 0.15) b.x = a.x; }
+    measure.b = b; renderOverlay();
+  }
+});
+function computeChecksLite() { if (S.cfg.checks) { const keep = checks.aisles; computeChecks(); checks.aisles = keep; } }
+
+function endPointer(e) {
+  pts.delete(e.pointerId);
+  if (!drag) return;
+  if (drag.kind === 'pinch') { if (pts.size < 2) { drag = null; renderAll(); } return; }
+  const d = drag; drag = null; guides = []; svg.classList.remove('panning');
+  if (d.kind === 'pan') { if (!d.moved && d.tapClear) { sel.clear(); selectionChanged(); } scheduleFull(); return; }
+  if (d.kind === 'move') {
+    if (d.moved) changed();
+    else { renderOverlay(); if (e.pointerType === 'touch') openTab('props', true); }
+    return;
+  }
+  if (d.kind === 'resize') { if (d.moved) changed(); else renderOverlay(); return; }
+  if (d.kind === 'marquee') {
+    const r = normRect(d.a, d.b), s = scale();
+    if (r.w * s < 4 && r.h * s < 4) { if (!d.add) { sel.clear(); selectionChanged(); } return; }
+    if (!d.add) sel.clear();
+    for (const it of S.items) if (it.x >= r.x && it.y >= r.y && it.x + it.w <= r.x + r.w && it.y + it.h <= r.y + r.h) sel.add(it.id);
+    selectionChanged(); return;
+  }
+  if (d.kind === 'measure') { if (mode === 'calib') calibReady(); renderOverlay(); }
+}
+svg.addEventListener('pointerup', endPointer);
+svg.addEventListener('pointercancel', endPointer);
+svg.addEventListener('contextmenu', e => e.preventDefault());
+svg.addEventListener('dblclick', e => { if (e.target.closest('.it')) openTab('props', true); });
+svg.addEventListener('wheel', e => {
+  e.preventDefault();
+  const p = toMM(e);
+  const mouseWheel = e.deltaMode === 1 || (e.deltaX === 0 && Math.abs(e.deltaY) >= 50 && Number.isInteger(e.deltaY));
+  if (e.ctrlKey || e.metaKey || mouseWheel) zoomAt(p, Math.exp(-e.deltaY * (e.deltaMode === 1 ? 0.05 : e.ctrlKey ? 0.01 : 0.0018)));
+  else { const s = scale(); vb.x += e.deltaX / s; vb.y += e.deltaY / s; applyVB(); }
+  scheduleFull();
+}, { passive: false });
+svg.addEventListener('pointerleave', () => { $('#coords').textContent = ''; });
+
+/* ---------- quick bar ---------- */
+function placeQbar() {
+  const q = $('#qbar'); const list = selItems();
+  if (!list.length || drag || mode !== 'select') { q.hidden = true; return; }
+  const gb = bbox(list), s = scale();
+  q.hidden = false;
+  const qw = q.offsetWidth || 260, qh = q.offsetHeight || 40, sw = stage.clientWidth, sh = stage.clientHeight;
+  let x = (gb.x + gb.w / 2 - vb.x) * s - qw / 2, y = (gb.y - vb.y) * s - qh - 10;
+  if (y < 8) y = (gb.y + gb.h - vb.y) * s + 10;
+  if (y > sh - qh - 8) y = sh - qh - 8;
+  q.style.left = clamp(x, 8, Math.max(8, sw - qw - 8)) + 'px'; q.style.top = clamp(y, 8, Math.max(8, sh - qh - 8)) + 'px';
+}
+$('#qbar').addEventListener('click', e => {
+  const b = e.target.closest('[data-q]'); if (!b) return;
+  ({ rotate: rotateSel, dup: duplicateSel, del: deleteSel, props: () => openTab('props', true) })[b.dataset.q]();
+});
+
+/* ============================================================
+   Edits
+   ============================================================ */
+function changed(skipCheckpoint) { persist(); renderAll(); renderPanels(); updateHistoryBtns(); }
+function selectionChanged() { renderOverlay(); renderProps(); renderListHighlight(); }
+
+function rotateItem(it) {
+  const cx = it.x + it.w / 2, cy = it.y + it.h / 2;
+  [it.w, it.h] = [it.h, it.w]; it.rot = ((it.rot || 0) + 90) % 360;
+  it.x = Math.round(cx - it.w / 2); it.y = Math.round(cy - it.h / 2);
+}
+function rotateSel() { const l = selItems().filter(i => !i.locked); if (!l.length) return; checkpoint(); l.forEach(rotateItem); changed(); }
+function duplicateSel() {
+  const l = selItems(); if (!l.length) return; checkpoint();
+  const gb = bbox(l); const off = gb.w <= gb.h ? { x: gb.w, y: 0 } : { x: 0, y: gb.h };
+  const copies = l.map(i => ({ ...JSON.parse(JSON.stringify(i)), id: uid(), x: i.x + off.x, y: i.y + off.y, locked: false }));
+  S.items.push(...copies); sel = new Set(copies.map(c => c.id)); changed(); toast(`${copies.length}개 복제했습니다`);
+}
+function deleteSel() {
+  const l = selItems(); if (!l.length) return; checkpoint();
+  S.items = S.items.filter(i => !sel.has(i.id)); sel.clear(); changed(); toast(`${l.length}개 삭제 · Ctrl+Z로 되돌리기`);
+}
+function nudge(dx, dy) {
+  const l = selItems().filter(i => !i.locked); if (!l.length) return;
+  if (!nudge.t) checkpoint(); clearTimeout(nudge.t); nudge.t = setTimeout(() => { nudge.t = 0; }, 600);
+  l.forEach(i => { i.x += dx; i.y += dy; }); changed();
+}
+function addItem(type, name, Lw, D, extra = {}) {
+  checkpoint();
+  const c = center(); const it = { id: uid(), type, name, rot: 0, w: Lw, h: D, x: 0, y: 0, ...extra };
+  let x = gridSnap(c.x - Lw / 2), y = gridSnap(c.y - D / 2);
+  const free = (x, y) => !solid(it) || !S.items.some(o => solid(o) && o.x < x + Lw && o.x + o.w > x && o.y < y + D && o.y + o.h > y);
+  outer: for (let r = 0; r < 14; r++) for (let k = 0; k < 8; k++) {
+    const a = k * Math.PI / 4, tx = gridSnap(x + Math.cos(a) * r * 300), ty = gridSnap(y + Math.sin(a) * r * 300);
+    if (free(tx, ty)) { x = tx; y = ty; break outer; }
+  }
+  it.x = x; it.y = y; S.items.push(it); sel = new Set([it.id]); changed();
+  toast(`'${name}' 추가 — 끌어서 위치를 옮기세요`);
+  return it;
+}
+
+/* ---------- keyboard ---------- */
+document.addEventListener('keydown', e => {
+  const tag = (e.target.tagName || '').toLowerCase(); if (tag === 'input' || tag === 'textarea' || tag === 'select') return;
+  const k = e.key.toLowerCase(), mod = e.ctrlKey || e.metaKey;
+  if (k === ' ') { spaceDown = true; svg.classList.add('tool-hand'); e.preventDefault(); return; }
+  if (mod && k === 'z') { e.preventDefault(); e.shiftKey ? redo() : undo(); return; }
+  if (mod && k === 'y') { e.preventDefault(); redo(); return; }
+  if (mod && k === 'd') { e.preventDefault(); duplicateSel(); return; }
+  if (mod && k === 'a') { e.preventDefault(); sel = new Set(S.items.map(i => i.id)); selectionChanged(); return; }
+  if (mod) return;
+  if (k === 'delete' || k === 'backspace') { e.preventDefault(); deleteSel(); return; }
+  if (k === 'escape') { if (mode !== 'select') setMode('select'); else { sel.clear(); selectionChanged(); } return; }
+  if (k === 'r') { rotateSel(); return; }
+  if (k === 'v') setMode('select'); if (k === 'h') setMode('hand'); if (k === 'm') setMode('measure'); if (k === 'f') { fit(); renderAll(); }
+  const step = (S.cfg.grid || 10) * (e.shiftKey ? 10 : 1);
+  const map = { arrowleft: [-step, 0], arrowright: [step, 0], arrowup: [0, -step], arrowdown: [0, step] };
+  if (map[k] && sel.size) { e.preventDefault(); nudge(...map[k]); }
+});
+document.addEventListener('keyup', e => { if (e.key === ' ') { spaceDown = false; svg.classList.remove('tool-hand'); if (mode === 'hand') svg.classList.add('tool-hand'); } });
+
+/* ============================================================
+   Panel
+   ============================================================ */
+let curTab = 'props';
+function openTab(t, expand) {
+  curTab = t;
+  $$('.tabs [data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+  $$('[data-pane]').forEach(p => p.hidden = p.dataset.pane !== t);
+  if (expand) $('#panel').classList.remove('collapsed');
+  if (t === 'list') renderList(); if (t === 'setup') renderSetup(); if (t === 'props') renderProps();
+}
+$('.tabs').addEventListener('click', e => {
+  const b = e.target.closest('[data-tab]'); if (!b) return;
+  const panel = $('#panel');
+  if (b.dataset.tab === curTab && matchMedia('(max-width: 860px)').matches) { panel.classList.toggle('collapsed'); return; }
+  panel.classList.remove('collapsed'); openTab(b.dataset.tab);
+});
+function renderPanels() { if (curTab === 'props') renderProps(); if (curTab === 'list') renderList(); if (curTab === 'setup') renderSetup(); }
+
+/* ---------- library ---------- */
+function miniSVG(type, Lw, D, extra) {
+  const it = { type, rot: 0, w: Lw, h: D, n: extra?.n, name: '' }; const P = pal; const pad = Math.max(Lw, D) * 0.08;
+  const vbw = Lw + pad * 2, vbh = D + pad * 2;
+  return `<svg viewBox="${-vbw / 2} ${-vbh / 2} ${vbw} ${vbh}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${symbol(it, Lw, D, P).replace(/stroke-width="([\d.]+)"/g, (m, w) => `stroke-width="${Math.min(1, w)}"`)}</svg>`;
+}
+function renderLib() {
+  let h = '';
+  LIB.forEach(([cat, items], ci) => {
+    h += `<div class="group"><h2>${cat}</h2><div class="lib">`;
+    items.forEach(([type, name, Lw, D, extra], ii) => { h += `<button type="button" data-lib="${ci}.${ii}" title="${esc(name)} ${Lw}×${D} mm">${miniSVG(type, Lw, D, extra)}<span><b>${esc(name.replace(/\s\d{3,4}$/, ''))}</b><small>${Lw}×${D}</small></span></button>`; });
+    h += '</div></div>';
+  });
+  $('#libWrap').innerHTML = h;
+  $('#cType').innerHTML = Object.entries(TYPES).map(([k, v]) => `<option value="${k}"${k === 'box' ? ' selected' : ''}>${v.label}</option>`).join('');
+}
+$('#libWrap').addEventListener('click', e => {
+  const b = e.target.closest('[data-lib]'); if (!b) return;
+  const [ci, ii] = b.dataset.lib.split('.').map(Number); const [type, name, Lw, D, extra] = LIB[ci][1][ii];
+  addItem(type, name.replace(/\s\d{3,4}$/, ''), Lw, D, extra ? { ...extra } : {});
+  if (matchMedia('(max-width: 860px)').matches) $('#panel').classList.add('collapsed');
+});
+$('#cAdd').addEventListener('click', () => {
+  const Lw = clamp(+$('#cL').value || 600, 50, 20000), D = clamp(+$('#cD').value || 600, 50, 20000);
+  addItem($('#cType').value, $('#cName').value.trim() || '장비', Lw, D);
+});
+
+/* ---------- properties ---------- */
+let propPending = null;
+function renderProps() {
+  if (curTab !== 'props') return;
+  const pane = $('#propsPane'); const list = selItems();
+  if (pane.contains(document.activeElement) && document.activeElement.matches('input,textarea,select') && pane.dataset.for === [...sel].join(',')) return;
+  pane.dataset.for = [...sel].join(',');
+  if (!list.length) {
+    const counts = {}; S.items.forEach(i => { const c = catOf(i); counts[c] = (counts[c] || 0) + 1; });
+    const eq = S.items.filter(i => layerOf(i) === 'floor').length;
+    pane.innerHTML = `<div class="empty"><b>도면에서 장비를 눌러 선택하세요</b><p class="hint">받은 도면을 따라 장비를 그려 두었습니다. 밑그림과 비교해서 다른 곳은 끌어서 옮기고, 여기서 이름·크기·방향을 고치세요.</p></div>
+      <div class="group"><h2>현재 배치</h2><dl class="kv"><dt>주방 내부</dt><dd>${fmt(S.room.w)} × ${fmt(S.room.h)} mm</dd><dt>면적</dt><dd>${(S.room.w * S.room.h / 1e6).toFixed(1)} ㎡</dd><dt>바닥 장비</dt><dd>${eq}개</dd><dt>겹침</dt><dd>${checks.cols.length}</dd><dt>좁은 통로 (&lt; ${fmt(S.cfg.aisleMin)})</dt><dd>${checks.aisles.length}</dd></dl></div>
+      <div class="group"><h2>색 구분</h2><div style="display:flex;flex-wrap:wrap;gap:8px 14px">${['cold', 'hot', 'wash', 'work', 'hood', 'misc'].map(c => `<span class="chip"><i style="background:var(--${c})"></i>${CAT_NAME[c]}</span>`).join('')}</div>
+      <p class="hint">굵은 선이 있는 쪽이 장비의 앞(작업하는 쪽)입니다. 점선 상자는 천장에 달린 후드입니다.</p></div>
+      <div class="group"><h2>조작</h2><dl class="kv" style="grid-template-columns:auto 1fr"><dt>여러 개 선택</dt><dd>빈 곳 드래그 · Shift+클릭</dd><dt>화면 이동</dt><dd>스페이스+드래그 · 두 손가락</dd><dt>확대/축소</dt><dd>휠 · Ctrl+휠 · 핀치</dd><dt>회전 / 복제</dt><dd>R / Ctrl+D</dd><dt>미세 이동</dt><dd>방향키 (Shift ×10)</dd></dl></div>`;
+    return;
+  }
+  if (list.length > 1) {
+    pane.innerHTML = `<div class="group"><h2>${list.length}개 선택됨</h2>
+      <div class="grid2"><button type="button" class="btn" data-al="left">왼쪽 맞춤</button><button type="button" class="btn" data-al="right">오른쪽 맞춤</button><button type="button" class="btn" data-al="top">위 맞춤</button><button type="button" class="btn" data-al="bottom">아래 맞춤</button>
+      <button type="button" class="btn" data-al="packx">가로로 붙이기</button><button type="button" class="btn" data-al="packy">세로로 붙이기</button></div>
+      <p class="hint">붙이기: 왼쪽(위)부터 차례로 빈틈 없이 이어 붙입니다. 벽면 장비 줄을 정리할 때 쓰세요.</p></div>
+      <div class="btnrow"><button type="button" class="btn" data-act="rotate">90° 회전</button><button type="button" class="btn" data-act="dup">복제</button><button type="button" class="btn danger" data-act="del">삭제</button></div>`;
+    return;
+  }
+  const it = list[0], T = TYPES[it.type] || TYPES.box, [Lw, D] = spec(it), lay = layerOf(it);
+  const dirs = [[0, '아래'], [90, '왼쪽'], [180, '위'], [270, '오른쪽']];
+  const showFront = !['wall', 'column', 'zone', 'hood', 'table', 'walkin'].includes(it.type);
+  pane.innerHTML = `
+    <div class="group">
+      <span class="chip"><i style="background:var(--${catOf(it)})"></i>${CAT_NAME[catOf(it)]} · ${T.label}</span>
+      <label class="field"><span>이름</span><input type="text" data-f="name" value="${esc(it.name)}"></label>
+      <label class="field"><span>모양 (종류)</span><select data-f="type">${Object.entries(TYPES).map(([k, v]) => `<option value="${k}"${k === it.type ? ' selected' : ''}>${v.label}</option>`).join('')}</select></label>
+    </div>
+    <div class="group"><h2>크기 · 위치 (mm)</h2>
+      <div class="grid2">
+        <label class="field unit" data-u="mm"><span>${it.type === 'door' ? '문 폭' : '가로(폭)'}</span><input type="number" data-f="L" value="${Lw}" inputmode="numeric"></label>
+        <label class="field unit" data-u="mm"><span>${it.type === 'door' ? '열림 깊이' : '깊이'}</span><input type="number" data-f="D" value="${D}" inputmode="numeric"></label>
+        <label class="field unit" data-u="mm"><span>X (왼쪽 벽에서)</span><input type="number" data-f="x" value="${it.x}" inputmode="numeric"></label>
+        <label class="field unit" data-u="mm"><span>Y (위쪽 벽에서)</span><input type="number" data-f="y" value="${it.y}" inputmode="numeric"></label>
+      </div>
+    </div>
+    ${showFront ? `<div class="group"><h2>${it.type === 'door' ? '문 방향' : '앞면 방향 (작업하는 쪽)'}</h2><div class="dirs">${dirs.map(([r, l]) => `<button type="button" data-rot="${r}" class="${(it.rot || 0) === r ? 'on' : ''}">${l}</button>`).join('')}</div>
+      ${it.type === 'door' ? `<label class="check"><input type="checkbox" data-f="flip"${it.flip ? ' checked' : ''}>경첩 반대쪽으로</label>` : ''}</div>` : ''}
+    ${T.n ? `<label class="field"><span>${T.n}</span><input type="number" data-f="n" min="1" max="24" value="${it.n || ''}" placeholder="자동" inputmode="numeric"></label>` : ''}
+    ${lay === 'floor' ? `<div class="grid2"><label class="field unit" data-u="mm"><span>높이 (선택)</span><input type="number" data-f="height" value="${it.height || ''}" placeholder="850" inputmode="numeric"></label>
+      <label class="field unit" data-u="원"><span>단가 (선택)</span><input type="number" data-f="price" value="${it.price || ''}" placeholder="0" inputmode="numeric"></label></div>` : ''}
+    <label class="field"><span>메모</span><textarea data-f="note" placeholder="예: 전기 3상 220V, 배수 필요">${esc(it.note || '')}</textarea></label>
+    <label class="check"><input type="checkbox" data-f="locked"${it.locked ? ' checked' : ''}>위치 잠금 (실수로 끌리지 않게)</label>
+    <div class="btnrow"><button type="button" class="btn" data-act="rotate">90° 회전</button><button type="button" class="btn" data-act="dup">복제</button><button type="button" class="btn danger" data-act="del">삭제</button></div>`;
+}
+const propsPane = $('#propsPane');
+propsPane.addEventListener('focusin', e => { if (e.target.dataset.f) propPending = snap(); });
+propsPane.addEventListener('input', e => {
+  const f = e.target.dataset.f; const it = selItems()[0]; if (!f || !it || sel.size !== 1) return;
+  const v = e.target.value; const num = Math.round(+v);
+  if (f === 'name') it.name = v;
+  else if (f === 'note') it.note = v;
+  else if (f === 'x' && v !== '') it.x = num;
+  else if (f === 'y' && v !== '') it.y = num;
+  else if ((f === 'L' || f === 'D') && num >= 20) { let [Lw, D] = spec(it); f === 'L' ? Lw = num : D = num; if (it.rot % 180 === 0) { it.w = Lw; it.h = D; } else { it.w = D; it.h = Lw; } }
+  else if (f === 'n') it.n = v === '' ? undefined : clamp(num, 1, 24);
+  else if (f === 'height') it.height = v === '' ? undefined : num;
+  else if (f === 'price') it.price = v === '' ? undefined : num;
+  else return;
+  persist(); renderAll();
+});
+propsPane.addEventListener('change', e => {
+  const f = e.target.dataset.f; const it = selItems()[0]; if (!f || !it) return;
+  if (f === 'type') { checkpoint(); it.type = e.target.value; if (!TYPES[it.type].n) delete it.n; changed(); return; }
+  if (f === 'flip' || f === 'locked') { checkpoint(); it[f] = e.target.checked; changed(); return; }
+  if (propPending && propPending !== snap()) checkpoint(propPending);
+  propPending = snap(); changed();
+});
+propsPane.addEventListener('click', e => {
+  const r = e.target.closest('[data-rot]');
+  if (r) { const it = selItems()[0]; const target = +r.dataset.rot; if (!it || it.rot === target) return; checkpoint(); while ((it.rot || 0) !== target) rotateItem(it); changed(); return; }
+  const a = e.target.closest('[data-act]'); if (a) { ({ rotate: rotateSel, dup: duplicateSel, del: deleteSel })[a.dataset.act](); return; }
+  const al = e.target.closest('[data-al]'); if (al) alignSel(al.dataset.al);
+});
+function alignSel(how) {
+  const l = selItems().filter(i => !i.locked); if (l.length < 2) return; checkpoint(); const gb = bbox(l);
+  if (how === 'left') l.forEach(i => i.x = gb.x); if (how === 'right') l.forEach(i => i.x = gb.x + gb.w - i.w);
+  if (how === 'top') l.forEach(i => i.y = gb.y); if (how === 'bottom') l.forEach(i => i.y = gb.y + gb.h - i.h);
+  if (how === 'packx') { l.sort((a, b) => a.x - b.x); let x = l[0].x; l.forEach(i => { i.x = x; x += i.w; }); }
+  if (how === 'packy') { l.sort((a, b) => a.y - b.y); let y = l[0].y; l.forEach(i => { i.y = y; y += i.h; }); }
+  changed();
+}
+
+/* ---------- equipment list ---------- */
+function groups() {
+  const map = new Map();
+  for (const it of S.items) {
+    const lay = layerOf(it); if (lay === 'struct' || lay === 'zone' || lay === 'door') continue;
+    const [Lw, D] = spec(it); const key = [it.type, it.name, Lw, D].join('|');
+    if (!map.has(key)) map.set(key, { type: it.type, name: it.name, L: Lw, D, cat: catOf(it), ids: [], price: 0, priced: 0 });
+    const g = map.get(key); g.ids.push(it.id); if (it.price) { g.price += it.price; g.priced++; }
+  }
+  return [...map.values()].sort((a, b) => CAT_ORDER.indexOf(a.cat) - CAT_ORDER.indexOf(b.cat) || a.name.localeCompare(b.name, 'ko') || b.L - a.L);
+}
+function renderList() {
+  if (curTab !== 'list') return;
+  const gs = groups(); const total = gs.reduce((a, g) => a + g.ids.length, 0), money = gs.reduce((a, g) => a + g.price, 0);
+  const pc = money > 0;
+  let h = `<p class="hint">같은 이름·규격끼리 묶었습니다. 줄을 누르면 도면에서 찾아 보여줍니다.${pc ? '' : ' 속성에서 단가를 넣으면 금액 열이 생깁니다.'}</p><div class="tablewrap"><table><thead><tr><th>장비</th><th class="n">규격 (mm)</th><th class="n">수량</th>${pc ? '<th class="n">금액 (원)</th>' : ''}</tr></thead><tbody>`;
+  for (const g of gs) {
+    h += `<tr data-ids="${g.ids.join(',')}"><td><span class="dot" style="background:var(--${g.cat})"></span>${esc(g.name)}</td><td class="n">${g.L}×${g.D}</td><td class="n">${g.ids.length}</td>${pc ? `<td class="n">${g.priced ? fmt(g.price) : '–'}</td>` : ''}</tr>`;
+  }
+  h += `</tbody><tfoot><tr><td>합계</td><td></td><td class="n">${total}</td>${pc ? `<td class="n">${fmt(money)}</td>` : ''}</tr></tfoot></table></div>
+    <div class="btnrow"><button type="button" class="btn" id="listCsv">CSV로 내보내기</button></div>`;
+  $('#listPane').innerHTML = h; renderListHighlight();
+}
+function renderListHighlight() { $$('#listPane tbody tr').forEach(tr => tr.style.background = tr.dataset.ids.split(',').some(id => sel.has(id)) ? 'var(--accent-soft)' : ''); }
+$('#listPane').addEventListener('click', e => {
+  if (e.target.closest('#listCsv')) { exportCSV(); return; }
+  const tr = e.target.closest('tr[data-ids]'); if (!tr) return;
+  sel = new Set(tr.dataset.ids.split(',')); focusBox(bbox(selItems())); selectionChanged();
+});
+
+/* ---------- setup ---------- */
+function renderSetup() {
+  if (curTab !== 'setup') return;
+  const set = (id, v) => { const el = $(id); if (document.activeElement !== el) el.value = v; };
+  set('#roomW', S.room.w); set('#roomH', S.room.h); set('#cfgGrid', String(S.cfg.grid)); set('#cfgAisle', S.cfg.aisleMin);
+  $('#cfgMagnet').checked = S.cfg.magnet; $('#cfgChecks').checked = S.cfg.checks; $('#cfgLabels').checked = S.cfg.labels; $('#cfgSizes').checked = S.cfg.sizes;
+  $('#uShow').checked = S.under.show; set('#uOp', S.under.opacity); $('#uOpLbl').textContent = Math.round(S.under.opacity * 100) + '%';
+  set('#uX', Math.round(S.under.x)); set('#uY', Math.round(S.under.y)); set('#uW', Math.round(S.under.w)); set('#uH', Math.round(S.under.h));
+  renderSaved();
+}
+$('#setupPane').addEventListener('input', e => {
+  const t = e.target;
+  if (t.dataset.cfg) {
+    const k = t.dataset.cfg;
+    if (k === 'roomW' || k === 'roomH') { const v = Math.round(+t.value); if (v >= 1000 && v <= 60000) { if (!roomPending) roomPending = snap(); S.room[k === 'roomW' ? 'w' : 'h'] = v; persist(); renderAll(); } return; }
+    if (t.type === 'checkbox') S.cfg[k] = t.checked; else if (k === 'aisleMin') { const v = +t.value; if (v > 0) S.cfg.aisleMin = v; else return; } else S.cfg[k] = +t.value;
+    persist(); renderAll(); return;
+  }
+  if (t.dataset.u) {
+    const k = t.dataset.u;
+    if (k === 'show') S.under.show = t.checked; else if (k === 'opacity') { S.under.opacity = +t.value; $('#uOpLbl').textContent = Math.round(S.under.opacity * 100) + '%'; } else if (t.value !== '') S.under[k] = +t.value;
+    persist(); renderUnder();
+  }
+});
+let roomPending = null;
+$('#setupPane').addEventListener('change', e => { if ((e.target.id === 'roomW' || e.target.id === 'roomH') && roomPending) { checkpoint(roomPending); roomPending = null; fit(); renderAll(); } });
+$('#underBtn').addEventListener('click', () => { S.under.show = !S.under.show; persist(); renderUnder(); renderSetup(); });
+$('#uReset').addEventListener('click', () => { S.under = { ...DEFAULT_UNDER }; underData = FLOORPLAN; lsSet(LS_UNDER, ''); persist(); renderUnder(); renderSetup(); toast('받은 도면으로 되돌렸습니다'); });
+$('#uFile').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return; const rd = new FileReader();
+  rd.onload = () => {
+    const img = new Image(); img.onload = () => {
+      underData = rd.result; const ar = img.naturalHeight / img.naturalWidth;
+      S.under = { show: true, opacity: 0.4, x: 0, y: 0, w: S.room.w, h: Math.round(S.room.w * ar), custom: true };
+      const ok = lsSet(LS_UNDER, underData); persist(); renderUnder(); renderSetup();
+      toast(ok ? '새 밑그림을 넣었습니다. 축척 맞추기로 크기를 맞추세요' : '밑그림을 넣었습니다 (용량이 커서 이 브라우저에 기억되지 않습니다)');
+    }; img.src = rd.result;
+  }; rd.readAsDataURL(f); e.target.value = '';
+});
+
+/* ---------- calibration (two-point scale) ---------- */
+$('#uCalib').addEventListener('click', () => {
+  if (!S.under.show) { S.under.show = true; persist(); renderUnder(); }
+  setMode('calib'); $('#calibBox').hidden = false; $('#calibRow').hidden = true; $('#calibApply').hidden = true;
+  $('#calibMsg').textContent = '밑그림에서 길이를 아는 치수선의 양 끝을 이어서 드래그하세요. (예: 섬 작업대 위 1,500 치수선)';
+  if (matchMedia('(max-width: 860px)').matches) $('#panel').classList.add('collapsed');
+});
+function calibReady() {
+  if (!measure) return; const d = Math.hypot(measure.b.x - measure.a.x, measure.b.y - measure.a.y); if (d < 50) return;
+  const horiz = Math.abs(measure.b.x - measure.a.x) >= Math.abs(measure.b.y - measure.a.y);
+  $('#calibMsg').textContent = `지금 화면상 ${fmt(d)} mm (${horiz ? '가로' : '세로'} 방향). 실제 길이를 넣고 적용하세요. 다시 그어도 됩니다.`;
+  $('#calibRow').hidden = false; $('#calibApply').hidden = false; $('#calibLen').focus();
+}
+$('#calibApply').addEventListener('click', () => {
+  if (!measure) return; const real = +$('#calibLen').value; if (!(real > 0)) { toast('실제 길이를 mm로 넣어 주세요'); return; }
+  const a = measure.a, b = measure.b, dx = Math.abs(b.x - a.x), dy = Math.abs(b.y - a.y), horiz = dx >= dy;
+  const k = real / (horiz ? dx : dy); const both = $('#calibBoth').checked; const u = S.under;
+  if (horiz || both) { u.x = a.x - (a.x - u.x) * k; u.w *= k; }
+  if (!horiz || both) { u.y = a.y - (a.y - u.y) * k; u.h *= k; }
+  persist(); renderUnder(); renderSetup(); setMode('select'); toast(`밑그림 ${horiz && !both ? '가로' : !horiz && !both ? '세로' : ''} 축척을 맞췄습니다 (×${k.toFixed(3)})`);
+});
+$('#calibCancel').addEventListener('click', () => setMode('select'));
+function hideCalib() { $('#calibBox').hidden = true; measure = null; }
+
+/* ---------- saved layouts (shared store when available, else this browser) ---------- */
+const Store = {
+  mode: 'local', db: null, list: [], unsub: null,
+  async init() {
+    renderSaved();
+    try {
+      if (window.claude && typeof window.claude.use === 'function') {
+        const db = await window.claude.use('db');
+        if (db) {
+          this.db = db; this.mode = 'db';
+          const t = setTimeout(() => { $('#storeHint').textContent = '공유 저장소에 아직 연결되지 않았습니다. 잠시 후 다시 확인하세요.'; }, 10000);
+          this.unsub = db.collection('layouts').onSnapshot(s => { clearTimeout(t); this.list = s.docs.map(d => ({ id: d.id, ...d.data() })); renderSaved(); }, () => { clearTimeout(t); this.mode = 'local'; this.list = this.readLocal(); renderSaved(); });
+        }
+      }
+    } catch { this.mode = 'local'; }
+    if (this.mode === 'local') { this.list = this.readLocal(); renderSaved(); }
+  },
+  readLocal() { try { return JSON.parse(lsGet(LS_SAVES) || '[]'); } catch { return []; } },
+  async save(name) {
+    const doc = { name, savedAt: Date.now(), count: S.items.length, data: JSON.stringify({ room: S.room, items: S.items, cfg: S.cfg }) };
+    if (this.mode === 'db') { const id = 'l' + Date.now().toString(36) + uid(); await this.db.collection('layouts').doc(id).set(doc); return; }
+    const l = this.readLocal(); l.push({ id: 'l' + Date.now().toString(36), ...doc }); if (!lsSet(LS_SAVES, JSON.stringify(l))) throw new Error('local');
+    this.list = l; renderSaved();
+  },
+  async remove(id) {
+    if (this.mode === 'db') { await this.db.collection('layouts').doc(id).delete(); return; }
+    const l = this.readLocal().filter(x => x.id !== id); lsSet(LS_SAVES, JSON.stringify(l)); this.list = l; renderSaved();
+  },
+};
+let armedDel = null;
+function renderSaved() {
+  if (curTab !== 'setup') return;
+  $('#storeHint').textContent = Store.mode === 'db' ? '이 페이지를 함께 보는 사람들과 공유되는 저장소에 저장됩니다.' : '이 브라우저에만 저장됩니다. 다른 기기로 옮기려면 아래 배치 파일(JSON)을 쓰세요.';
+  const l = [...Store.list].sort((a, b) => b.savedAt - a.savedAt);
+  $('#savedList').innerHTML = l.length ? l.map(x => `<div class="row"><div><b>${esc(x.name)}</b><small>${new Date(x.savedAt).toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' })} · ${x.count ?? '?'}개</small></div>
+    <button type="button" class="btn" data-load="${esc(x.id)}">불러오기</button><button type="button" class="btn ${armedDel === x.id ? 'armed' : 'danger'}" data-del="${esc(x.id)}">${armedDel === x.id ? '삭제 확인' : '삭제'}</button></div>`).join('')
+    : `<p class="hint">저장한 배치안이 없습니다. 이름을 넣고 저장하면 A안·B안을 비교할 수 있습니다.</p>`;
+}
+$('#saveBtn').addEventListener('click', async () => {
+  const name = $('#saveName').value.trim() || `배치안 ${new Date().toLocaleDateString('ko-KR')}`;
+  try { await Store.save(name); $('#saveName').value = ''; toast(`'${name}' 저장했습니다`); } catch { toast('저장하지 못했습니다. 배치 파일(JSON)로 내보내 보관하세요.'); }
+});
+$('#savedList').addEventListener('click', async e => {
+  const ld = e.target.closest('[data-load]'), dl = e.target.closest('[data-del]');
+  if (ld) { const x = Store.list.find(v => v.id === ld.dataset.load); if (!x) return; try { const o = JSON.parse(x.data); checkpoint(); S.room = o.room; S.items = o.items; if (o.cfg) S.cfg = { ...DEFAULT_CFG, ...o.cfg }; sel.clear(); fit(); changed(); toast(`'${x.name}' 불러왔습니다 · Ctrl+Z로 되돌리기`); } catch { toast('이 배치안을 읽지 못했습니다'); } }
+  if (dl) { const id = dl.dataset.del; if (armedDel !== id) { armedDel = id; renderSaved(); setTimeout(() => { if (armedDel === id) { armedDel = null; renderSaved(); } }, 3500); return; } armedDel = null; try { await Store.remove(id); toast('삭제했습니다'); } catch { toast('삭제하지 못했습니다'); } renderSaved(); }
+});
+let resetArmed = false;
+$('#resetBtn').addEventListener('click', e => {
+  const b = e.currentTarget;
+  if (!resetArmed) { resetArmed = true; b.classList.add('armed'); b.textContent = '한 번 더 누르면 되돌립니다'; setTimeout(() => { resetArmed = false; b.classList.remove('armed'); b.textContent = '기본 배치로 되돌리기'; }, 3500); return; }
+  resetArmed = false; b.classList.remove('armed'); b.textContent = '기본 배치로 되돌리기';
+  checkpoint(); S.room = { ...DEFAULT_ROOM }; S.items = defaultItems(); sel.clear(); fit(); changed(); toast('기본 배치로 되돌렸습니다');
+});
+
+/* ---------- files ---------- */
+let dlCap = null;
+async function getDownloads() { try { if (dlCap === null && window.claude && typeof window.claude.use === 'function') dlCap = (await window.claude.use('downloads')) || false; } catch { dlCap = false; } return dlCap || null; }
+async function offerFile(filename, data, mime) {
+  const dl = await getDownloads();
+  if (dl) { try { await dl.save({ filename, data }); toast('저장했습니다'); return; } catch (err) { if (err && err.code === 'declined') { toast('저장을 취소했습니다'); return; } if (err && err.code === 'rate_limited') { toast('잠시 후 다시 눌러 주세요'); return; } } }
+  const blob = data instanceof Blob ? data : new Blob([data], { type: mime });
+  const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = filename; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const stamp = () => { const d = new Date(); return `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`; };
+function exportCSV() {
+  const rows = [['구분', '장비', '가로(mm)', '깊이(mm)', '수량', '금액(원)', '메모']];
+  for (const g of groups()) { const notes = [...new Set(g.ids.map(id => byId(id).note).filter(Boolean))].join(' / '); rows.push([CAT_NAME[g.cat], g.name, g.L, g.D, g.ids.length, g.priced ? g.price : '', notes]); }
+  const csv = '﻿' + rows.map(r => r.map(v => /[",\n]/.test(String(v)) ? `"${String(v).replace(/"/g, '""')}"` : v).join(',')).join('\r\n');
+  offerFile(`주방장비목록_${stamp()}.csv`, csv, 'text/csv');
+}
+$('#expCsv').addEventListener('click', exportCSV);
+$('#expJson').addEventListener('click', () => offerFile(`주방배치_${stamp()}.json`, JSON.stringify({ app: 'kitchen-layout', v: 1, room: S.room, items: S.items, cfg: S.cfg }, null, 1), 'application/json'));
+$('#impJson').addEventListener('change', e => {
+  const f = e.target.files[0]; if (!f) return; const rd = new FileReader();
+  rd.onload = () => { try { const o = JSON.parse(rd.result); if (!Array.isArray(o.items)) throw 0; checkpoint(); S.room = o.room || S.room; S.items = o.items.map(i => ({ ...i, id: i.id || uid() })); if (o.cfg) S.cfg = { ...DEFAULT_CFG, ...o.cfg }; sel.clear(); fit(); changed(); toast('배치 파일을 불러왔습니다'); } catch { toast('배치 파일 형식이 아닙니다'); } };
+  rd.readAsText(f); e.target.value = '';
+});
+function exportSVGString(withUnder) {
+  const P = { ...LIGHT }; const m = 900, W = S.room.w, H = S.room.h, tb = 900;
+  const x0 = -m - 200, y0 = -m, w = W + 2 * m + 200, h = H + 2 * m + tb; const px = 3600, s = px / w;
+  const ctx = { s }; const ly = layersSVG(P, ctx);
+  const eq = S.items.filter(i => layerOf(i) === 'floor').length;
+  const fs = 20 / s;
+  const sbY = H + m + 320, sbX = 0;
+  let sb = ''; for (let k = 0; k < 3; k++) sb += `<rect x="${sbX + k * 1000}" y="${sbY}" width="1000" height="${n1(10 / s)}" fill="${k % 2 ? P.canvas : P.ink}" stroke="${P.ink}" stroke-width="1"/><text x="${sbX + k * 1000}" y="${n1(sbY + 30 / s)}" font-size="${n1(13 / s)}" fill="${P.muted}" font-family="${MONO}">${k}</text>`;
+  sb += `<text x="${sbX + 3000}" y="${n1(sbY + 30 / s)}" font-size="${n1(13 / s)}" fill="${P.muted}" font-family="${MONO}">3 m</text>`;
+  const title = `<text x="${W}" y="${n1(H + m + 360)}" text-anchor="end" font-size="${n1(fs * 1.3)}" font-weight="700" fill="${P.ink}">주방 배치도</text>
+    <text x="${W}" y="${n1(H + m + 360 + fs * 1.6)}" text-anchor="end" font-size="${n1(fs * 0.8)}" fill="${P.muted}" font-family="${MONO}">${fmt(W)} × ${fmt(H)} mm · 바닥 장비 ${eq}개 · ${new Date().toLocaleDateString('ko-KR')}</text>`;
+  const under = withUnder && S.under.show ? `<image href="${underData}" x="${S.under.x}" y="${S.under.y}" width="${S.under.w}" height="${S.under.h}" opacity="${S.under.opacity}" preserveAspectRatio="none"/>` : '';
+  return { str: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${x0} ${y0} ${w} ${h}" width="${px}" height="${Math.round(h * s)}" font-family="IBM Plex Sans KR, Apple SD Gothic Neo, Malgun Gothic, sans-serif"><style>line,rect,path,circle,ellipse{vector-effect:non-scaling-stroke}</style><rect x="${x0}" y="${y0}" width="${w}" height="${h}" fill="#FFFFFF"/>${under}${staticSVG(P, ctx)}${ly.zone}${ly.items}${ly.over}${sb}${title}</svg>`, w: px, h: Math.round(h * s) };
+}
+$('#expPng').addEventListener('click', async () => {
+  toast('이미지를 만드는 중…');
+  const { str, w, h } = exportSVGString(false);
+  const img = new Image();
+  try { await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(str); }); } catch { toast('이미지를 만들지 못했습니다'); return; }
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const g = cv.getContext('2d'); g.fillStyle = '#fff'; g.fillRect(0, 0, w, h); g.drawImage(img, 0, 0, w, h);
+  cv.toBlob(b => { if (b) offerFile(`주방배치도_${stamp()}.png`, b, 'image/png'); else toast('이미지를 만들지 못했습니다'); }, 'image/png');
+});
+
+/* ---------- toolbar ---------- */
+$$('.seg [data-mode]').forEach(b => b.addEventListener('click', () => setMode(b.dataset.mode)));
+$('#undo').addEventListener('click', undo); $('#redo').addEventListener('click', redo);
+$('#zoomIn').addEventListener('click', () => { zoomAt(center(), 1.35); scheduleFull(); });
+$('#zoomOut').addEventListener('click', () => { zoomAt(center(), 1 / 1.35); scheduleFull(); });
+$('#zoomLbl').addEventListener('click', () => { fit(); renderAll(); });
+$('#status').addEventListener('click', e => {
+  const b = e.target.closest('[data-issue]'); if (!b) return;
+  const arr = b.dataset.issue === 'cols' ? checks.cols : checks.aisles; if (!arr.length) return;
+  const is = arr[issueCursor++ % arr.length]; sel = new Set([is.a, is.b].filter(id => byId(id)));
+  const box = 'w' in is ? { x: is.x, y: is.y, w: is.w, h: is.h } : normRect({ x: is.x1, y: is.y1 }, { x: is.x2, y: is.y2 });
+  focusBox(box); selectionChanged();
+});
+
+let toastT = 0;
+function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove('show'), 2600); }
+
+/* ---------- theme changes ---------- */
+matchMedia('(prefers-color-scheme: dark)').addEventListener?.('change', () => { renderAll(); renderLib(); });
+new MutationObserver(() => { renderAll(); renderLib(); }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class'] });
+
+/* ---------- boot ---------- */
+const hadLocal = loadLocal();
+if (!hadLocal) S.items = defaultItems();
+pal = readPalette();
+renderLib();
+openTab(matchMedia('(max-width: 860px)').matches ? 'props' : 'props');
+if (matchMedia('(max-width: 860px)').matches) $('#panel').classList.add('collapsed');
+updateHistoryBtns();
+Store.init();
+getDownloads();
+if (!hadLocal) setTimeout(() => toast('받은 도면을 따라 장비를 배치했습니다. 끌어서 조정해 보세요'), 600);
+</script>
+</body>
+</html>
