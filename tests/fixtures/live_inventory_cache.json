@@ -1,0 +1,4 @@
+{"items": [
+  {"name": "양파", "on_hand": 20, "reserved": 4, "burn_per_hour": 1.5, "snapshot_at": "2026-11-13T09:00:00"},
+  {"name": "치즈", "on_hand": 3, "reserved": 2, "burn_per_hour": 2.0, "snapshot_at": "2026-11-13T09:00:00"}
+]}

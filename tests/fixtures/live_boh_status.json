@@ -1,0 +1,4 @@
+{"as_of": "14:05",
+ "events": [{"shift": "OP", "name": "김민수", "type": "퇴근", "time": "14:00"},
+            {"shift": "CL", "name": "이지은", "type": "출근", "time": "14:00"}],
+ "on_duty": 5, "off_duty": 2, "notes": ""}
