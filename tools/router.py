@@ -47,7 +47,10 @@ NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
 MONTH_DAY_RE = re.compile(r"(\d{1,2})\s*(?:/|월)\s*(\d{1,2})")
 STATUS_RE = re.compile(r"^#?(\d+)\s*번?\s*(완료|실패)\s*(.*)$")
 ASKING_RE = re.compile(r"(몇|얼마|언제|됐어|됐나|했어|했나|했니|인가|일까|어때)")
-COMMAND_RE = re.compile(r"(눌러|넣어|해줘|해주세요|해줄래|부탁|보내|올려|등록|취소|진행해|바꿔|변경)")
+# Verbs that change something somewhere. Only these make an unlisted request a refused command;
+# "확인해줘" or "알려줘" are questions and go on to the AIs.
+COMMAND_RE = re.compile(r"(눌러|넣어|보내|올려|등록|취소|바꿔|변경|삭제|결제|승인|진행해|재부팅|재시작|꺼줘|켜줘)")
+ORDER_STATUS_RE = re.compile(r"(했어|됐어|됐나|했나|했니|들어갔|넣었|현황|내역|상태)")
 SCHEDULE_RE = re.compile(r"(hr|스케[쥴줄]|schedule|근무표)", re.I)
 CONFIRM_RE = re.compile(r"(확정|컨펌|confirm)", re.I)
 TASKS_RE = re.compile(r"(작업|발주)(확인|현황|상태|내역|목록)")
@@ -261,9 +264,12 @@ def route(text, cache_dir, queue, now=None):
     if m:
         done = queue.set_status(int(m[1]), m[2], m[3].strip(), now)
         return Reply("status", f"#{m[1]} {m[2]} 처리" if done else f"#{m[1]} 작업 없음")
-    if TASKS_RE.search(compact) or ("발주" in compact and asking):
+    if TASKS_RE.search(compact) or ("발주" in compact and ORDER_STATUS_RE.search(compact)):
         return Reply("tasks", "\n".join(queue.view()) or "작업 없음")
     if "발주" in compact:
+        # "발주량?", "몇 개 발주해야 해?" ask for advice; an order names a quantity or is a plain command.
+        if asking or "발주량" in compact or "얼마나" in compact or (compact.endswith("?") and not parse_quantities(t)):
+            return Reply("ask", "")
         return _order(t, cache_dir, now, queue)
     if SCHEDULE_RE.search(compact) and CONFIRM_RE.search(compact) and not asking:
         action = {"type": "hr_confirm", "text": "HR 스케줄 확정"}

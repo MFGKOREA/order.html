@@ -3,7 +3,6 @@
 import argparse
 import re
 import sys
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
@@ -133,33 +132,6 @@ def speed_report(stats, total):
     return out
 
 
-def run_ask(question, askers, out=None, err=None):
-    """Answer one question. Pickle lines go to `out` the moment they arrive; then the filled board block."""
-    out, err = out or sys.stdout, err or sys.stderr
-    start = time.perf_counter()
-    block = parse(post(question, datetime.now()))[-1]
-    sent, withheld, lock = [], [], threading.Lock()
-
-    def push(slot, line):
-        with lock:
-            if banned_in(line):
-                withheld.append(line)
-            elif line not in sent:
-                sent.append(line)
-                print(line, file=out, flush=True)
-
-    stats = fill(block, askers, on_line=push)
-    total = time.perf_counter() - start
-    print("---", file=out)
-    print(render(block), file=out, flush=True)
-    for line in speed_report(stats, total):
-        print(line, file=err)
-    for line in withheld:
-        print(f"WITHHELD (banned word {', '.join(banned_in(line))}): {line}", file=err)
-    failed = any(st["error"] for st in stats.values())
-    return 0 if sent and not failed else 1
-
-
 def _warm(item):
     name, fn = item
     try:
@@ -177,18 +149,6 @@ def warm_all(warmers, err=None):
             print(f"warm {name}: {error or 'OK'}", file=err, flush=True)
 
 
-def serve(askers, warmers, inp=None, out=None, err=None):
-    """Stay resident: SDKs load once and connections stay open, so each question skips that setup."""
-    inp, err = inp or sys.stdin, err or sys.stderr
-    start = time.perf_counter()
-    warm_all(warmers, err)
-    print(f"ready in {time.perf_counter() - start:.2f}s; one question per line", file=err, flush=True)
-    for line in inp:
-        if line.strip():
-            run_ask(line.strip(), askers, out, err)
-    return 0
-
-
 def load_ais():
     import ask_claude
     import ask_gpt
@@ -202,8 +162,6 @@ def main(argv=None):
     sub.add_parser("post", help="print a question post with answer slots").add_argument("text")
     sub.add_parser("answer", help="fill empty Claude/GPT slots of the latest question").add_argument("board")
     sub.add_parser("relay", help="print the Pickle message for the latest question").add_argument("board")
-    sub.add_parser("ask", help="answer one question now; Pickle lines stream as they arrive").add_argument("text")
-    sub.add_parser("serve", help="stay resident and answer one question per stdin line (fastest)")
     args = p.parse_args(argv)
 
     if args.cmd == "post":
@@ -223,16 +181,7 @@ def main(argv=None):
                 print(f"WITHHELD (banned word {', '.join(banned_in(line))}): {line}", file=sys.stderr)
             return 0 if msg else 1
 
-    t0 = time.perf_counter()
-    askers, warmers = load_ais()
-    startup = time.perf_counter() - t0
-
-    if args.cmd == "serve":
-        return serve(askers, warmers)
-    if args.cmd == "ask":
-        print(f"startup: {startup:.2f}s (serve skips this)", file=sys.stderr)
-        return run_ask(args.text, askers)
-
+    askers, _ = load_ais()
     start = time.perf_counter()  # answer
     stats = fill(block, askers)
     print(render(block))

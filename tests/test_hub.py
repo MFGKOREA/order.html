@@ -128,27 +128,73 @@ class HubTest(unittest.TestCase):
         self.make().tick(NOW)
         self.assertEqual(self.read(hub.TASKS), "#1 접수 11:00 발주 브로콜리 2개\n")
 
-    def test_free_question_gets_the_fastest_ais_first_useful_line(self):
-        def slow(q, system):
-            time.sleep(0.3)
-            yield "느린 답"
+    def test_free_question_gets_a_finished_three_line_answer_from_gpt_only(self):
+        asked = []
 
-        def fast(q, system):
-            yield "안녕하세요"  # filler, never sent
-            yield "빠른 답"
+        def claude(q, system):
+            asked.append("Claude")
+            yield "결론: 쓰이면 안 됨"
 
-        h = self.make({"Claude": slow, "GPT": fast})
+        def gpt(q, system):
+            asked.append("GPT")
+            yield from "결론: 비 오는 날은 매장 손님이 줄 수 있음\n근거: 배달 비중이 느는 경향\n확인 필요: 없음".splitlines()
+
+        h = self.make({"Claude": claude, "GPT": gpt})
         h.tick(NOW)
         append(self.drive / hub.INBOX, "오늘 비 오면 손님 줄어?")
         h.tick(NOW)
         h.pool.shutdown(wait=True)
-        self.assertEqual(self.read(hub.OUTBOX), "> 오늘 비 오면 손님 줄어?\n빠른 답\n")
+        self.assertEqual(asked, ["GPT"])
+        self.assertEqual(self.read(hub.OUTBOX), "> 오늘 비 오면 손님 줄어?\n결론: 비 오는 날은 매장 손님이 줄 수 있음\n"
+                                                "근거: 배달 비중이 느는 경향\n확인 필요: 없음\n")
+        self.assertIn("→ GPT", self.read(hub.BOARD))
+
+    def test_personal_information_never_reaches_pickle(self):
+        def gpt(q, system):
+            yield from "결론: 연락처 010-1234-5678\n근거: 직원 명부 (HR 11/13 09:00)\n확인 필요: 없음".splitlines()
+
+        h = self.make({"GPT": gpt})
+        h.tick(NOW)
+        append(self.drive / hub.INBOX, "점장 연락처 알려줘")
+        h.tick(NOW)
+        h.pool.shutdown(wait=True)
+        self.assertIn("결론: 연락처 [가림]", self.read(hub.OUTBOX))
+        self.assertNotIn("010-1234-5678", self.read(hub.OUTBOX) + self.read(hub.BOARD))
+        alerts = (self.state / "alerts.log").read_text(encoding="utf-8")
+        self.assertIn("개인정보 가림 답.txt: 전화번호", alerts)
+        self.assertIn("개인정보 가림", self.log.getvalue())
+
+    def test_private_words_file_is_used(self):
+        self.state.mkdir(parents=True)
+        (self.state / "private_terms.txt").write_text("신우님 본가\n", encoding="utf-8")
+        h = self.make()
+        h.outbox.add("q", "결론: 신우님 본가 근처")
+        self.assertEqual(self.read(hub.OUTBOX), "> q\n결론: [가림] 근처\n")
+
+    def test_remy_answers_a_browser_question_through_the_inbox(self):
+        h = self.make({"GPT": lambda q, s: iter(())})
+        h.tick(NOW)
+        append(self.drive / hub.INBOX, "세콤 출입 기록 확인해줘")
+        h.tick(NOW)
+        h.pool.shutdown(wait=True)
+        h.pool = hub.ThreadPoolExecutor(max_workers=4)
+        self.assertFalse((self.drive / hub.OUTBOX).exists())  # nothing yet: Pickle says 접수
+        board = self.read(hub.BOARD)
+        qid = board.split("## [대기] ")[1].split()[0]
+        self.assertIn(f"{qid}", board)
+        self.assertIn("→ 레미", board)
+        append(self.drive / hub.INBOX, f"{qid} 답: 결론: 김민수 09:02 출입 / 근거: 출입 기록 (세콤 11/13 09:05) / 확인 필요: 없음")
+        h.tick(NOW)
+        self.assertEqual(self.read(hub.OUTBOX), "> 세콤 출입 기록 확인해줘\n결론: 김민수 09:02 출입\n"
+                                                "근거: 출입 기록 (세콤 11/13 09:05)\n확인 필요: 없음\n")
+        self.assertIn(f"[완료] {qid}", self.read(hub.BOARD))
 
     def test_without_ai_keys_free_questions_say_so(self):
         h = self.make()
         h.tick(NOW)
         append(self.drive / hub.INBOX, "오늘 비 오면 손님 줄어?")
         h.tick(NOW)
+        h.pool.shutdown(wait=True)  # free questions are answered on a worker
         self.assertEqual(self.read(hub.OUTBOX), "> 오늘 비 오면 손님 줄어?\nAI 연결 안 됨\n")
 
     def test_answer_file_keeps_only_the_latest(self):

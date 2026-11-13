@@ -3,6 +3,7 @@ import io
 import json
 import os
 import sys
+import tempfile
 import threading
 import time
 import unittest
@@ -15,6 +16,7 @@ import ai_board as ab  # noqa: E402
 import pickle_relay as pr  # noqa: E402
 
 NOW = datetime(2026, 11, 13, 14, 5)
+FIX = Path(__file__).resolve().parent / "fixtures"
 BOARD = """회의 메모 (무시됨)
 ## 질문: [2026-11-13 09:00] 어제 질문
 - 대상: Claude, 그록봇, GPT, 피클(루이)
@@ -121,27 +123,20 @@ class Board(unittest.TestCase):
             "total: 3.62s OK",
         ])
 
-    def test_run_ask_sends_pickle_lines_before_the_board_block(self):
-        out, err = io.StringIO(), io.StringIO()
-        askers = {"Claude": timed(0.2, "양파 20kg 발주", "관제 기록"), "GPT": timed("양파 20kg 발주", 0.1, "예약 4개")}
-        self.assertEqual(ab.run_ask("오늘 양파 발주량?", askers, out, err), 0)
-        lines = out.getvalue().splitlines()
-        self.assertEqual(lines[:3], ["양파 20kg 발주", "예약 4개", "---"])
-        self.assertTrue(lines[3].startswith("## 질문: "))
-        self.assertIn("WITHHELD (banned word 관제): 관제 기록", err.getvalue())
-        self.assertIn("first to Pickle:", err.getvalue())
-
-    def test_serve_warms_up_then_answers_every_line(self):
-        out, err = io.StringIO(), io.StringIO()
+    def test_warm_all_reports_each_ai(self):
+        err = io.StringIO()
 
         def no_key():
             raise PermissionError("no key")
 
-        ab.serve({"Claude": timed("A"), "GPT": timed("B")}, {"Claude": lambda: None, "GPT": no_key},
-                 inp=io.StringIO("q1\n\nq2\n"), out=out, err=err)
+        ab.warm_all({"Claude": lambda: None, "GPT": no_key}, err)
         self.assertIn("warm Claude: OK", err.getvalue())
         self.assertIn("warm GPT: PermissionError: no key", err.getvalue())
-        self.assertEqual(out.getvalue().count("## 질문: "), 2)
+
+
+# What the mock APIs answer when they receive a hub envelope (a JSON message).
+CLAUDE_ENVELOPE_ANSWER = "결론: 양파 20kg 추가 발주\n근거: 재고 13.0개, 모레 2.5kg 입고 (매장 11/13 09:00)\n확인 필요: 없음"
+GPT_ENVELOPE_ANSWER = "결론: 비 오는 날은 매장 손님이 줄 수 있음\n근거: 배달 비중이 늘어나는 일반적 경향\n확인 필요: 없음"
 
 
 class _Mock(BaseHTTPRequestHandler):
@@ -194,6 +189,8 @@ class _Mock(BaseHTTPRequestHandler):
 
         refuse = body["messages"][0]["content"] == "REFUSE"
         texts = [] if refuse else ["안녕하세요\n양파 20kg 발주\n", None, "추가 설명"]
+        if body["messages"][0]["content"].startswith("{"):
+            texts = [CLAUDE_ENVELOPE_ANSWER]
         yield ev("message_start", {"type": "message_start", "message": {
             "id": "msg_1", "type": "message", "role": "assistant", "model": body["model"], "content": [],
             "stop_reason": None, "stop_sequence": None, "usage": {"input_tokens": 1, "output_tokens": 0}}})
@@ -216,9 +213,12 @@ class _Mock(BaseHTTPRequestHandler):
                     "choices": [{"index": 0, "delta": delta, "finish_reason": finish}]}
             return f"data: {json.dumps(data, ensure_ascii=False)}\n\n"
 
-        yield chunk({"role": "assistant", "content": "양파 20kg 발주\n"})
-        yield None
-        yield chunk({"content": "추가 설명"})
+        if body["messages"][-1]["content"].startswith("{"):
+            yield chunk({"role": "assistant", "content": GPT_ENVELOPE_ANSWER})
+        else:
+            yield chunk({"role": "assistant", "content": "양파 20kg 발주\n"})
+            yield None
+            yield chunk({"content": "추가 설명"})
         yield chunk({}, "stop")
         yield "data: [DONE]\n\n"
 
@@ -325,16 +325,46 @@ class WireFormat(unittest.TestCase):
             self.gpt.PRIORITY = False
         self.assertEqual(self.posts()[0][2]["service_tier"], "priority")
 
-    def test_serve_end_to_end(self):
-        out, err = io.StringIO(), io.StringIO()
+    def test_hub_end_to_end_through_the_sdks(self):
+        """Real SDK calls: analysis goes to Claude only, a general question to GPT only, each with
+        its role prompt and a JSON envelope; Pickle's answer file gets the finished 3 lines."""
+        import hub
         askers, warmers = ab.load_ais()
-        ab.serve(askers, warmers, inp=io.StringIO("오늘 양파 발주량?\n"), out=out, err=err)
-        gets = [p for m, p, _, _ in _Mock.seen if m == "GET"]
-        self.assertEqual(len(gets), 2)  # both connections opened before the first question
+        err = io.StringIO()
+        ab.warm_all(warmers, err)
+        self.assertEqual([m for m, *_ in _Mock.seen].count("GET"), 2)  # both connections opened first
         self.assertIn("warm Claude: OK", err.getvalue())
-        self.assertIn("warm GPT: OK", err.getvalue())
-        lines = out.getvalue().splitlines()
-        self.assertEqual(lines[:3], ["양파 20kg 발주", "추가 설명", "---"])  # same line from both AIs sent once
+        prompts = Path(__file__).resolve().parent.parent / "prompts"
+        with tempfile.TemporaryDirectory() as d:
+            drive = Path(d) / "drive"
+            h = hub.Hub(FIX, drive, Path(d) / "state", askers, log=io.StringIO())
+            h.tick()
+            for question, answer, path, role in (
+                    ("다음 주 화요일 양파 발주량?", CLAUDE_ENVELOPE_ANSWER, "/v1/messages", "claude"),
+                    ("오늘 비 오면 손님 줄어?", GPT_ENVELOPE_ANSWER, "/v1/chat/completions", "gpt")):
+                _Mock.seen.clear()
+                with open(drive / hub.INBOX, "a", encoding="utf-8") as f:
+                    f.write(question + "\n")
+                h.tick()
+                outbox, until = drive / hub.OUTBOX, time.time() + 5
+                while time.time() < until:
+                    if outbox.exists() and f"> {question}\n" in outbox.read_text(encoding="utf-8"):
+                        break
+                    time.sleep(0.02)
+                self.assertEqual(outbox.read_text(encoding="utf-8"), f"> {question}\n{answer}\n")
+                (p, headers, body), = self.posts()  # exactly one AI was asked
+                self.assertTrue(p.startswith(path))
+                system = body["system"] if role == "claude" else body["messages"][0]["content"]
+                self.assertEqual(system, (prompts / f"{role}.txt").read_text(encoding="utf-8"))
+                envelope = json.loads(body["messages"][-1]["content"])
+                self.assertEqual(envelope["질문"], question)
+                self.assertEqual(envelope["원하는형식"], "결론→근거→확인 필요")
+                if role == "claude":  # the onion question carries the onion lines, each with its source
+                    self.assertIn("양파: 예상", envelope["자료"])
+                    self.assertIn("(매장 11/13 09:00)", envelope["자료"])
+            board = (drive / hub.BOARD).read_text(encoding="utf-8")
+            self.assertIn("→ Claude", board)
+            self.assertIn("→ GPT", board)
 
 
 if __name__ == "__main__":

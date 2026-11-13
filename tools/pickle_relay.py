@@ -10,6 +10,9 @@ from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import privacy  # noqa: E402
+
 BOARD_DOC_ID = "123Xl37_ffN18WCPpWas_cn94G4ibAtfeHtWn8IgkiQo"
 BOARD_TARGETS = "Claude, 그록봇, GPT, 피클(루이)"
 BOARD_SPEED = "단일 3초 내, 2중 전달 10초 안쪽 완료"
@@ -238,14 +241,19 @@ def topic_texts(sections, known=()):
     return texts
 
 
-def write_topics(out_dir, sections, last=None):
+def write_topics(out_dir, sections, last=None, scrub=None, hits=None):
     """Write each answer file whose text changed; returns the names written.
 
     `last` (a dict kept by the caller) remembers what was written, so unchanged files are not
-    even read back from the Drive folder.
+    even read back from the Drive folder. `scrub(text) -> (text, kinds)` masks personal data
+    first (privacy.Filter.scrub); what it masked is added to `hits` as "file: kind".
     """
     written = []
     for name, text in topic_texts(sections, last or ()).items():
+        if scrub:
+            text, found = scrub(text)
+            if hits is not None:
+                hits.extend(f"{name}: {kind}" for kind in found)
         if last is not None and last.get(name) == text:
             continue
         if write_if_changed(Path(out_dir) / name, text):
@@ -279,8 +287,9 @@ def write_if_changed(path, text):
 class Feed:
     """Keeps the topic files in step with the cache. One step() costs well under a millisecond."""
 
-    def __init__(self, cache_dir, out_dir):
+    def __init__(self, cache_dir, out_dir, scrub=None):
         self.cache_dir, self.out_dir = cache_dir, out_dir
+        self.scrub = scrub or privacy.Filter().scrub  # nothing personal leaves for Pickle
         self.last_good, self.last_texts = {}, {}
 
     def step(self, now=None):
@@ -289,8 +298,10 @@ class Feed:
         # A file caught mid-write keeps its last good answers; a deleted file reads "없음".
         self.last_good = {**sections, **{k: self.last_good[k] for k in broken if k in self.last_good}}
         # Nothing readable at all (wrong folder, cache not written yet): leave the files alone.
-        written = write_topics(self.out_dir, self.last_good, self.last_texts) if self.last_good else []
-        return written, problems
+        hits = []
+        written = (write_topics(self.out_dir, self.last_good, self.last_texts, self.scrub, hits)
+                   if self.last_good else [])
+        return written, problems + [f"개인정보 가림: {h}" for h in hits]
 
 
 def watch_feed(cache_dir, out_dir, interval=0.1, stop=None, log=None):
@@ -348,7 +359,9 @@ def main(argv=None):
                 return 0
         sections, broken, problems = feed_sections(args.dir, now)
         if sections:
-            written = write_topics(out_dir, sections)
+            hits = []
+            written = write_topics(out_dir, sections, scrub=privacy.Filter().scrub, hits=hits)
+            problems += [f"개인정보 가림: {h}" for h in hits]
             ms = (time.perf_counter() - start) * 1000
             print(f"{'updated ' + ', '.join(written) if written else 'unchanged'} in {out_dir} ({ms:.1f} ms)",
                   file=sys.stderr)

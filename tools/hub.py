@@ -7,8 +7,10 @@ Files in the Drive folder Pickle reads (--drive):
   작업.txt                            pending actions + the 3 latest finished; 레미 does the 접수 lines
   요청.txt                            requests, one per line, appended by Pickle (or anyone)
   답.txt                              the latest answer, under "> request"
+  게시판.txt                          the team's log: status tags, missing or late AIs, code (Pickle never reads it)
 
-Requests can also be typed straight into the hub's window.
+Everything written there passes the personal-information filter first (tools/privacy.py; extra
+private words go in <state>/private_terms.txt). Requests can also be typed into the hub's window.
 
 Usage: python3 tools/hub.py --drive "<Drive folder Pickle reads>" [--ai]
 """
@@ -25,9 +27,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ai_board  # noqa: E402
 import pickle_relay as pr  # noqa: E402
+import pipeline  # noqa: E402
+import privacy  # noqa: E402
 import router  # noqa: E402
 
-INBOX, OUTBOX, TASKS = "요청.txt", "답.txt", "작업.txt"
+INBOX, OUTBOX, TASKS, BOARD = "요청.txt", "답.txt", "작업.txt", "게시판.txt"
 KEEP_ANSWERS = 1  # 답.txt holds only the latest answer, so Pickle reads the fewest tokens
 
 
@@ -85,60 +89,63 @@ class Inbox:
 
 
 class Outbox:
-    """답.txt: the latest answers, newest last, each under '> request'."""
+    """답.txt: the latest answer under '> request', with personal information masked."""
 
-    def __init__(self, path, keep=KEEP_ANSWERS):
-        self.path, self.keep = Path(path), keep
+    def __init__(self, path, keep=KEEP_ANSWERS, scrub=None, alert=None):
+        self.path, self.keep, self.scrub, self.alert = Path(path), keep, scrub, alert
         self.blocks, self.lock = [], threading.Lock()
 
     def add(self, request, answer):
+        if self.scrub:
+            answer, hits = self.scrub(answer)
+            if hits and self.alert:
+                self.alert(f"개인정보 가림 답.txt: {', '.join(hits)}")
         with self.lock:
             self.blocks = (self.blocks + [f"> {request}\n{answer}"])[-self.keep:]
             pr.write_if_changed(self.path, "\n".join(self.blocks) + "\n")
 
 
 class Hub:
-    def __init__(self, cache_dir, drive_dir, state_dir, askers=None, log=None):
-        self.cache, self.drive, state = Path(cache_dir), Path(drive_dir), Path(state_dir)
+    def __init__(self, cache_dir, drive_dir, state_dir, askers=None, log=None, deadline=pipeline.DEADLINE):
+        self.cache, self.drive, self.state = Path(cache_dir), Path(drive_dir), Path(state_dir)
         self.log = log or sys.stderr
-        self.feed = pr.Feed(self.cache, self.drive)
-        self.queue = router.ActionQueue(state / "actions.jsonl")
-        self.inbox = Inbox(self.drive / INBOX, state / "inbox.json", self.log)
-        self.outbox = Outbox(self.drive / OUTBOX)
-        self.askers = askers
+        self.filter = privacy.Filter(self.state / "private_terms.txt")
+        self.feed = pr.Feed(self.cache, self.drive, scrub=self.filter.scrub)
+        self.queue = router.ActionQueue(self.state / "actions.jsonl")
+        self.inbox = Inbox(self.drive / INBOX, self.state / "inbox.json", self.log)
+        self.outbox = Outbox(self.drive / OUTBOX, scrub=self.filter.scrub, alert=self.alert)
+        self.board = pipeline.Board(self.drive / BOARD, scrub=self.filter.scrub, alert=self.alert)
+        self.pipeline = pipeline.Pipeline(self.cache, askers, board=self.board, deadline=deadline)
         self.pool = ThreadPoolExecutor(max_workers=4)
         self._lock = threading.Lock()  # one request routed at a time: action ids never collide
         self._tasks_version, self._problems = None, None
 
-    def handle(self, request, reply_to, now=None, quiet=()):
-        """Answer one request. reply_to(answer) is called once (for AI questions later, from a worker),
-        except for reply kinds listed in `quiet`."""
+    def alert(self, message):
+        """Tell 신우님: the hub's window and <state>/alerts.log (never the Drive folder)."""
+        line = f"{datetime.now():%Y-%m-%d %H:%M:%S} {message}"
+        print(line, file=self.log, flush=True)
+        self.state.mkdir(parents=True, exist_ok=True)
+        with (self.state / "alerts.log").open("a", encoding="utf-8") as f:
+            f.write(line + "\n")
+
+    def handle(self, request, reply_to, now=None, quiet=(), requester="피클"):
+        """Answer one request. reply_to(answer) is called once (free questions later, from a
+        worker; 레미's questions when 레미 answers), except for reply kinds listed in `quiet`."""
+        m = pipeline.REMY_RE.match(request)
+        if m:
+            status = self.pipeline.accept_remy(m[1], m[2])
+            if "remy_answer" not in quiet:
+                reply_to(status)
+            return "remy_answer"
         with self._lock:
             reply = router.route(request, self.cache, self.queue, now)
         if reply.kind in quiet:
             pass
         elif reply.kind != "ask":
             reply_to(reply.text)
-        elif not self.askers:
-            reply_to("AI 연결 안 됨")
         else:
-            self.pool.submit(self._ask_ai, request, reply_to)
-        return reply
-
-    def _ask_ai(self, question, reply_to):
-        """The fastest AI's first useful line goes out: one line for Pickle, as early as possible."""
-        block = ai_board.parse(ai_board.post(question, datetime.now()))[-1]
-        sent, lock = [], threading.Lock()
-
-        def first(slot, line):
-            with lock:
-                if not sent and not ai_board.banned_in(line):
-                    sent.append(line)
-                    reply_to(line)
-
-        ai_board.fill(block, self.askers, on_line=first)
-        if not sent:
-            reply_to("AI 답 없음")
+            self.pool.submit(self.pipeline.run, request, reply_to, requester)
+        return reply.kind
 
     def tick(self, now=None):
         """One pass: refresh answer files, answer new requests, refresh 작업.txt. Well under 1 ms idle."""
@@ -146,16 +153,23 @@ class Hub:
         _, problems = self.feed.step(now)
         if problems != self._problems:
             for problem in problems:
-                print(f"  {problem}", file=self.log, flush=True)
+                if problem.startswith("개인정보 가림") and problem not in (self._problems or ()):
+                    self.alert(problem)
+                else:
+                    print(f"  {problem}", file=self.log, flush=True)
             self._problems = problems
         for request in self.inbox.poll():
-            # 레미's "#3 완료" shows in 작업.txt; kept out of 답.txt so it never replaces Pickle's answer.
+            # Status lines ("#3 완료") and 레미's answers show in 작업.txt and 게시판.txt; they are
+            # kept out of 답.txt so they never replace Pickle's answer.
             self.handle(request, lambda answer, request=request: self.outbox.add(request, answer), now,
-                        quiet=("status",))
+                        quiet=("status", "remy_answer"))
         self.queue.refresh()
         if self.queue.version != self._tasks_version:
             lines = self.queue.view()
-            pr.write_if_changed(self.drive / TASKS, "\n".join(lines) + "\n" if lines else "없음\n")
+            text, hits = self.filter.scrub("\n".join(lines) + "\n" if lines else "없음\n")
+            if hits:
+                self.alert(f"개인정보 가림 작업.txt: {', '.join(hits)}")
+            pr.write_if_changed(self.drive / TASKS, text)
             self._tasks_version = self.queue.version
 
     def console(self, inp=None, out=None):
@@ -168,14 +182,14 @@ class Hub:
 
         for line in inp:
             if line.strip():
-                self.handle(line.strip(), say)
+                self.handle(line.strip(), say, requester="신우님")
 
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--drive", required=True, help="the Drive folder Pickle reads (synced by Google Drive for desktop)")
     p.add_argument("--cache", default="downloads", help="cache directory (default: downloads)")
-    p.add_argument("--state", help="action log and inbox position (default: <cache>/.hub)")
+    p.add_argument("--state", help="action log, inbox position, alerts, private words (default: <cache>/.hub)")
     p.add_argument("--interval", type=float, default=0.05, help="seconds between checks (default 0.05)")
     p.add_argument("--ai", action="store_true", help="answer free questions with Claude and GPT (needs API keys)")
     args = p.parse_args(argv)
