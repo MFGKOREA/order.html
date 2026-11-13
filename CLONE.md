@@ -29,7 +29,30 @@ The formatter and checker live in `tools/pickle_relay.py`. Run `python3 tools/pi
   - 대상: Claude, 그록봇, GPT, 피클(루이)
   - 속도 기준: 단일 3초 내, 2중 전달 10초 안쪽 완료
   ```
-- Collect each AI's answer, strip filler and labels, and send only the core data to Pickle.
+- Each question gets one answer slot per AI, directly below the header:
+  ```
+  [Claude] 답변:
+  [GPT] 답변:
+  [레미] 답변:
+  ```
+  - `Claude` and `GPT` are filled automatically (`tools/ai_board.py`).
+  - `레미` (Grokbot) runs inside the Grok Bot app and needs no xAI API key. It does PC and browser work, and fills its own slot when 신우님 says "게시판 확인". The script never calls xAI and leaves this slot blank.
+  - An answer may run over several lines; it ends at the next slot or the next `## 질문:`.
+- Collect each AI's answer, strip filler and labels, drop duplicate lines, skip empty slots, and send only the core data to Pickle via Google Drive.
+
+### Running the board
+
+```
+pip install -r requirements.txt
+python3 tools/ai_board.py post "질문"      # question post with empty slots
+python3 tools/ai_board.py answer board.txt  # fill empty Claude/GPT slots of the latest question
+python3 tools/ai_board.py relay board.txt   # Pickle message for the latest question
+python3 tools/ai_board.py ask "질문"        # all three in one go, with speed check
+```
+
+- Keys: `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` on the machine that runs the script. In a Claude cloud session, a network secret for `api.openai.com` works for GPT; Anthropic keys cannot be saved there.
+- Models: `CLAUDE_MODEL` (default `claude-opus-5-5`, low effort), `GPT_MODEL` (default `gpt-5-mini`).
+- Speed check is printed to stderr: each answer ≤ 3 s, question to relay-ready ≤ 10 s.
 
 ## 3. Local cache index (1-second answers)
 
