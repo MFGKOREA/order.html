@@ -84,6 +84,11 @@ class Feed(unittest.TestCase):
                        "- 근무 중: 5명\n"
                        "- 퇴근 완료: 2명\n"
                        "- 특이사항: 없음\n",
+            "근무표.txt": "오늘(11/13) 출근: OP 김민수 09:00~15:00, CL 이지은 15:00~22:00\n"
+                       "내일(11/14) 출근: OP 최다인 09:00~15:00\n"
+                       "모레(11/15) 출근: 없음\n",
+            # this week (11/9~11/15): the Black Friday promotion is later
+            "행사.txt": "행사: 런치 세트 20% 할인 (11/10~11/16, 평일 11~14시)\n행사: 수능 응원 음료 1+1 (11/13~11/13)\n",
         })
 
     def test_first_consonant(self):
@@ -145,8 +150,8 @@ class Feed(unittest.TestCase):
 
             pr.watch_feed(cache, out, interval=0, stop=stop, log=io.StringIO())
             self.assertEqual(sorted(snapshots[0]), [
-                "BOH.txt", "매출.txt", "입고.txt", "입고_내일.txt", "입고_모레.txt", "입고_오늘.txt",
-                "재고.txt", "재고_ㄱ.txt", "재고_ㅂ.txt", "재고_ㅇ.txt", "재고_ㅊ.txt"])
+                "BOH.txt", "근무표.txt", "매출.txt", "입고.txt", "입고_내일.txt", "입고_모레.txt", "입고_오늘.txt",
+                "재고.txt", "재고_ㄱ.txt", "재고_ㅂ.txt", "재고_ㅇ.txt", "재고_ㅊ.txt", "행사.txt"])
             self.assertIn("[BOH 리포트 (14:05)]", snapshots[0]["BOH.txt"])
             self.assertEqual(snapshots[1], snapshots[0])
             self.assertEqual(snapshots[2]["BOH.txt"], "없음\n")

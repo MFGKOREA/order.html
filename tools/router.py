@@ -30,8 +30,11 @@ KOREAN_NUMBERS = {"한": 1, "하나": 1, "두": 2, "둘": 2, "세": 3, "셋": 3,
                   "여섯": 6, "일곱": 7, "여덟": 8, "아홉": 9, "열": 10}
 DAY_WORDS = [("내일모레", 2), ("모레", 2), ("오늘", 0), ("금일", 0), ("내일", 1), ("명일", 1)]
 TOPIC_WORDS = {"inventory": ("재고",), "inbound": ("입고",), "sales": ("그로스", "매출", "세일즈"),
-               "boh": ("boh", "근태", "출근", "퇴근", "근무")}
-TOPIC_NAMES = {"inventory": "재고", "inbound": "입고", "sales": "매출", "boh": "BOH"}
+               "boh": ("boh", "근태", "출근", "퇴근", "근무"),
+               "roster": ("누구", "명단", "근무표", "근무자", "출근자", "스케줄", "스케쥴"),
+               "promotions": ("행사", "프로모션", "이벤트", "할인")}
+TOPIC_NAMES = {"inventory": "재고", "inbound": "입고", "sales": "매출", "boh": "BOH", "roster": "근무표",
+               "promotions": "행사"}
 DEDUPE_SECONDS = 60  # the same pending action again within this window is not queued twice
 
 
@@ -251,7 +254,23 @@ def _boh(items, t, cache_dir, now):
     return [pr.fmt_boh(pr.load(cache_dir, "boh"))]
 
 
-ANSWERS = {"inventory": _inventory, "inbound": _inbound, "sales": _sales, "boh": _boh}
+def _roster(items, t, cache_dir, now):
+    today = now.date()
+    return [pr.fmt_roster(pr.load(cache_dir, "roster"), find_date(t, today) or today, today)]
+
+
+def _promotions(items, t, cache_dir, now):
+    today = now.date()
+    if "오늘" in t:
+        start = end = today
+    else:  # this week, or next week when asked
+        start = today - timedelta(days=today.weekday() - (7 if "다음주" in re.sub(r"\s+", "", t) else 0))
+        end = start + timedelta(days=6)
+    return pr.promotion_lines(pr.load(cache_dir, "promotions"), start, end) or ["행사: 없음"]
+
+
+ANSWERS = {"inventory": _inventory, "inbound": _inbound, "sales": _sales, "boh": _boh, "roster": _roster,
+           "promotions": _promotions}
 
 
 def route(text, cache_dir, queue, now=None):
@@ -271,11 +290,15 @@ def route(text, cache_dir, queue, now=None):
         if asking or "발주량" in compact or "얼마나" in compact or (compact.endswith("?") and not parse_quantities(t)):
             return Reply("ask", "")
         return _order(t, cache_dir, now, queue)
-    if SCHEDULE_RE.search(compact) and CONFIRM_RE.search(compact) and not asking:
+    if SCHEDULE_RE.search(compact) and CONFIRM_RE.search(compact):
+        if asking:  # "확정됐어?" asks how the confirm task went
+            return Reply("tasks", "\n".join(queue.view()) or "작업 없음")
         action = {"type": "hr_confirm", "text": "HR 스케줄 확정"}
         return Reply("hr_confirm", _queued(queue, action, now, "HR 스케줄 확정 접수"), (action,))
 
     topics = [k for k, words in TOPIC_WORDS.items() if any(w in compact for w in words)]
+    if "roster" in topics and "boh" in topics:  # "오늘 출근 누구?" asks for the roster, not the BOH report
+        topics.remove("boh")
     if topics:
         items, lines = find_items(t, known_items(cache_dir)), []
         for k in topics:

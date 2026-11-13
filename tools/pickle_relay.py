@@ -24,6 +24,7 @@ CACHE_FILES = {
     "boh": "live_boh_status.json",
     "sales": "live_sales.json",
     "inbound": "live_inbound.json",
+    "roster": "live_roster.json",
 }
 
 # Words that must never reach Pickle.
@@ -36,6 +37,8 @@ SALES_RE = re.compile(
     r"\(목표 포캐스트 [\d,]+만 원 대비 \d+\.\d% 달성\)$")
 INBOUND_RE = re.compile(
     r"^[^:\n]+: (?:(?:오늘|내일|모레)\(\d{1,2}/\d{1,2}\)|\d{1,2}/\d{1,2}) 입고 (?:\d+(?:\.\d)?\D+|없음)$")
+ROSTER_RE = re.compile(r"^(?:(?:오늘|내일|모레)\(\d{1,2}/\d{1,2}\)|\d{1,2}/\d{1,2}) 출근: .+$")
+PROMOTION_RE = re.compile(r"^행사: (?:없음|.+ \(\d{1,2}/\d{1,2}~\d{1,2}/\d{1,2}(?:, .+)?\))$")
 BOH_RE = re.compile(
     r"^\[BOH 리포트 \(\d{2}:\d{2}\)\]\n"
     r"- 신규 출근/퇴근: .+\n"
@@ -104,6 +107,25 @@ def inbound_lines(data, today, days=7):
             if 0 <= (d - today).days < days]
 
 
+def fmt_roster(data, day, today):
+    """오늘(11/13) 출근: OP 김민수 09:00~15:00, CL 이지은 15:00~22:00  (or "… 출근: 없음")"""
+    shifts = sorted((s for s in data["shifts"] if date.fromisoformat(s["date"]) == day),
+                    key=lambda s: (s.get("start", ""), s["name"]))
+    names = ", ".join(f"{s['shift']} {s['name']} {s['start']}~{s['end']}" for s in shifts)
+    return f"{day_label(day, today)} 출근: {names or '없음'}"
+
+
+def promotion_lines(data, start, end):
+    """Promotions running at any time from `start` to `end`: 행사: 런치 세트 20% (11/10~11/16, 평일 점심)"""
+    lines = []
+    for p in sorted(data["promotions"], key=lambda p: (p["start"], p["name"])):
+        first, last = date.fromisoformat(p["start"]), date.fromisoformat(p["end"])
+        if first <= end and last >= start:
+            detail = f", {p['detail']}" if p.get("detail") else ""
+            lines.append(f"행사: {p['name']} ({first.month}/{first.day}~{last.month}/{last.day}{detail})")
+    return lines
+
+
 def fmt_boh(b):
     events = ", ".join(f"{e['shift']} {e['name']} ({e['type']} {e['time']})" for e in b.get("events", []))
     notes = b.get("notes") or "없음"
@@ -139,7 +161,7 @@ def lint(msg, kind):
     """Return a list of rule violations (empty list = pass)."""
     errors = [f"banned word: {w}" for w in BANNED if w in msg]
     pattern = {"inventory": INVENTORY_RE, "sales": SALES_RE, "inbound": INBOUND_RE, "boh": BOH_RE,
-               "question": QUESTION_RE}[kind]
+               "roster": ROSTER_RE, "promotions": PROMOTION_RE, "question": QUESTION_RE}[kind]
     if not pattern.match(msg):
         errors.append(f"does not match {kind} format")
     if kind == "inventory" and re.search(r"\d{1,2}:\d{2}", msg):
@@ -167,10 +189,11 @@ def check_cache(cache_dir):
     return ok
 
 
-FEED_KEYS = ("inventory", "sales", "inbound", "boh")
+FEED_KEYS = ("inventory", "sales", "inbound", "boh", "roster", "promotions")
 # Small files, so Pickle reads only the one it needs: one per topic, plus inventory split by the
 # item's first consonant (감자튀김 -> 재고_ㄱ.txt) and deliveries split by day (입고_내일.txt).
-BASE_FILES = {"inventory": "재고.txt", "sales": "매출.txt", "inbound": "입고.txt", "boh": "BOH.txt"}
+BASE_FILES = {"inventory": "재고.txt", "sales": "매출.txt", "inbound": "입고.txt", "boh": "BOH.txt",
+              "roster": "근무표.txt", "promotions": "행사.txt"}
 DAY_FILES = {0: "입고_오늘.txt", 1: "입고_내일.txt", 2: "입고_모레.txt"}
 CHOSEONG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
 
@@ -205,6 +228,13 @@ def _topic_files(key, cache_dir, now):
             files[name] = [(fmt_inbound(item, d, q, u, today), "inbound")
                            for (d, item), (q, u) in sorted(totals.items()) if d == day]
         return files
+    if key == "roster":  # today, tomorrow and the day after, one line each
+        data, today = load(cache_dir, key), now.date()
+        return {BASE_FILES[key]: [(fmt_roster(data, today + timedelta(days=i), today), "roster") for i in range(3)]}
+    if key == "promotions":  # everything running this week (Monday to Sunday)
+        monday = now.date() - timedelta(days=now.weekday())
+        lines = promotion_lines(load(cache_dir, key), monday, monday + timedelta(days=6))
+        return {BASE_FILES[key]: [(line, "promotions") for line in lines]}
     return {BASE_FILES[key]: [(fmt_boh(load(cache_dir, key)), "boh")]}
 
 

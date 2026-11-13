@@ -71,6 +71,22 @@ class Items(RouterCase):
         self.assertEqual(kind, "boh")
         self.assertTrue(text.startswith("[BOH 리포트 (14:05)]"))
 
+    def test_roster(self):
+        self.assertEqual(self.ask("오늘 출근 누구?"),
+                         ("roster", "오늘(11/13) 출근: OP 김민수 09:00~15:00, CL 이지은 15:00~22:00"))
+        self.assertEqual(self.ask("내일 출근 누구야"), ("roster", "내일(11/14) 출근: OP 최다인 09:00~15:00"))
+        self.assertEqual(self.ask("모레 근무자 명단"), ("roster", "모레(11/15) 출근: 없음"))
+        self.assertEqual(self.ask("지금 근무 몇명이야")[0], "boh")  # no roster words: still the BOH report
+
+    def test_promotions(self):
+        lunch = "행사: 런치 세트 20% 할인 (11/10~11/16, 평일 11~14시)"
+        exam = "행사: 수능 응원 음료 1+1 (11/13~11/13)"
+        self.assertEqual(self.ask("이번 주 행사?"), ("promotions", f"{lunch}\n{exam}"))
+        self.assertEqual(self.ask("오늘 할인 뭐 있어"), ("promotions", f"{lunch}\n{exam}"))
+        self.assertEqual(self.ask("다음 주 행사"), ("promotions", lunch))
+        self.assertEqual(self.ask("다음주 이벤트", now=NOW.replace(day=24)),
+                         ("promotions", "행사: 블랙프라이데이 피자 30% (11/27~11/30)"))
+
     def test_missing_cache_says_so(self):
         with tempfile.TemporaryDirectory() as empty:
             self.assertEqual(self.ask("감자튀김 재고", cache=empty), ("inventory", "재고 데이터 없음"))
@@ -131,7 +147,7 @@ class Safety(RouterCase):
         self.assertEqual(self.queue.items, {})
 
     def test_questions_are_not_actions(self):
-        self.assertEqual(self.ask("HR 스케줄 확정됐어?")[0], "ask")
+        self.assertEqual(self.ask("HR 스케줄 확정됐어?"), ("tasks", "작업 없음"))  # reports, never confirms
         self.assertEqual(self.ask("오늘 비 오면 손님 줄어?"), ("ask", ""))
         self.assertEqual(self.queue.items, {})
 

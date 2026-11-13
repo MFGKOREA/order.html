@@ -293,10 +293,11 @@ class Pipeline:
     def names(self):
         """(item names, staff names) in the cache: what counts as a name in an answer."""
         staff = set()
-        try:
-            staff = {e["name"] for e in pr.load(self.cache_dir, "boh").get("events", [])}
-        except router.DATA_ERRORS:
-            pass
+        for key, field in (("boh", "events"), ("roster", "shifts")):
+            try:
+                staff |= {e["name"] for e in pr.load(self.cache_dir, key).get(field, [])}
+            except router.DATA_ERRORS:
+                pass
         return router.known_items(self.cache_dir), staff
 
     def _issue(self, qid, kind, slot):
