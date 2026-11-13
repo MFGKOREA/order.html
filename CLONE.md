@@ -47,12 +47,13 @@ pip install -r requirements.txt
 python3 tools/ai_board.py post "질문"      # question post with empty slots
 python3 tools/ai_board.py answer board.txt  # fill empty Claude/GPT slots of the latest question
 python3 tools/ai_board.py relay board.txt   # Pickle message for the latest question
-python3 tools/ai_board.py ask "질문"        # all three in one go, with speed check
+python3 tools/ai_board.py ask "질문"        # answer one question now; Pickle lines stream as they arrive
+python3 tools/ai_board.py serve             # fastest: stays running, one question per line
 ```
 
 - Keys: `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` on the machine that runs the script. In a Claude cloud session, a network secret for `api.openai.com` works for GPT; Anthropic keys cannot be saved there.
 - Models: `CLAUDE_MODEL` (default `claude-opus-5-5`, low effort), `GPT_MODEL` (default `gpt-5-mini`).
-- Speed check is printed to stderr: each answer ≤ 3 s, question to relay-ready ≤ 10 s.
+- Speed check is printed to stderr: each AI's first useful line ≤ 3 s, all AIs done ≤ 10 s.
 
 ## 3. Local cache index (1-second answers)
 
@@ -65,3 +66,36 @@ python3 tools/ai_board.py ask "질문"        # all three in one go, with speed 
 | Today's sales | `downloads/live_sales.json` | `date`, `gross_sales` (원), `forecast_manwon` (만 원) |
 
 Sample files in this format are in `tests/fixtures/`.
+
+## 4. Speed
+
+Data questions never go to an AI. Keep every ready-made answer in the file Pickle reads:
+
+```
+python3 tools/pickle_relay.py feed --watch --out "<Drive folder Pickle reads>/pickle_feed.txt"
+```
+
+AI questions go through the resident process:
+
+```
+python3 tools/ai_board.py serve
+```
+
+Measured on the cloud machine against stand-in APIs that answer instantly. These are the script's own costs, before the AIs' own time:
+
+| Path | Script time before Pickle can read the answer |
+|---|---|
+| Data question (inventory, sales, BOH) with `feed --watch` | None at question time: the answer is already in the file. A cache change reaches the file in 64 ms median, 101 ms worst. |
+| AI question with `serve` | 3–5 ms, then the AI's time to its first line |
+| AI question with one-shot `ask` | ~1.5 s (Python loading the two SDKs), then the AI's time |
+
+What makes each part fast:
+- `feed --watch` rebuilds every answer every 0.1 s (0.06 ms per rebuild). It rewrites the file only when an answer changes, and atomically, so Pickle never reads half a file. A cache file caught mid-write keeps its last good answers.
+- `serve` loads both SDKs once, builds their response models offline, and opens both connections before the first question.
+- Answers stream. Each useful line goes to Pickle the moment it arrives, the fastest AI first, and a line both AIs give is sent once.
+- Claude runs at low effort, GPT at minimal reasoning, and both are asked for one line.
+- Paid speed options, off by default:
+  - `CLAUDE_FAST=1`: Claude fast mode, up to 2.5x output speed at 2x price ($8 / $40 per MTok on Opus 5.5). It retries once at standard speed if the fast pool is busy.
+  - `GPT_PRIORITY=1`: OpenAI priority processing, at a higher price.
+
+Not measured yet: the AIs' real latency (needs keys), Google Drive sync time, and how often Pickle reads the file. 레미 answers by hand and is never on the fast path.

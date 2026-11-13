@@ -2,6 +2,7 @@
 """Format and lint messages relayed to Pickle, per CLONE.md. Stdlib only."""
 import argparse
 import json
+import os
 import re
 import sys
 import time
@@ -126,6 +127,93 @@ def check_cache(cache_dir):
     return ok
 
 
+FEED_KEYS = ("inventory", "sales", "boh")
+
+
+def _feed_messages(key, cache_dir, now):
+    if key == "inventory":
+        return [(fmt_inventory(i, now), "inventory") for i in load(cache_dir, key)["items"]]
+    if key == "sales":
+        return [(fmt_sales(load(cache_dir, key)), "sales")]
+    return [(fmt_boh(load(cache_dir, key)), "boh")]
+
+
+def feed_sections(cache_dir, now):
+    """Every ready-made answer, per section, so Pickle reads them instead of asking anyone.
+
+    Returns (sections, broken, problems): a missing file has no section; a file that does not
+    parse (e.g. caught mid-write) is listed in `broken`.
+    """
+    sections, broken, problems = {}, set(), []
+    for key in FEED_KEYS:
+        try:
+            msgs = _feed_messages(key, cache_dir, now)
+        except FileNotFoundError:
+            problems.append(f"missing {CACHE_FILES[key]}")
+            continue
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError) as e:
+            broken.add(key)
+            problems.append(f"unreadable {CACHE_FILES[key]}: {type(e).__name__}: {e}")
+            continue
+        for msg, kind in msgs:
+            problems.extend(f"{CACHE_FILES[key]}: {e}" for e in lint(msg, kind))
+        sections[key] = "\n".join(m for m, _ in msgs)
+    return sections, broken, problems
+
+
+def join_feed(sections):
+    return "\n\n".join(sections[k] for k in FEED_KEYS if sections.get(k)) + "\n"
+
+
+def write_if_changed(path, text):
+    """Atomically replace `path` with `text`, only when it differs (no needless Drive re-syncs)."""
+    path = Path(path)
+    try:
+        if path.read_text(encoding="utf-8") == text:
+            return False
+    except FileNotFoundError:
+        pass
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    for attempt in range(20):
+        try:
+            os.replace(tmp, path)  # readers see the old file or the new one, never half of it
+            return True
+        except PermissionError:  # Windows: a sync client can hold the file for a moment
+            if attempt == 19:
+                raise
+            time.sleep(0.05)
+
+
+def watch_feed(cache_dir, out, interval=0.1, stop=None, log=None):
+    """Rebuild the feed every `interval` seconds and rewrite `out` whenever any answer changes.
+
+    A rebuild costs ~0.06 ms, so a short interval is nearly free. The last written text is kept in
+    memory, so the output file (in a Drive folder) is only touched when an answer changes.
+    """
+    log = log or sys.stderr
+    last_good, last_problems, last_text = {}, None, None
+    while True:
+        t0 = time.perf_counter()
+        sections, broken, problems = feed_sections(cache_dir, datetime.now())
+        # A file caught mid-write keeps its last good section; a deleted file drops its section.
+        last_good = {**sections, **{k: last_good[k] for k in broken if k in last_good}}
+        text = join_feed(last_good)
+        # Nothing readable at all (wrong folder, cache not written yet): leave the old file alone.
+        if last_good and text != last_text and write_if_changed(out, text):
+            ms = (time.perf_counter() - t0) * 1000
+            print(f"{datetime.now():%H:%M:%S} updated {out} ({ms:.1f} ms)", file=log, flush=True)
+        last_text = text
+        if problems != last_problems:
+            for p in problems:
+                print(f"  {p}", file=log, flush=True)
+            last_problems = problems
+        if stop and stop():
+            return
+        time.sleep(interval)
+
+
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--dir", default="downloads", help="cache directory (default: downloads)")
@@ -137,12 +225,33 @@ def main(argv=None):
     sub.add_parser("boh")
     q = sub.add_parser("question", help="build a board question post")
     q.add_argument("text")
+    f = sub.add_parser("feed", help="write every ready-made answer to one file that Pickle reads")
+    f.add_argument("--out", help="output file (default: <dir>/pickle_feed.txt); use the Drive folder Pickle reads")
+    f.add_argument("--watch", action="store_true", help="keep running; rewrite the file whenever an answer changes")
+    f.add_argument("--interval", type=float, default=0.1, help="seconds between checks with --watch (default 0.1)")
     args = p.parse_args(argv)
 
     start = time.perf_counter()
     now = datetime.now()
     if args.cmd == "check":
         return 0 if check_cache(args.dir) else 1
+    if args.cmd == "feed":
+        out = args.out or str(Path(args.dir) / "pickle_feed.txt")
+        if args.watch:
+            try:
+                watch_feed(args.dir, out, args.interval)
+            except KeyboardInterrupt:
+                return 0
+        sections, broken, problems = feed_sections(args.dir, now)
+        if sections:
+            changed = write_if_changed(out, join_feed(sections))
+            ms = (time.perf_counter() - start) * 1000
+            print(f"{'updated' if changed else 'unchanged'} {out} ({ms:.1f} ms)", file=sys.stderr)
+        else:
+            print(f"nothing readable in {args.dir}; {out} left as it was", file=sys.stderr)
+        for problem in problems:
+            print(f"  {problem}", file=sys.stderr)
+        return 1 if problems else 0
     if args.cmd == "inventory":
         items = {i["name"]: i for i in load(args.dir, "inventory")["items"]}
         if args.item not in items:
