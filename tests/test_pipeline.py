@@ -190,6 +190,82 @@ class Run(PipelineCase):
         self.assertEqual([p.run("q", self.replies.append)["id"] for _ in range(2)], ["Q-20261113-001", "Q-20261113-002"])
 
 
+class LogAndCache(PipelineCase):
+    def make_logged(self, clock=lambda: NOW, cache=FIX, **askers):
+        self.log = pl.Log(Path(self.tmp.name) / "envelopes.jsonl")
+        return pl.Pipeline(cache, askers, systems={}, board=pl.Board(self.board_path), clock=clock, log=self.log,
+                           reply_for=lambda request: (lambda answer: self.replies.append((request, answer))))
+
+    def states(self, qid):
+        return [r["상태"] for r in self.log.read() if r["id"] == qid]
+
+    def test_status_changes_are_logged_in_order(self):
+        p = self.make_logged(Claude=FakeAI("결론: 합계 수식\n근거: B열 (POS 11/13 14:00)\n확인 필요: 없음"),
+                             GPT=FakeAI("결론: 일치\n근거: 확인함 (POS 11/13 14:00)\n확인 필요: 없음"))
+        qid = p.run("엑셀 합계 수식 만들어줘", self.replies.append)["id"]
+        self.assertEqual(self.states(qid), ["대기", "처리중", "검증중", "완료"])
+        done = self.log.read()[-1]
+        self.assertEqual((done["kind"], done["answered"], done["missing"], done["rejected"]),
+                         ("build", ["Claude"], [], []))
+        self.assertGreaterEqual(done["seconds"], 0)
+
+    def test_same_question_same_day_reuses_the_answer(self):
+        gpt = FakeAI(GOOD)
+        p = self.make_logged(GPT=gpt)
+        first = p.run("오늘 비 오면 손님 줄어?", self.replies.append)["id"]
+        second = p.run("오늘 비 오면  손님 줄어", self.replies.append)
+        self.assertEqual(len(gpt.calls), 1)
+        self.assertEqual(self.replies, [GOOD, GOOD])
+        self.assertTrue(second["cached"])
+        self.assertIn(f"→ 캐시 ({first} 답 재사용)", self.board())
+        self.assertTrue(self.log.read()[-1]["cached"])
+
+    def test_cache_is_dropped_when_the_data_changes(self):
+        with tempfile.TemporaryDirectory() as d:
+            import shutil
+            shutil.copytree(FIX, Path(d) / "c")
+            gpt = FakeAI(GOOD)
+            p = self.make_logged(cache=Path(d) / "c", Claude=gpt)
+            p.run("다음 주 화요일 양파 발주량?", self.replies.append)
+            inv = Path(d) / "c" / "live_inventory_cache.json"
+            inv.write_text(inv.read_text(encoding="utf-8").replace('"on_hand": 20', '"on_hand": 30'), encoding="utf-8")
+            p.run("다음 주 화요일 양파 발주량?", self.replies.append)
+            self.assertEqual(len(gpt.calls), 2)  # 양파 stock moved: asked again
+
+    def test_important_and_unknown_answers_skip_the_cache(self):
+        gpt = FakeAI("결론: 20kg\n근거: 감\n확인 필요: 없음")  # never acceptable: answer is 모름
+        p = self.make_logged(GPT=gpt)
+        p.run("오늘 비 오면 손님 줄어?", self.replies.append)
+        p.run("오늘 비 오면 손님 줄어?", self.replies.append)
+        self.assertEqual(len(gpt.calls), 4)  # 2 questions x (ask + one send-back), nothing cached
+        claude, gpt2 = FakeAI(GOOD), FakeAI(GOOD)
+        p2 = self.make_logged(Claude=claude, GPT=gpt2)
+        p2.run("다음 주 화요일 양파 발주량?", self.replies.append)
+        p2.run("[중요] 다음 주 화요일 양파 발주량?", self.replies.append)
+        self.assertEqual((len(claude.calls), len(gpt2.calls)), (2, 1))
+
+    def test_next_day_asks_again(self):
+        gpt, day = FakeAI(GOOD), [NOW]
+        p = self.make_logged(clock=lambda: day[0], GPT=gpt)
+        p.run("오늘 비 오면 손님 줄어?", self.replies.append)
+        day[0] = NOW.replace(day=14)
+        p.run("오늘 비 오면 손님 줄어?", self.replies.append)
+        self.assertEqual(len(gpt.calls), 2)
+
+    def test_restart_keeps_numbers_cache_and_remys_open_questions(self):
+        gpt = FakeAI(GOOD)
+        p = self.make_logged(GPT=gpt)
+        p.run("오늘 비 오면 손님 줄어?", self.replies.append)
+        remy_q = p.run("세콤 출입 기록 확인해줘", self.replies.append)["id"]
+        again = self.make_logged(GPT=gpt)  # a new process reading the same log
+        self.assertEqual(again.run("오늘 비 오면 손님 줄어?", self.replies.append)["id"], "Q-20261113-003")
+        self.assertEqual(len(gpt.calls), 1)  # answered from the restored cache
+        self.assertEqual(again.accept_remy(remy_q, "결론: 이상 없음 / 근거: 출입 기록 / 확인 필요: 없음"),
+                         f"{remy_q} 완료")
+        self.assertEqual(self.replies[-1], ("세콤 출입 기록 확인해줘", "결론: 이상 없음\n근거: 출입 기록\n확인 필요: 없음"))
+        self.assertEqual(self.states(remy_q), ["대기", "완료"])
+
+
 class Remy(PipelineCase):
     def test_browser_question_waits_for_remys_answer(self):
         p = self.make(GPT=FakeAI(GOOD))

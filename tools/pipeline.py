@@ -224,21 +224,64 @@ class Board:
                     time.sleep(0.05)
 
 
+def cache_key(question):
+    """Same question, whatever the spacing, punctuation or [중요] mark."""
+    return re.sub(r"[\s?!.,~…]+", "", IMPORTANT_RE.sub("", question)).lower()
+
+
+class Log:
+    """envelopes.jsonl in the hub's state folder: every status change of every question, with its
+    result. Restarts and the weekly summary read it. Local only; never synced."""
+
+    def __init__(self, path):
+        self.path, self.lock = Path(path), threading.Lock()
+
+    def write(self, record):
+        with self.lock:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    def read(self):
+        try:
+            lines = self.path.read_text(encoding="utf-8").splitlines()
+        except FileNotFoundError:
+            return []
+        records = []
+        for line in lines:
+            try:
+                records.append(json.loads(line))
+            except json.JSONDecodeError:  # a line cut short by a crash: skip it
+                pass
+        return records
+
+
 class Pipeline:
-    def __init__(self, cache_dir, askers=None, systems=None, board=None, deadline=DEADLINE, clock=datetime.now):
-        self.cache_dir, self.askers, self.board = cache_dir, askers or {}, board
+    def __init__(self, cache_dir, askers=None, systems=None, board=None, deadline=DEADLINE, clock=datetime.now,
+                 log=None, reply_for=None):
+        self.cache_dir, self.askers, self.board, self.log = cache_dir, askers or {}, board, log
         self.systems = systems if systems is not None else {"Claude": load_prompt("claude"), "GPT": load_prompt("gpt")}
         self.deadline, self.clock = deadline, clock
-        self.pending = {}  # qid -> {"question", "reply"}: 레미's questions, answered later
+        self.reply_for = reply_for  # question -> reply function, for 레미's questions after a restart
+        self.pending = {}  # qid -> {"request", "reply"}: 레미's questions, answered later
         self.delivered = {}  # qid -> {"answers", "notes", "reply"}: for late answers
         self.late = {}  # qid -> [(slot, parsed)] that arrived after the deadline, before delivery
+        self.cache = {}  # cache_key -> {"id", "date", "data", "answer"}: today's answers
+        self.issues = {}  # qid -> {"missing": [...], "rejected": [...]}: for the log
         self._lock, self._count = threading.Lock(), {}
         self.pool = ThreadPoolExecutor(max_workers=8)
+        self._restore()
 
     # -- small helpers -------------------------------------------------------------------------
     def note(self, text):
         if self.board:
             self.board.note(text)
+
+    def status(self, qid, state, line=None, **fields):
+        """A status change: one line on the board, one record in the log."""
+        self.note(line or f"[{state}] {qid}")
+        if self.log:
+            self.log.write({"id": qid, "at": self.clock().isoformat(timespec="seconds"), "상태": state, **fields})
 
     def next_id(self, now):
         with self._lock:
@@ -255,6 +298,36 @@ class Pipeline:
             pass
         return router.known_items(self.cache_dir), staff
 
+    def _issue(self, qid, kind, slot):
+        with self._lock:
+            self.issues.setdefault(qid, {"missing": [], "rejected": []})[kind].append(slot)
+
+    def _restore(self):
+        """After a restart: keep counting question numbers, keep today's cache, and keep waiting
+        for 레미's open questions."""
+        if not self.log:
+            return
+        today, waiting = self.clock().date().isoformat(), {}
+        for r in self.log.read():
+            qid = r.get("id", "")
+            if re.fullmatch(r"Q-\d{8}-\d{3}", qid):
+                self._count[qid[2:10]] = max(self._count.get(qid[2:10], 0), int(qid[11:]))
+            if r.get("상태") == "대기" and r.get("대상") == ["레미"]:
+                waiting[qid] = r
+            elif r.get("상태") == "완료":
+                waiting.pop(qid, None)
+                if r.get("key") and r.get("date") == today and r.get("answer") not in (None, UNKNOWN, NO_AI):
+                    self.cache[r["key"]] = {"id": qid, "date": today, "data": r.get("data", []), "answer": r["answer"]}
+        if self.reply_for:
+            for qid, r in waiting.items():
+                self.pending[qid] = {"request": r["요청"], "reply": self.reply_for(r["요청"]), "key": r.get("key"),
+                                     "data": r.get("data", [])}
+
+    def _remember(self, qid, key, data, answer, now):
+        if key and answer not in (UNKNOWN, NO_AI):
+            with self._lock:
+                self.cache[key] = {"id": qid, "date": now.date().isoformat(), "data": data, "answer": answer}
+
     # -- asking ------------------------------------------------------------------------------------
     def _ask(self, qid, envs, catch_late):
         """Ask each slot in parallel; {slot: text} for those that answered within the deadline."""
@@ -268,9 +341,11 @@ class Pipeline:
                 got[slot] = f.result()
             except Exception as e:  # one AI failing must not stop the others
                 self.note(f"[{slot}] 응답 없음 {qid}: {type(e).__name__}")
+                self._issue(qid, "missing", slot)
         for f in not_done:
             slot = futures[f]
             self.note(f"[{slot}] 응답 없음 {qid}: {self.deadline:g}초 마감")
+            self._issue(qid, "missing", slot)
             if catch_late:
                 f.add_done_callback(lambda f, slot=slot: self._late(qid, slot, f))
         return got
@@ -299,6 +374,7 @@ class Pipeline:
                 why = problem(parsed, staff) if s in got else "다시 요청에 응답 없음"
                 if why:
                     self.note(f"[{s}] 반려 {qid}: {why}")
+                    self._issue(qid, "rejected", s)
                 else:
                     usable.append((s, parsed))
         usable.sort(key=lambda sp: (sp[1]["결론"].startswith("모름"), slots.index(sp[0])))
@@ -335,7 +411,9 @@ class Pipeline:
         if after != before:
             entry["answers"].append((slot, parsed))
             entry["reply"](after)
-            self.note(f"[완료] {qid} 늦은 답 반영\n{after}")
+            self._remember(qid, entry["key"], entry["data"], after, self.clock())
+            self.status(qid, "완료", f"[완료] {qid} 늦은 답 반영\n{after}", answer=after, late=[slot],
+                        key=entry["key"], data=entry["data"], date=self.clock().date().isoformat())
 
     # -- entry points --------------------------------------------------------------------------------
     def run(self, question, reply, requester="피클"):
@@ -345,38 +423,53 @@ class Pipeline:
         kind, important = classify(question)
         q = IMPORTANT_RE.sub("", question).strip()
         answerers, checker = plan(kind, important)
-        qid = self.next_id(now)
+        qid, key = self.next_id(now), cache_key(question)
         items, staff = self.names()
         data = gather(q, self.cache_dir, now)
         record = {"id": qid, "question": q, "kind": kind, "important": important, "targets": answerers,
                   "requester": requester, "data": data, "answer": None, "status": "대기"}
-        self.note(f"## [대기] {qid} {now:%H:%M} {q} → {', '.join(answerers)}")
+        done = dict(key=key, data=data, date=now.date().isoformat(), kind=kind)
+
+        hit = None if important else self.cache.get(key)
+        if hit and hit["date"] == now.date().isoformat() and hit["data"] == data:
+            reply(hit["answer"])
+            self.status(qid, "완료", f"## [완료] {qid} {now:%H:%M} {q} → 캐시 ({hit['id']} 답 재사용)",
+                        요청=question, 질문=q, 대상=[], 요청자=requester, answer=hit["answer"], seconds=0.0,
+                        cached=True, **done)
+            return {**record, "answer": hit["answer"], "status": "완료", "cached": True}
+
+        self.status(qid, "대기", f"## [대기] {qid} {now:%H:%M} {q} → {', '.join(answerers)}",
+                    요청=question, 질문=q, 대상=answerers, 요청자=requester, important=important, **done)
         if answerers == ["레미"]:
             with self._lock:
-                self.pending[qid] = {"question": question, "reply": reply}
+                self.pending[qid] = {"request": question, "reply": reply, "key": key, "data": data}
             return record
         slots = [s for s in answerers if s in self.askers]
         if not slots:
             reply(NO_AI)
-            self.note(f"[완료] {qid} {NO_AI}")
+            self.status(qid, "완료", f"[완료] {qid} {NO_AI}", answer=NO_AI, seconds=0.0, **done)
             return {**record, "answer": NO_AI, "status": "완료"}
-        self.note(f"[처리중] {qid}")
+        self.status(qid, "처리중")
         answers = self._round(qid, q, slots, data, staff, now)
         notes = []
         if checker and answers:
             if checker in self.askers:
-                self.note(f"[검증중] {qid}")
+                self.status(qid, "검증중")
                 notes.append(self._verify(qid, q, checker, answers[0], data, now))
             else:
                 notes.append(f"{checker} 검증 못 함")
         with self._lock:
             answers += self.late.pop(qid, [])
             text = compose(answers, items | staff, notes)
-            self.delivered[qid] = {"answers": answers, "notes": notes, "reply": reply}
+            self.delivered[qid] = {"answers": answers, "notes": notes, "reply": reply, "key": key, "data": data}
         reply(text)
+        self._remember(qid, key, data, text, now)
+        seconds = round(time.perf_counter() - start, 2)
         code = next((a["code"] for _, a in answers if a["code"]), "")
-        self.note(f"[완료] {qid} {time.perf_counter() - start:.1f}초\n{text}" + (f"\n{code}" if code else ""))
-        return {**record, "answer": text, "status": "완료", "seconds": round(time.perf_counter() - start, 2)}
+        issues = self.issues.pop(qid, {"missing": [], "rejected": []})
+        self.status(qid, "완료", f"[완료] {qid} {seconds:.1f}초\n{text}" + (f"\n{code}" if code else ""),
+                    answer=text, seconds=seconds, answered=[s for s, _ in answers], **issues, **done)
+        return {**record, "answer": text, "status": "완료", "seconds": seconds}
 
     def accept_remy(self, qid, text):
         """레미's one-line answer for a waiting question. Returns a short status for the board."""
@@ -390,9 +483,11 @@ class Pipeline:
         if why:
             self.note(f"[레미] 반려 {qid}: {why}")
             return f"{qid} 반려: {why}"
-        answer = compose([("레미", parsed)], items | staff)
+        answer, now = compose([("레미", parsed)], items | staff), self.clock()
         entry["reply"](answer)
         with self._lock:
             self.pending.pop(qid, None)
-        self.note(f"[완료] {qid}\n{answer}")
+        self._remember(qid, entry.get("key"), entry.get("data", []), answer, now)
+        self.status(qid, "완료", f"[완료] {qid}\n{answer}", answer=answer, answered=["레미"], key=entry.get("key"),
+                    data=entry.get("data", []), date=now.date().isoformat(), kind="browser")
         return f"{qid} 완료"

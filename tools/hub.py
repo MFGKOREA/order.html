@@ -115,7 +115,10 @@ class Hub:
         self.inbox = Inbox(self.drive / INBOX, self.state / "inbox.json", self.log)
         self.outbox = Outbox(self.drive / OUTBOX, scrub=self.filter.scrub, alert=self.alert)
         self.board = pipeline.Board(self.drive / BOARD, scrub=self.filter.scrub, alert=self.alert)
-        self.pipeline = pipeline.Pipeline(self.cache, askers, board=self.board, deadline=deadline)
+        self.pipeline = pipeline.Pipeline(
+            self.cache, askers, board=self.board, deadline=deadline,
+            log=pipeline.Log(self.state / "envelopes.jsonl"),  # status changes; restarts and weekly summary
+            reply_for=lambda request: (lambda answer: self.outbox.add(request, answer)))
         self.pool = ThreadPoolExecutor(max_workers=4)
         self._lock = threading.Lock()  # one request routed at a time: action ids never collide
         self._tasks_version, self._problems = None, None
