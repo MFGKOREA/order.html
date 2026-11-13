@@ -15,6 +15,8 @@ from openai import DefaultHttpx2Client, OpenAI
 MODEL = os.environ.get("GPT_MODEL", "gpt-5-mini")
 REASONING_EFFORT = os.environ.get("GPT_REASONING_EFFORT", "minimal")
 PRIORITY = os.environ.get("GPT_PRIORITY") == "1"
+# Set by the hub for the cost meter: on_usage(model, input_tokens, output_tokens) after each answer.
+on_usage = None
 
 _client = None
 
@@ -60,6 +62,7 @@ def _lines(c, question, system):
         messages=[{"role": "system", "content": system},
                   {"role": "user", "content": question}],
         stream=True,
+        stream_options={"include_usage": True},  # the last chunk reports tokens, for the cost meter
     )
     if REASONING_EFFORT:
         params["reasoning_effort"] = REASONING_EFFORT
@@ -69,6 +72,9 @@ def _lines(c, question, system):
     buf = ""
     try:
         for chunk in stream:
+            usage = getattr(chunk, "usage", None)
+            if usage and on_usage:
+                on_usage(MODEL, usage.prompt_tokens, usage.completion_tokens)
             if not chunk.choices:
                 continue
             buf += chunk.choices[0].delta.content or ""

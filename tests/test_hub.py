@@ -1,3 +1,4 @@
+import contextlib
 import io
 import shutil
 import sys
@@ -5,7 +6,7 @@ import tempfile
 import threading
 import time
 import unittest
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "tools"))
@@ -188,6 +189,38 @@ class HubTest(unittest.TestCase):
         self.assertEqual(self.read(hub.OUTBOX), "> 세콤 출입 기록 확인해줘\n결론: 김민수 09:02 출입\n"
                                                 "근거: 출입 기록 (세콤 11/13 09:05)\n확인 필요: 없음\n")
         self.assertIn(f"[완료] {qid}", self.read(hub.BOARD))
+
+    def test_every_request_is_logged_for_the_weekly_summary(self):
+        h = self.make()
+        h.tick(NOW)
+        append(self.drive / hub.INBOX, "매장에 감자튀김 재고 몇개야", "브로콜리 발주 2개", "#1 완료")
+        h.tick(NOW)
+        self.assertEqual([r["kind"] for r in h.log_book.read() if r.get("route") == "hub"], ["inventory", "order"])
+
+    def test_last_weeks_summary_goes_on_the_board_once(self):
+        h = self.make()
+        h.tick(NOW)  # the first run starts counting; nothing to report yet
+        append(self.drive / hub.INBOX, "매장에 감자튀김 재고 몇개야")
+        h.tick(NOW)
+        self.assertFalse((self.drive / hub.BOARD).exists())
+        monday = NOW + timedelta(days=3)  # 2026-11-16
+        h.tick(monday)
+        h.tick(monday)
+        self.make().tick(monday)  # a restart on the same day does not post it again
+        board = self.read(hub.BOARD)
+        self.assertEqual(board.count("## [주간 요약] 11/9~11/15"), 1)
+        self.assertIn("요청 1건: 데이터 1, 지시 0, AI 0 (캐시 0)", board)
+
+    def test_weekly_flag_prints_this_weeks_summary(self):
+        h = self.make()
+        h.tick()
+        append(self.drive / hub.INBOX, "매장에 감자튀김 재고 몇개야")
+        h.tick()
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(hub.main(["--state", str(self.state), "--weekly"]), 0)
+        self.assertIn("## [주간 요약]", out.getvalue())
+        self.assertIn("데이터 1", out.getvalue())
 
     def test_without_ai_keys_free_questions_say_so(self):
         h = self.make()

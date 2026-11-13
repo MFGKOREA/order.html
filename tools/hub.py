@@ -21,11 +21,12 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ai_board  # noqa: E402
+import meter  # noqa: E402
 import pickle_relay as pr  # noqa: E402
 import pipeline  # noqa: E402
 import privacy  # noqa: E402
@@ -115,13 +116,15 @@ class Hub:
         self.inbox = Inbox(self.drive / INBOX, self.state / "inbox.json", self.log)
         self.outbox = Outbox(self.drive / OUTBOX, scrub=self.filter.scrub, alert=self.alert)
         self.board = pipeline.Board(self.drive / BOARD, scrub=self.filter.scrub, alert=self.alert)
+        self.meter = meter.Meter(self.state / "usage.jsonl", alert=self.alert)
+        self.log_book = pipeline.Log(self.state / "envelopes.jsonl")  # every request; restarts, weekly summary
         self.pipeline = pipeline.Pipeline(
-            self.cache, askers, board=self.board, deadline=deadline,
-            log=pipeline.Log(self.state / "envelopes.jsonl"),  # status changes; restarts and weekly summary
-            reply_for=lambda request: (lambda answer: self.outbox.add(request, answer)))
+            self.cache, askers, board=self.board, deadline=deadline, log=self.log_book,
+            reply_for=lambda request: (lambda answer: self.outbox.add(request, answer)),
+            blocked=lambda slot: slot == "GPT" and self.meter.blocked("openai"))
         self.pool = ThreadPoolExecutor(max_workers=4)
         self._lock = threading.Lock()  # one request routed at a time: action ids never collide
-        self._tasks_version, self._problems = None, None
+        self._tasks_version, self._problems, self._week_checked = None, None, None
 
     def alert(self, message):
         """Tell 신우님: the hub's window and <state>/alerts.log (never the Drive folder)."""
@@ -140,8 +143,13 @@ class Hub:
             if "remy_answer" not in quiet:
                 reply_to(status)
             return "remy_answer"
+        start = time.perf_counter()
         with self._lock:
             reply = router.route(request, self.cache, self.queue, now)
+        if reply.kind not in ("ask", "status"):  # free questions are logged by the pipeline
+            self.log_book.write({"at": (now or datetime.now()).isoformat(timespec="seconds"), "상태": "완료",
+                                 "route": "hub", "kind": reply.kind, "요청자": requester,
+                                 "seconds": round(time.perf_counter() - start, 4)})
         if reply.kind in quiet:
             pass
         elif reply.kind != "ask":
@@ -174,6 +182,25 @@ class Hub:
                 self.alert(f"개인정보 가림 작업.txt: {', '.join(hits)}")
             pr.write_if_changed(self.drive / TASKS, text)
             self._tasks_version = self.queue.version
+        self.weekly(now)
+
+    def weekly(self, now):
+        """On the first check of a new week, post last week's summary on the board (once)."""
+        today = now.date()
+        if self._week_checked == today:
+            return
+        self._week_checked = today
+        last_monday = today - timedelta(days=today.weekday() + 7)
+        path = self.state / "weekly.json"
+        try:
+            last = json.loads(path.read_text(encoding="utf-8"))["last"]
+        except (FileNotFoundError, json.JSONDecodeError, KeyError):
+            last = None
+        if last != last_monday.isoformat():
+            if last is not None:  # the very first run starts counting; there is no week to report yet
+                self.board.note(meter.weekly_summary(self.log_book.read(), self.meter.records, last_monday))
+            self.state.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps({"last": last_monday.isoformat()}), encoding="utf-8")
 
     def console(self, inp=None, out=None):
         """Requests typed into the hub's own window get the same answers, printed right there."""
@@ -190,18 +217,33 @@ class Hub:
 
 def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--drive", required=True, help="the Drive folder Pickle reads (synced by Google Drive for desktop)")
+    p.add_argument("--drive", help="the Drive folder Pickle reads (synced by Google Drive for desktop)")
     p.add_argument("--cache", default="downloads", help="cache directory (default: downloads)")
-    p.add_argument("--state", help="action log, inbox position, alerts, private words (default: <cache>/.hub)")
+    p.add_argument("--state", help="logs, alerts, spend, private words (default: <cache>/.hub)")
     p.add_argument("--interval", type=float, default=0.05, help="seconds between checks (default 0.05)")
     p.add_argument("--ai", action="store_true", help="answer free questions with Claude and GPT (needs API keys)")
+    p.add_argument("--weekly", action="store_true", help="print this week's summary so far and exit")
     args = p.parse_args(argv)
+    state = Path(args.state or Path(args.cache) / ".hub")
+
+    if args.weekly:
+        today = datetime.now().date()
+        print(meter.weekly_summary(pipeline.Log(state / "envelopes.jsonl").read(),
+                                   meter.Meter(state / "usage.jsonl").records, today - timedelta(days=today.weekday())))
+        return 0
+    if not args.drive:
+        p.error("--drive is required")
 
     askers = None
     if args.ai:
         askers, warmers = ai_board.load_ais()
         ai_board.warm_all(warmers)
-    hub = Hub(args.cache, args.drive, args.state or Path(args.cache) / ".hub", askers)
+    hub = Hub(args.cache, args.drive, state, askers)
+    if args.ai:
+        import ask_claude
+        import ask_gpt
+        ask_gpt.on_usage = lambda model, i, o: hub.meter.record("openai", model, i, o)
+        ask_claude.on_usage = lambda model, i, o: hub.meter.record("anthropic", model, i, o)
     threading.Thread(target=hub.console, daemon=True).start()
     print(f"hub ready: {args.drive} (requests can be typed here too; Ctrl+C stops)", file=sys.stderr, flush=True)
     try:

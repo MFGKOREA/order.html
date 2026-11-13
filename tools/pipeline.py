@@ -258,8 +258,9 @@ class Log:
 
 class Pipeline:
     def __init__(self, cache_dir, askers=None, systems=None, board=None, deadline=DEADLINE, clock=datetime.now,
-                 log=None, reply_for=None):
+                 log=None, reply_for=None, blocked=None):
         self.cache_dir, self.askers, self.board, self.log = cache_dir, askers or {}, board, log
+        self.blocked = blocked or (lambda slot: False)  # slot -> True when its spending cap is reached
         self.systems = systems if systems is not None else {"Claude": load_prompt("claude"), "GPT": load_prompt("gpt")}
         self.deadline, self.clock = deadline, clock
         self.reply_for = reply_for  # question -> reply function, for 레미's questions after a restart
@@ -438,6 +439,15 @@ class Pipeline:
                         cached=True, **done)
             return {**record, "answer": hit["answer"], "status": "완료", "cached": True}
 
+        notes = []
+        if self.blocked("GPT") and ("GPT" in answerers or checker == "GPT"):
+            answerers = list(dict.fromkeys("Claude" if a == "GPT" else a for a in answerers))
+            if checker == "GPT":
+                checker = None
+                notes.append("GPT 오늘 한도 도달, 검증 못 함")
+            record["targets"] = answerers
+            self.note(f"[GPT] 오늘 한도 도달 {qid}: Claude로")
+
         self.status(qid, "대기", f"## [대기] {qid} {now:%H:%M} {q} → {', '.join(answerers)}",
                     요청=question, 질문=q, 대상=answerers, 요청자=requester, important=important, **done)
         if answerers == ["레미"]:
@@ -451,7 +461,6 @@ class Pipeline:
             return {**record, "answer": NO_AI, "status": "완료"}
         self.status(qid, "처리중")
         answers = self._round(qid, q, slots, data, staff, now)
-        notes = []
         if checker and answers:
             if checker in self.askers:
                 self.status(qid, "검증중")

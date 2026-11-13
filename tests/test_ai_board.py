@@ -220,6 +220,9 @@ class _Mock(BaseHTTPRequestHandler):
             yield None
             yield chunk({"content": "추가 설명"})
         yield chunk({}, "stop")
+        usage = {"id": "c1", "object": "chat.completion.chunk", "created": 0, "model": body["model"], "choices": [],
+                 "usage": {"prompt_tokens": 12, "completion_tokens": 34, "total_tokens": 46}}
+        yield f"data: {json.dumps(usage)}\n\n"
         yield "data: [DONE]\n\n"
 
     def log_message(self, *args):
@@ -324,6 +327,18 @@ class WireFormat(unittest.TestCase):
         finally:
             self.gpt.PRIORITY = False
         self.assertEqual(self.posts()[0][2]["service_tier"], "priority")
+
+    def test_usage_reaches_the_cost_meter(self):
+        seen = []
+        self.gpt.on_usage = lambda *usage: seen.append(("gpt",) + usage)
+        self.claude.on_usage = lambda *usage: seen.append(("claude",) + usage)
+        try:
+            list(self.gpt.lines("q", ab.SYSTEM))
+            list(self.claude.lines("q", ab.SYSTEM))
+        finally:
+            self.gpt.on_usage = self.claude.on_usage = None
+        self.assertEqual(seen, [("gpt", "gpt-5-mini", 12, 34), ("claude", "claude-opus-5-5", 1, 5)])
+        self.assertEqual(self.posts()[0][2]["stream_options"], {"include_usage": True})
 
     def test_hub_end_to_end_through_the_sdks(self):
         """Real SDK calls: analysis goes to Claude only, a general question to GPT only, each with

@@ -15,6 +15,9 @@ FAST = os.environ.get("CLAUDE_FAST") == "1"
 # Models that accept server-side refusal fallbacks (fallbacks="default").
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}
 FAST_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-opus-4-8"}
+# Set by the hub for the cost meter: on_usage(model, input_tokens, output_tokens) after each answer
+# (the model name ends in ":fast" for fast-mode answers, which cost double).
+on_usage = None
 
 _client = None
 
@@ -93,6 +96,8 @@ def _stream(question, system, fast):
         if buf:
             yield buf
         final = stream.get_final_message()
+    if on_usage and final.usage:
+        on_usage(MODEL + (":fast" if fast else ""), final.usage.input_tokens, final.usage.output_tokens)
     # A mid-stream decline continues on the fallback model inside the same stream; only a refusal
     # of the whole chain ends here, and the caller then discards the partial answer.
     if final.stop_reason == "refusal":

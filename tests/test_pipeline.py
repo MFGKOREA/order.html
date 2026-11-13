@@ -181,6 +181,19 @@ class Run(PipelineCase):
         self.assertEqual(self.replies, [GOOD])
         self.assertIn("[Claude] 응답 없음 Q-20261113-001: ConnectionError", self.board())
 
+    def test_gpt_over_its_cap_hands_work_to_claude(self):
+        def make(**askers):
+            return pl.Pipeline(FIX, askers, systems={}, board=pl.Board(self.board_path), clock=lambda: NOW,
+                               blocked=lambda slot: slot == "GPT")
+        claude, gpt = FakeAI(GOOD), FakeAI(GOOD)
+        make(Claude=claude, GPT=gpt).run("오늘 비 오면 손님 줄어?", self.replies.append)
+        self.assertEqual((len(claude.calls), len(gpt.calls)), (1, 0))
+        builder = FakeAI("결론: 합계 수식\n근거: B열 (POS 11/13 14:00)\n확인 필요: 없음")
+        make(Claude=builder, GPT=gpt).run("엑셀 합계 수식 만들어줘", self.replies.append)
+        self.assertEqual(self.replies[-1].splitlines()[2], "확인 필요: GPT 오늘 한도 도달, 검증 못 함")
+        self.assertEqual(len(gpt.calls), 0)
+        self.assertIn("[GPT] 오늘 한도 도달", self.board())
+
     def test_no_ai_connected(self):
         self.make().run("오늘 비 오면 손님 줄어?", self.replies.append)
         self.assertEqual(self.replies, [pl.NO_AI])
