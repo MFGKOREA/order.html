@@ -115,13 +115,18 @@ class ActionQueue:
                       "updated_at": now.isoformat(timespec="seconds")})
         return True
 
-    def view(self, n=20):
-        """Latest n actions, oldest first, e.g. '#3 접수 14:05 발주 브로콜리 2개'."""
+    def view(self, finished=3):
+        """Every pending (접수) action plus the latest `finished` done or failed ones, oldest first,
+        e.g. '#3 접수 14:05 발주 브로콜리 2개'. Short, so Pickle and 레미 read few tokens."""
         self.refresh()
+        ordered = sorted(self.items.values(), key=lambda a: a["id"])
+        done_ids = {a["id"] for a in ordered if a["status"] != "접수"}
+        keep = {a["id"] for a in ordered if a["status"] == "접수"} | set(sorted(done_ids)[-finished:] if finished else ())
         lines = []
-        for a in sorted(self.items.values(), key=lambda a: a["id"])[-n:]:
-            note = f" ({a['note']})" if a.get("note") else ""
-            lines.append(f"#{a['id']} {a['status']} {datetime.fromisoformat(a['at']):%H:%M} {a['text']}{note}")
+        for a in ordered:
+            if a["id"] in keep:
+                note = f" ({a['note']})" if a.get("note") else ""
+                lines.append(f"#{a['id']} {a['status']} {datetime.fromisoformat(a['at']):%H:%M} {a['text']}{note}")
         return lines
 
 
@@ -257,7 +262,7 @@ def route(text, cache_dir, queue, now=None):
         done = queue.set_status(int(m[1]), m[2], m[3].strip(), now)
         return Reply("status", f"#{m[1]} {m[2]} 처리" if done else f"#{m[1]} 작업 없음")
     if TASKS_RE.search(compact) or ("발주" in compact and asking):
-        return Reply("tasks", "\n".join(queue.view(10)) or "작업 없음")
+        return Reply("tasks", "\n".join(queue.view()) or "작업 없음")
     if "발주" in compact:
         return _order(t, cache_dir, now, queue)
     if SCHEDULE_RE.search(compact) and CONFIRM_RE.search(compact) and not asking:

@@ -111,6 +111,13 @@ class Queue(RouterCase):
         self.assertEqual(self.ask("작업 확인"), ("tasks", "#1 완료 11:00 발주 브로콜리 2개\n"
                                                           "#2 실패 11:00 HR 스케줄 확정 (로그인 만료)"))
 
+    def test_task_list_keeps_pending_and_the_three_latest_finished(self):
+        for i in range(6):
+            self.ask(f"양파 발주 {i + 1}개")
+        for i in (1, 2, 3, 4):
+            self.ask(f"#{i} 완료")
+        self.assertEqual([line.split()[0] for line in self.queue.view()], ["#2", "#3", "#4", "#5", "#6"])
+
     def test_queue_survives_a_restart(self):
         self.ask("브로콜리 발주 2개")
         again = router.ActionQueue(self.queue.path)

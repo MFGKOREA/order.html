@@ -6,7 +6,7 @@ import os
 import re
 import sys
 import time
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
@@ -165,30 +165,56 @@ def check_cache(cache_dir):
 
 
 FEED_KEYS = ("inventory", "sales", "inbound", "boh")
-# One small file per topic, so Pickle reads only the one it needs (fewer tokens per question).
-TOPIC_FILES = {"inventory": "재고.txt", "sales": "매출.txt", "inbound": "입고.txt", "boh": "BOH.txt"}
+# Small files, so Pickle reads only the one it needs: one per topic, plus inventory split by the
+# item's first consonant (감자튀김 -> 재고_ㄱ.txt) and deliveries split by day (입고_내일.txt).
+BASE_FILES = {"inventory": "재고.txt", "sales": "매출.txt", "inbound": "입고.txt", "boh": "BOH.txt"}
+DAY_FILES = {0: "입고_오늘.txt", 1: "입고_내일.txt", 2: "입고_모레.txt"}
+CHOSEONG = "ㄱㄲㄴㄷㄸㄹㅁㅂㅃㅅㅆㅇㅈㅉㅊㅋㅌㅍㅎ"
 
 
-def _feed_messages(key, cache_dir, now):
+def initial(name):
+    """First consonant of an item name (감자튀김 -> ㄱ); a Latin letter upper-cased; else 기타."""
+    ch = name.strip()[:1]
+    if "가" <= ch <= "힣":
+        return CHOSEONG[(ord(ch) - ord("가")) // 588]
+    if ch.isascii() and ch.isalpha():
+        return ch.upper()
+    return "기타"
+
+
+def _topic_files(key, cache_dir, now):
+    """{file name: [(message, kind)]} for one topic; the first file holds every message."""
     if key == "inventory":
-        return [(fmt_inventory(i, now), "inventory") for i in load(cache_dir, key)["items"]]
+        files = {BASE_FILES[key]: []}
+        for item in load(cache_dir, key)["items"]:
+            msg = (fmt_inventory(item, now), "inventory")
+            files[BASE_FILES[key]].append(msg)
+            files.setdefault(f"재고_{initial(item['name'])}.txt", []).append(msg)
+        return files
     if key == "sales":
-        return [(fmt_sales(load(cache_dir, key)), "sales")]
+        return {BASE_FILES[key]: [(fmt_sales(load(cache_dir, key)), "sales")]}
     if key == "inbound":
-        return [(line, "inbound") for line in inbound_lines(load(cache_dir, key), now.date())]
-    return [(fmt_boh(load(cache_dir, key)), "boh")]
+        data, today = load(cache_dir, key), now.date()
+        files = {BASE_FILES[key]: [(line, "inbound") for line in inbound_lines(data, today)]}
+        totals = inbound_totals(data)
+        for offset, name in DAY_FILES.items():
+            day = today + timedelta(days=offset)
+            files[name] = [(fmt_inbound(item, d, q, u, today), "inbound")
+                           for (d, item), (q, u) in sorted(totals.items()) if d == day]
+        return files
+    return {BASE_FILES[key]: [(fmt_boh(load(cache_dir, key)), "boh")]}
 
 
 def feed_sections(cache_dir, now):
-    """Every ready-made answer, per section, so Pickle reads them instead of asking anyone.
+    """Every ready-made answer: {topic: {file name: text}}, so Pickle reads instead of asking.
 
-    Returns (sections, broken, problems): a missing file has no section; a file that does not
-    parse (e.g. caught mid-write) is listed in `broken`.
+    Returns (sections, broken, problems): a missing cache file has no section; a file that does
+    not parse (e.g. caught mid-write) is listed in `broken`.
     """
     sections, broken, problems = {}, set(), []
     for key in FEED_KEYS:
         try:
-            msgs = _feed_messages(key, cache_dir, now)
+            files = _topic_files(key, cache_dir, now)
         except FileNotFoundError:
             problems.append(f"missing {CACHE_FILES[key]}")
             continue
@@ -196,25 +222,30 @@ def feed_sections(cache_dir, now):
             broken.add(key)
             problems.append(f"unreadable {CACHE_FILES[key]}: {type(e).__name__}: {e}")
             continue
-        for msg, kind in msgs:
+        for msg, kind in files[BASE_FILES[key]]:  # the other files only repeat these
             problems.extend(f"{CACHE_FILES[key]}: {e}" for e in lint(msg, kind))
-        sections[key] = "\n".join(m for m, _ in msgs)
+        sections[key] = {name: "\n".join(m for m, _ in msgs) for name, msgs in files.items()}
     return sections, broken, problems
 
 
-def topic_texts(sections):
-    """{file name: text} for every topic. A topic without data reads "없음"."""
-    return {TOPIC_FILES[k]: (sections.get(k) or "없음") + "\n" for k in FEED_KEYS}
+def topic_texts(sections, known=()):
+    """{file name: text} to write. A file without data reads "없음", so none goes stale; `known`
+    names files written before (e.g. 재고_ㅎ.txt after its last item is gone)."""
+    texts = {name: "없음\n" for name in known}
+    for key in FEED_KEYS:
+        files = sections.get(key) or {BASE_FILES[key]: ""}
+        texts.update({name: (text or "없음") + "\n" for name, text in files.items()})
+    return texts
 
 
 def write_topics(out_dir, sections, last=None):
-    """Write each topic file whose text changed; returns the names written.
+    """Write each answer file whose text changed; returns the names written.
 
-    `last` (a dict kept by the caller) remembers what was written, so unchanged topics are not
+    `last` (a dict kept by the caller) remembers what was written, so unchanged files are not
     even read back from the Drive folder.
     """
     written = []
-    for name, text in topic_texts(sections).items():
+    for name, text in topic_texts(sections, last or ()).items():
         if last is not None and last.get(name) == text:
             continue
         if write_if_changed(Path(out_dir) / name, text):
@@ -297,8 +328,9 @@ def main(argv=None):
     q = sub.add_parser("question", help="build a board question post")
     q.add_argument("text")
     f = sub.add_parser("feed", help="write every ready-made answer into the topic files Pickle reads")
-    f.add_argument("--out-dir", help="folder for 재고.txt, 매출.txt, 입고.txt, BOH.txt "
-                                     "(default: <dir>/pickle); use the Drive folder Pickle reads")
+    f.add_argument("--out-dir", help="folder for the answer files (재고.txt, 재고_ㄱ.txt, 매출.txt, 입고.txt, "
+                                     "입고_내일.txt, BOH.txt, ...) (default: <dir>/pickle); "
+                                     "use the Drive folder Pickle reads")
     f.add_argument("--watch", action="store_true", help="keep running; rewrite a file whenever its answers change")
     f.add_argument("--interval", type=float, default=0.1, help="seconds between checks with --watch (default 0.1)")
     args = p.parse_args(argv)

@@ -26,9 +26,11 @@ Files in the Drive folder:
 | File | Written by | Holds |
 |---|---|---|
 | `재고.txt` `매출.txt` `입고.txt` `BOH.txt` | hub | Every ready-made answer, one topic per file |
-| `작업.txt` | hub | The latest actions, e.g. `#3 접수 14:05 발주 브로콜리 2개` |
+| `재고_ㄱ.txt` `재고_ㄴ.txt` … | hub | Inventory split by the item's first consonant (감자튀김 → `재고_ㄱ.txt`), so a one-item question reads one slice |
+| `입고_오늘.txt` `입고_내일.txt` `입고_모레.txt` | hub | That day's deliveries |
+| `작업.txt` | hub | Every pending action plus the 3 latest finished, e.g. `#3 접수 14:05 발주 브로콜리 2개` |
 | `요청.txt` | Pickle, 레미, anyone | One request per line, appended |
-| `답.txt` | hub | The 5 latest answers, each under `> 요청` |
+| `답.txt` | hub | The latest answer only, under `> 요청`. 레미's `#3 완료` updates show in `작업.txt` and never replace it |
 
 ## 1. Messages to Pickle
 
@@ -137,11 +139,27 @@ Measured on the cloud machine with the sample data:
 | Free question with `--ai` | 3–5 ms of script time, then the fastest AI's time to its first line |
 | Hub when idle | 0.15 ms per check, every 0.05 s |
 
-Token cost for Pickle, counted with GPT's tokenizer as an estimate:
-- The prompt is about 210 tokens.
-- With the sample data, the answer files are 43–69 tokens each; `재고.txt` grows about 11 tokens per item.
-- `답.txt` never holds more than 5 answers (about 280 tokens at most).
-- Pickle reads one of these files per question and writes back one line.
+Token cost for Pickle, per question:
+- The cost is prompt + the one file Pickle reads + its one-line answer.
+- Measured with GPT's tokenizer as an estimate, on a store with 67 items and 29 deliveries in the week.
+- The platform's own tool-call overhead is not included.
+
+| Request | Before | Now |
+|---|---|---|
+| 피클에게 브로컬리 발주 2개 넣어줘 | 380 | 236 |
+| 매장에 감자튀김 재고 몇개야 | 967 | 259 |
+| 지금 현재 그로스세일즈 얼마야 | 307 | 257 |
+| 내일 피자치즈 입고 몇개야 | 676 | 276 |
+| HR 스케쥴 확정 눌러줘 | 370 | 222 |
+| All five | 2,700 | 1,250 (54% less) |
+
+Where the savings come from:
+- **Prompt:** 210 → 160 tokens. All formatting rules live in the hub, so Pickle only picks a file and copies.
+- **Inventory:** the whole list is 734 tokens; one first-consonant slice is 46 on average (86 at most).
+- **Deliveries:** the week is 438 tokens; `입고_내일.txt` is 88.
+- **답.txt:** holds one answer instead of five.
+
+The rest is on Pickle's side: every earlier turn of a chat is sent again with each new question, so a fresh chat each day keeps that from piling up.
 
 What makes it fast:
 - **Data questions never touch an AI.** Every answer is pre-written, rebuilt every 0.05–0.1 s, and written atomically, only when it changes. A cache file caught mid-write keeps its last good answers.

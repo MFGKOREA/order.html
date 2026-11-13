@@ -3,9 +3,10 @@
 
 Files in the Drive folder Pickle reads (--drive):
   재고.txt 매출.txt 입고.txt BOH.txt   ready-made answers, rewritten when the cache changes
-  작업.txt                            the action queue; 레미 works through the 접수 lines
+  재고_ㄱ.txt …  입고_오늘/내일/모레.txt  the same answers in small slices (fewer tokens per read)
+  작업.txt                            pending actions + the 3 latest finished; 레미 does the 접수 lines
   요청.txt                            requests, one per line, appended by Pickle (or anyone)
-  답.txt                              the latest answers, each under "> request"
+  답.txt                              the latest answer, under "> request"
 
 Requests can also be typed straight into the hub's window.
 
@@ -27,7 +28,7 @@ import pickle_relay as pr  # noqa: E402
 import router  # noqa: E402
 
 INBOX, OUTBOX, TASKS = "요청.txt", "답.txt", "작업.txt"
-KEEP_ANSWERS = 5  # 답.txt holds only the latest answers (~280 tokens at most), so Pickle reads few tokens
+KEEP_ANSWERS = 1  # 답.txt holds only the latest answer, so Pickle reads the fewest tokens
 
 
 def _digest(lines):
@@ -109,11 +110,14 @@ class Hub:
         self._lock = threading.Lock()  # one request routed at a time: action ids never collide
         self._tasks_version, self._problems = None, None
 
-    def handle(self, request, reply_to, now=None):
-        """Answer one request. reply_to(answer) is called once; for AI questions, later, from a worker."""
+    def handle(self, request, reply_to, now=None, quiet=()):
+        """Answer one request. reply_to(answer) is called once (for AI questions later, from a worker),
+        except for reply kinds listed in `quiet`."""
         with self._lock:
             reply = router.route(request, self.cache, self.queue, now)
-        if reply.kind != "ask":
+        if reply.kind in quiet:
+            pass
+        elif reply.kind != "ask":
             reply_to(reply.text)
         elif not self.askers:
             reply_to("AI 연결 안 됨")
@@ -145,7 +149,9 @@ class Hub:
                 print(f"  {problem}", file=self.log, flush=True)
             self._problems = problems
         for request in self.inbox.poll():
-            self.handle(request, lambda answer, request=request: self.outbox.add(request, answer), now)
+            # 레미's "#3 완료" shows in 작업.txt; kept out of 답.txt so it never replaces Pickle's answer.
+            self.handle(request, lambda answer, request=request: self.outbox.add(request, answer), now,
+                        quiet=("status",))
         self.queue.refresh()
         if self.queue.version != self._tasks_version:
             lines = self.queue.view()

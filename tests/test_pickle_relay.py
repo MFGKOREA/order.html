@@ -68,15 +68,39 @@ class Feed(unittest.TestCase):
         self.assertEqual((broken, problems), (set(), []))
         self.assertEqual(pr.topic_texts(sections), {
             "재고.txt": "양파: 예상 13.0개\n치즈: 예상 0.0개\n감자튀김: 예상 20.0개\n브로콜리: 예상 4.0개\n",
+            # one small file per first consonant, so a single-item question reads one slice
+            "재고_ㅇ.txt": "양파: 예상 13.0개\n",
+            "재고_ㅊ.txt": "치즈: 예상 0.0개\n",
+            "재고_ㄱ.txt": "감자튀김: 예상 20.0개\n",
+            "재고_ㅂ.txt": "브로콜리: 예상 4.0개\n",
             "매출.txt": "2026-11-13 매장 당일 그로스 세일즈: 3,250,000원 (목표 포캐스트 400만 원 대비 81.3% 달성)\n",
             # past delivery dropped, same-day deliveries of one item added up (4 + 2)
             "입고.txt": "감자튀김: 내일(11/14) 입고 10개\n피자치즈: 내일(11/14) 입고 6개\n양파: 모레(11/15) 입고 2.5kg\n",
+            "입고_오늘.txt": "없음\n",
+            "입고_내일.txt": "감자튀김: 내일(11/14) 입고 10개\n피자치즈: 내일(11/14) 입고 6개\n",
+            "입고_모레.txt": "양파: 모레(11/15) 입고 2.5kg\n",
             "BOH.txt": "[BOH 리포트 (14:05)]\n"
                        "- 신규 출근/퇴근: OP 김민수 (퇴근 14:00), CL 이지은 (출근 14:00)\n"
                        "- 근무 중: 5명\n"
                        "- 퇴근 완료: 2명\n"
                        "- 특이사항: 없음\n",
         })
+
+    def test_first_consonant(self):
+        self.assertEqual([pr.initial(n) for n in ("감자튀김", "꽃게", "BBQ소스", "3분카레")], ["ㄱ", "ㄲ", "B", "기타"])
+
+    def test_a_slice_whose_items_are_gone_reads_none(self):
+        with tempfile.TemporaryDirectory() as d:
+            cache, out = Path(d) / "cache", Path(d) / "drive"
+            shutil.copytree(FIX, cache)
+            feed = pr.Feed(cache, out)
+            feed.step(NOW)
+            self.assertEqual((out / "재고_ㅇ.txt").read_text(encoding="utf-8"), "양파: 예상 13.0개\n")
+            inv = cache / pr.CACHE_FILES["inventory"]
+            inv.write_text(inv.read_text(encoding="utf-8").replace('"양파"', '"대파"'), encoding="utf-8")
+            feed.step(NOW)
+            self.assertEqual((out / "재고_ㅇ.txt").read_text(encoding="utf-8"), "없음\n")
+            self.assertEqual((out / "재고_ㄷ.txt").read_text(encoding="utf-8"), "대파: 예상 13.0개\n")
 
     def test_inbound_label(self):
         today = NOW.date()
@@ -120,7 +144,9 @@ class Feed(unittest.TestCase):
                 return False
 
             pr.watch_feed(cache, out, interval=0, stop=stop, log=io.StringIO())
-            self.assertEqual(sorted(snapshots[0]), ["BOH.txt", "매출.txt", "입고.txt", "재고.txt"])
+            self.assertEqual(sorted(snapshots[0]), [
+                "BOH.txt", "매출.txt", "입고.txt", "입고_내일.txt", "입고_모레.txt", "입고_오늘.txt",
+                "재고.txt", "재고_ㄱ.txt", "재고_ㅂ.txt", "재고_ㅇ.txt", "재고_ㅊ.txt"])
             self.assertIn("[BOH 리포트 (14:05)]", snapshots[0]["BOH.txt"])
             self.assertEqual(snapshots[1], snapshots[0])
             self.assertEqual(snapshots[2]["BOH.txt"], "없음\n")

@@ -101,14 +101,16 @@ class HubTest(unittest.TestCase):
     def test_users_five_requests_end_to_end(self):
         h = self.make()
         h.tick(NOW)
-        self.assertEqual(sorted(p.name for p in self.drive.iterdir()),
-                         ["BOH.txt", "매출.txt", "입고.txt", "작업.txt", "재고.txt"])
-        append(self.drive / hub.INBOX, *[q for q, _ in EXAMPLES])
-        h.tick(NOW)
-        self.assertEqual(self.read(hub.OUTBOX), "".join(f"> {q}\n{a}\n" for q, a in EXAMPLES))
+        names = {p.name for p in self.drive.iterdir()}
+        self.assertLessEqual({"재고.txt", "재고_ㄱ.txt", "매출.txt", "입고.txt", "입고_내일.txt", "BOH.txt", "작업.txt"},
+                             names)
+        for question, answer in EXAMPLES:  # 답.txt holds just the latest answer
+            append(self.drive / hub.INBOX, question)
+            h.tick(NOW)
+            self.assertEqual(self.read(hub.OUTBOX), f"> {question}\n{answer}\n")
         self.assertEqual(self.read(hub.TASKS), "#1 접수 11:00 발주 브로콜리 2개\n#2 접수 11:00 HR 스케줄 확정\n")
 
-    def test_remy_marks_a_task_done_through_the_same_file(self):
+    def test_remy_marks_a_task_done_without_replacing_pickles_answer(self):
         h = self.make()
         h.tick(NOW)
         append(self.drive / hub.INBOX, "브로콜리 발주 2개")
@@ -116,7 +118,7 @@ class HubTest(unittest.TestCase):
         append(self.drive / hub.INBOX, "#1 완료")
         h.tick(NOW)
         self.assertEqual(self.read(hub.TASKS), "#1 완료 11:00 발주 브로콜리 2개\n")
-        self.assertTrue(self.read(hub.OUTBOX).endswith("> #1 완료\n#1 완료 처리\n"))
+        self.assertEqual(self.read(hub.OUTBOX), "> 브로콜리 발주 2개\n발주 접수 #1: 브로콜리 2개\n")
 
     def test_restart_does_not_repeat_actions(self):
         h = self.make()
