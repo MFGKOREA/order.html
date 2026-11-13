@@ -138,7 +138,7 @@ Measured on the cloud machine with the sample data:
 | Hub when idle | 0.15 ms per check, every 0.05 s |
 
 Token cost for Pickle, counted with GPT's tokenizer as an estimate:
-- The prompt is about 154 tokens.
+- The prompt is about 210 tokens.
 - With the sample data, the answer files are 43–69 tokens each; `재고.txt` grows about 11 tokens per item.
 - `답.txt` never holds more than 5 answers (about 280 tokens at most).
 - Pickle reads one of these files per question and writes back one line.
