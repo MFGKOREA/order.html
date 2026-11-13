@@ -63,43 +63,48 @@ class Cache(unittest.TestCase):
 
 
 class Feed(unittest.TestCase):
-    def test_feed_holds_every_answer_and_passes_lint(self):
+    def test_topic_files_hold_every_answer_and_pass_lint(self):
         sections, broken, problems = pr.feed_sections(FIX, NOW)
         self.assertEqual((broken, problems), (set(), []))
-        self.assertEqual(pr.join_feed(sections),
-                         "양파: 예상 13.0개\n"
-                         "치즈: 예상 0.0개\n"
-                         "\n"
-                         "2026-11-13 매장 당일 그로스 세일즈: 3,250,000원 (목표 포캐스트 400만 원 대비 81.3% 달성)\n"
-                         "\n"
-                         "[BOH 리포트 (14:05)]\n"
-                         "- 신규 출근/퇴근: OP 김민수 (퇴근 14:00), CL 이지은 (출근 14:00)\n"
-                         "- 근무 중: 5명\n"
-                         "- 퇴근 완료: 2명\n"
-                         "- 특이사항: 없음\n")
+        self.assertEqual(pr.topic_texts(sections), {
+            "재고.txt": "양파: 예상 13.0개\n치즈: 예상 0.0개\n감자튀김: 예상 20.0개\n브로콜리: 예상 4.0개\n",
+            "매출.txt": "2026-11-13 매장 당일 그로스 세일즈: 3,250,000원 (목표 포캐스트 400만 원 대비 81.3% 달성)\n",
+            # past delivery dropped, same-day deliveries of one item added up (4 + 2)
+            "입고.txt": "감자튀김: 내일(11/14) 입고 10개\n피자치즈: 내일(11/14) 입고 6개\n양파: 모레(11/15) 입고 2.5kg\n",
+            "BOH.txt": "[BOH 리포트 (14:05)]\n"
+                       "- 신규 출근/퇴근: OP 김민수 (퇴근 14:00), CL 이지은 (출근 14:00)\n"
+                       "- 근무 중: 5명\n"
+                       "- 퇴근 완료: 2명\n"
+                       "- 특이사항: 없음\n",
+        })
+
+    def test_inbound_label(self):
+        today = NOW.date()
+        self.assertEqual(pr.fmt_inbound("피자치즈", today, 6, "개", today), "피자치즈: 오늘(11/13) 입고 6개")
+        self.assertEqual(pr.fmt_inbound("피자치즈", today.replace(day=20), None, "개", today), "피자치즈: 11/20 입고 없음")
 
     def test_write_only_when_changed_and_leave_no_temp_file(self):
         with tempfile.TemporaryDirectory() as d:
-            out = Path(d) / "drive" / "pickle_feed.txt"
+            out = Path(d) / "drive" / "재고.txt"
             self.assertTrue(pr.write_if_changed(out, "a\n"))
             self.assertFalse(pr.write_if_changed(out, "a\n"))
             self.assertTrue(pr.write_if_changed(out, "b\n"))
             self.assertEqual(out.read_text(encoding="utf-8"), "b\n")
-            self.assertEqual(sorted(p.name for p in out.parent.iterdir()), ["pickle_feed.txt"])
+            self.assertEqual(sorted(p.name for p in out.parent.iterdir()), ["재고.txt"])
 
-    def test_feed_with_no_readable_cache_leaves_the_file_alone(self):
+    def test_feed_with_no_readable_cache_leaves_the_files_alone(self):
         with tempfile.TemporaryDirectory() as d:
-            out = Path(d) / "pickle_feed.txt"
+            out = Path(d) / "재고.txt"
             out.write_text("good answers\n", encoding="utf-8")
             with contextlib.redirect_stderr(io.StringIO()):
-                self.assertEqual(pr.main(["--dir", str(Path(d) / "empty"), "feed", "--out", str(out)]), 1)
+                self.assertEqual(pr.main(["--dir", str(Path(d) / "empty"), "feed", "--out-dir", d]), 1)
             self.assertEqual(out.read_text(encoding="utf-8"), "good answers\n")
+            self.assertEqual(sorted(p.name for p in Path(d).iterdir()), ["재고.txt"])
 
-    def test_watch_keeps_last_good_section_until_the_file_is_deleted(self):
+    def test_watch_keeps_last_good_answers_until_the_file_is_deleted(self):
         with tempfile.TemporaryDirectory() as d:
-            cache = Path(d) / "cache"
+            cache, out = Path(d) / "cache", Path(d) / "drive"
             shutil.copytree(FIX, cache)
-            out = Path(d) / "pickle_feed.txt"
             boh = cache / pr.CACHE_FILES["boh"]
             snapshots = []
             steps = iter([lambda: boh.write_text("{", encoding="utf-8"),  # caught mid-write
@@ -107,7 +112,7 @@ class Feed(unittest.TestCase):
                           None])
 
             def stop():
-                snapshots.append(out.read_text(encoding="utf-8"))
+                snapshots.append({p.name: p.read_text(encoding="utf-8") for p in out.iterdir()})
                 step = next(steps)
                 if step is None:
                     return True
@@ -115,10 +120,11 @@ class Feed(unittest.TestCase):
                 return False
 
             pr.watch_feed(cache, out, interval=0, stop=stop, log=io.StringIO())
-            self.assertIn("[BOH 리포트 (14:05)]", snapshots[0])
+            self.assertEqual(sorted(snapshots[0]), ["BOH.txt", "매출.txt", "입고.txt", "재고.txt"])
+            self.assertIn("[BOH 리포트 (14:05)]", snapshots[0]["BOH.txt"])
             self.assertEqual(snapshots[1], snapshots[0])
-            self.assertNotIn("BOH", snapshots[2])
-            self.assertIn("매장 당일 그로스 세일즈", snapshots[2])
+            self.assertEqual(snapshots[2]["BOH.txt"], "없음\n")
+            self.assertEqual(snapshots[2]["매출.txt"], snapshots[0]["매출.txt"])
 
 
 if __name__ == "__main__":

@@ -169,13 +169,19 @@ def _warm(item):
         return name, f"{type(e).__name__}: {e}"
 
 
+def warm_all(warmers, err=None):
+    """Warm every AI in parallel, one status line each (a failure is an early warning, e.g. no key)."""
+    err = err or sys.stderr
+    with ThreadPoolExecutor(max_workers=len(warmers) or 1) as pool:
+        for name, error in pool.map(_warm, warmers.items()):
+            print(f"warm {name}: {error or 'OK'}", file=err, flush=True)
+
+
 def serve(askers, warmers, inp=None, out=None, err=None):
     """Stay resident: SDKs load once and connections stay open, so each question skips that setup."""
     inp, err = inp or sys.stdin, err or sys.stderr
     start = time.perf_counter()
-    with ThreadPoolExecutor(max_workers=len(warmers) or 1) as pool:
-        for name, error in pool.map(_warm, warmers.items()):
-            print(f"warm {name}: {error or 'OK'}", file=err)
+    warm_all(warmers, err)
     print(f"ready in {time.perf_counter() - start:.2f}s; one question per line", file=err, flush=True)
     for line in inp:
         if line.strip():

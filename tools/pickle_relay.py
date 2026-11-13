@@ -6,7 +6,7 @@ import os
 import re
 import sys
 import time
-from datetime import datetime
+from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
@@ -20,6 +20,7 @@ CACHE_FILES = {
     "inventory": "live_inventory_cache.json",
     "boh": "live_boh_status.json",
     "sales": "live_sales.json",
+    "inbound": "live_inbound.json",
 }
 
 # Words that must never reach Pickle.
@@ -30,6 +31,8 @@ INVENTORY_RE = re.compile(r"^[^:\n]+: 예상 \d+\.\d개$")
 SALES_RE = re.compile(
     r"^\d{4}-\d{2}-\d{2} 매장 당일 그로스 세일즈: \d{1,3}(,\d{3})*원 "
     r"\(목표 포캐스트 [\d,]+만 원 대비 \d+\.\d% 달성\)$")
+INBOUND_RE = re.compile(
+    r"^[^:\n]+: (?:(?:오늘|내일|모레)\(\d{1,2}/\d{1,2}\)|\d{1,2}/\d{1,2}) 입고 (?:\d+(?:\.\d)?\D+|없음)$")
 BOH_RE = re.compile(
     r"^\[BOH 리포트 \(\d{2}:\d{2}\)\]\n"
     r"- 신규 출근/퇴근: .+\n"
@@ -63,6 +66,39 @@ def fmt_sales(s):
     pct = gross / (forecast * 10_000) * 100
     return (f"{s['date']} 매장 당일 그로스 세일즈: {gross:,}원 "
             f"(목표 포캐스트 {forecast:,}만 원 대비 {r1(pct)}% 달성)")
+
+
+def fmt_qty(q):
+    return str(int(q)) if float(q).is_integer() else str(r1(q))
+
+
+def day_label(d, today):
+    md = f"{d.month}/{d.day}"
+    word = {0: "오늘", 1: "내일", 2: "모레"}.get((d - today).days)
+    return f"{word}({md})" if word else md
+
+
+def fmt_inbound(name, d, qty, unit, today):
+    """피자치즈: 내일(11/14) 입고 6개  /  피자치즈: 내일(11/14) 입고 없음 (qty None)"""
+    amount = "없음" if qty is None else f"{fmt_qty(qty)}{unit}"
+    return f"{name}: {day_label(d, today)} 입고 {amount}"
+
+
+def inbound_totals(data):
+    """{(date, name): (qty, unit)}, with same-day deliveries of one item added up."""
+    totals = {}
+    for d in data["deliveries"]:
+        key = (date.fromisoformat(d["date"]), d["name"])
+        qty, unit = totals.get(key, (0, d.get("unit", "개")))
+        totals[key] = (qty + d["qty"], unit)
+    return totals
+
+
+def inbound_lines(data, today, days=7):
+    """Deliveries from today through the next `days - 1` days, by date then item."""
+    return [fmt_inbound(name, d, qty, unit, today)
+            for (d, name), (qty, unit) in sorted(inbound_totals(data).items())
+            if 0 <= (d - today).days < days]
 
 
 def fmt_boh(b):
@@ -99,7 +135,8 @@ def strip_filler(answer):
 def lint(msg, kind):
     """Return a list of rule violations (empty list = pass)."""
     errors = [f"banned word: {w}" for w in BANNED if w in msg]
-    pattern = {"inventory": INVENTORY_RE, "sales": SALES_RE, "boh": BOH_RE, "question": QUESTION_RE}[kind]
+    pattern = {"inventory": INVENTORY_RE, "sales": SALES_RE, "inbound": INBOUND_RE, "boh": BOH_RE,
+               "question": QUESTION_RE}[kind]
     if not pattern.match(msg):
         errors.append(f"does not match {kind} format")
     if kind == "inventory" and re.search(r"\d{1,2}:\d{2}", msg):
@@ -127,7 +164,9 @@ def check_cache(cache_dir):
     return ok
 
 
-FEED_KEYS = ("inventory", "sales", "boh")
+FEED_KEYS = ("inventory", "sales", "inbound", "boh")
+# One small file per topic, so Pickle reads only the one it needs (fewer tokens per question).
+TOPIC_FILES = {"inventory": "재고.txt", "sales": "매출.txt", "inbound": "입고.txt", "boh": "BOH.txt"}
 
 
 def _feed_messages(key, cache_dir, now):
@@ -135,6 +174,8 @@ def _feed_messages(key, cache_dir, now):
         return [(fmt_inventory(i, now), "inventory") for i in load(cache_dir, key)["items"]]
     if key == "sales":
         return [(fmt_sales(load(cache_dir, key)), "sales")]
+    if key == "inbound":
+        return [(line, "inbound") for line in inbound_lines(load(cache_dir, key), now.date())]
     return [(fmt_boh(load(cache_dir, key)), "boh")]
 
 
@@ -161,8 +202,26 @@ def feed_sections(cache_dir, now):
     return sections, broken, problems
 
 
-def join_feed(sections):
-    return "\n\n".join(sections[k] for k in FEED_KEYS if sections.get(k)) + "\n"
+def topic_texts(sections):
+    """{file name: text} for every topic. A topic without data reads "없음"."""
+    return {TOPIC_FILES[k]: (sections.get(k) or "없음") + "\n" for k in FEED_KEYS}
+
+
+def write_topics(out_dir, sections, last=None):
+    """Write each topic file whose text changed; returns the names written.
+
+    `last` (a dict kept by the caller) remembers what was written, so unchanged topics are not
+    even read back from the Drive folder.
+    """
+    written = []
+    for name, text in topic_texts(sections).items():
+        if last is not None and last.get(name) == text:
+            continue
+        if write_if_changed(Path(out_dir) / name, text):
+            written.append(name)
+        if last is not None:
+            last[name] = text
+    return written
 
 
 def write_if_changed(path, text):
@@ -186,25 +245,37 @@ def write_if_changed(path, text):
             time.sleep(0.05)
 
 
-def watch_feed(cache_dir, out, interval=0.1, stop=None, log=None):
-    """Rebuild the feed every `interval` seconds and rewrite `out` whenever any answer changes.
+class Feed:
+    """Keeps the topic files in step with the cache. One step() costs well under a millisecond."""
 
-    A rebuild costs ~0.06 ms, so a short interval is nearly free. The last written text is kept in
-    memory, so the output file (in a Drive folder) is only touched when an answer changes.
+    def __init__(self, cache_dir, out_dir):
+        self.cache_dir, self.out_dir = cache_dir, out_dir
+        self.last_good, self.last_texts = {}, {}
+
+    def step(self, now=None):
+        """Rebuild every answer; write the topics that changed. Returns (written, problems)."""
+        sections, broken, problems = feed_sections(self.cache_dir, now or datetime.now())
+        # A file caught mid-write keeps its last good answers; a deleted file reads "없음".
+        self.last_good = {**sections, **{k: self.last_good[k] for k in broken if k in self.last_good}}
+        # Nothing readable at all (wrong folder, cache not written yet): leave the files alone.
+        written = write_topics(self.out_dir, self.last_good, self.last_texts) if self.last_good else []
+        return written, problems
+
+
+def watch_feed(cache_dir, out_dir, interval=0.1, stop=None, log=None):
+    """Rebuild every `interval` seconds and rewrite each topic file whenever its answers change.
+
+    A rebuild costs ~0.06 ms, so a short interval is nearly free, and files in the Drive folder
+    are only touched when an answer changes.
     """
     log = log or sys.stderr
-    last_good, last_problems, last_text = {}, None, None
+    feed, last_problems = Feed(cache_dir, out_dir), None
     while True:
         t0 = time.perf_counter()
-        sections, broken, problems = feed_sections(cache_dir, datetime.now())
-        # A file caught mid-write keeps its last good section; a deleted file drops its section.
-        last_good = {**sections, **{k: last_good[k] for k in broken if k in last_good}}
-        text = join_feed(last_good)
-        # Nothing readable at all (wrong folder, cache not written yet): leave the old file alone.
-        if last_good and text != last_text and write_if_changed(out, text):
+        written, problems = feed.step()
+        if written:
             ms = (time.perf_counter() - t0) * 1000
-            print(f"{datetime.now():%H:%M:%S} updated {out} ({ms:.1f} ms)", file=log, flush=True)
-        last_text = text
+            print(f"{datetime.now():%H:%M:%S} updated {', '.join(written)} ({ms:.1f} ms)", file=log, flush=True)
         if problems != last_problems:
             for p in problems:
                 print(f"  {p}", file=log, flush=True)
@@ -218,16 +289,17 @@ def main(argv=None):
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--dir", default="downloads", help="cache directory (default: downloads)")
     sub = p.add_subparsers(dest="cmd", required=True)
-    sub.add_parser("check", help="check the five cache files exist and parse")
+    sub.add_parser("check", help="check the cache files exist and parse")
     inv = sub.add_parser("inventory", help="answer for one item")
     inv.add_argument("item")
     sub.add_parser("sales")
     sub.add_parser("boh")
     q = sub.add_parser("question", help="build a board question post")
     q.add_argument("text")
-    f = sub.add_parser("feed", help="write every ready-made answer to one file that Pickle reads")
-    f.add_argument("--out", help="output file (default: <dir>/pickle_feed.txt); use the Drive folder Pickle reads")
-    f.add_argument("--watch", action="store_true", help="keep running; rewrite the file whenever an answer changes")
+    f = sub.add_parser("feed", help="write every ready-made answer into the topic files Pickle reads")
+    f.add_argument("--out-dir", help="folder for 재고.txt, 매출.txt, 입고.txt, BOH.txt "
+                                     "(default: <dir>/pickle); use the Drive folder Pickle reads")
+    f.add_argument("--watch", action="store_true", help="keep running; rewrite a file whenever its answers change")
     f.add_argument("--interval", type=float, default=0.1, help="seconds between checks with --watch (default 0.1)")
     args = p.parse_args(argv)
 
@@ -236,19 +308,20 @@ def main(argv=None):
     if args.cmd == "check":
         return 0 if check_cache(args.dir) else 1
     if args.cmd == "feed":
-        out = args.out or str(Path(args.dir) / "pickle_feed.txt")
+        out_dir = args.out_dir or str(Path(args.dir) / "pickle")
         if args.watch:
             try:
-                watch_feed(args.dir, out, args.interval)
+                watch_feed(args.dir, out_dir, args.interval)
             except KeyboardInterrupt:
                 return 0
         sections, broken, problems = feed_sections(args.dir, now)
         if sections:
-            changed = write_if_changed(out, join_feed(sections))
+            written = write_topics(out_dir, sections)
             ms = (time.perf_counter() - start) * 1000
-            print(f"{'updated' if changed else 'unchanged'} {out} ({ms:.1f} ms)", file=sys.stderr)
+            print(f"{'updated ' + ', '.join(written) if written else 'unchanged'} in {out_dir} ({ms:.1f} ms)",
+                  file=sys.stderr)
         else:
-            print(f"nothing readable in {args.dir}; {out} left as it was", file=sys.stderr)
+            print(f"nothing readable in {args.dir}; {out_dir} left as it was", file=sys.stderr)
         for problem in problems:
             print(f"  {problem}", file=sys.stderr)
         return 1 if problems else 0
