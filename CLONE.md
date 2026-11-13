@@ -4,7 +4,7 @@
 
 | Who | Does |
 |---|---|
-| 피클 (Pickle, Louie) | Talks to the boss. Answers by copying one line from a file in the Drive folder; passes everything else on through `요청.txt`. Instructions: [`PICKLE_PROMPT.txt`](PICKLE_PROMPT.txt) |
+| 피클 (Pickle, Louie) | Talks to the boss. Answers by copying one line from a file in the Drive folder; passes everything else on through `요청.txt`. Instructions: [`prompts/pickle.txt`](prompts/pickle.txt) |
 | Hub (`tools/hub.py`, runs on the store PC, no AI) | Keeps the answer files fresh, answers requests in milliseconds, queues actions, asks Claude/GPT the rest |
 | Claude, GPT | Free-form questions (hub `--ai`, needs API keys) |
 | 레미 (Grokbot) | PC and browser work: does the `접수` lines in `작업.txt`, then writes `#번호 완료` (or `#번호 실패 사유`) into `요청.txt` |
@@ -17,7 +17,7 @@ python3 tools/hub.py --drive "<Google Drive>/피클" --ai
 ```
 
 - `--drive` must be a folder that Google Drive for desktop syncs; name it `피클`, as the prompt does.
-- Paste `PICKLE_PROMPT.txt` into Pickle's instructions.
+- Paste `prompts/pickle.txt` into Pickle's instructions. The other AIs' role prompts are in `prompts/`; the full design is in [DESIGN.md](DESIGN.md).
 - Drop `--ai` to run without API keys; free questions then answer `AI 연결 안 됨`.
 - Requests can also be typed straight into the hub's window.
 
@@ -35,7 +35,7 @@ Files in the Drive folder:
 ## 1. Messages to Pickle
 
 - No greetings, pleasantries or filler. Never use the word `관제`.
-- No labels or headers such as `결론`, `근거`, `확인필요`.
+- No labels or headers such as `결론`, `근거`, `확인필요` in data answers. Analysis answers from Claude/GPT/레미 will use the three lines 결론 / 근거 / 확인 필요 (see DESIGN.md; not in the code yet).
 - Inventory: `{품목명}: 예상 O.O개`
   - No timestamp, no `전산기준`.
   - Estimate = on hand − reserved − (burn rate per hour × hours since snapshot), floored at 0, one decimal.
@@ -146,15 +146,15 @@ Token cost for Pickle, per question:
 
 | Request | Before | Now |
 |---|---|---|
-| 피클에게 브로컬리 발주 2개 넣어줘 | 380 | 236 |
-| 매장에 감자튀김 재고 몇개야 | 967 | 259 |
-| 지금 현재 그로스세일즈 얼마야 | 307 | 257 |
-| 내일 피자치즈 입고 몇개야 | 676 | 276 |
-| HR 스케쥴 확정 눌러줘 | 370 | 222 |
-| All five | 2,700 | 1,250 (54% less) |
+| 피클에게 브로컬리 발주 2개 넣어줘 | 380 | 245 |
+| 매장에 감자튀김 재고 몇개야 | 967 | 268 |
+| 지금 현재 그로스세일즈 얼마야 | 307 | 266 |
+| 내일 피자치즈 입고 몇개야 | 676 | 285 |
+| HR 스케쥴 확정 눌러줘 | 370 | 231 |
+| All five | 2,700 | 1,295 (52% less) |
 
 Where the savings come from:
-- **Prompt:** 210 → 160 tokens. All formatting rules live in the hub, so Pickle only picks a file and copies.
+- **Prompt:** 210 → 169 tokens. All formatting rules live in the hub, so Pickle only picks a file and copies.
 - **Inventory:** the whole list is 734 tokens; one first-consonant slice is 46 on average (86 at most).
 - **Deliveries:** the week is 438 tokens; `입고_내일.txt` is 88.
 - **답.txt:** holds one answer instead of five.
