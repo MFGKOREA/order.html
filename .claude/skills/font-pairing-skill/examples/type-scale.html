@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>font-pairing-skill — Type Scale</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --font-display: 'Fraunces', Georgia, serif;
+      --font-body:    'Inter', system-ui, sans-serif;
+      --color-bg:     #FAFAF8;
+      --color-text:   #1a1a1a;
+      --color-muted:  #6b6b6b;
+      --color-rule:   #e0e0dc;
+    }
+
+    body {
+      background: var(--color-bg);
+      color: var(--color-text);
+      font-family: var(--font-body);
+      padding: 64px 32px;
+      max-width: 680px;
+      margin: 0 auto;
+    }
+
+    .meta {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--color-muted);
+      margin-bottom: 48px;
+    }
+
+    .row {
+      display: flex;
+      align-items: baseline;
+      gap: 20px;
+      padding: 20px 0;
+      border-bottom: 1px solid var(--color-rule);
+    }
+
+    .size-tag {
+      font-family: var(--font-body);
+      font-size: 11px;
+      color: var(--color-muted);
+      min-width: 44px;
+      flex-shrink: 0;
+      padding-top: 4px;
+    }
+
+    .sample {
+      line-height: 1.15;
+    }
+
+    .body-preview {
+      margin-top: 56px;
+      padding-top: 40px;
+      border-top: 2px solid var(--color-text);
+    }
+
+    .body-preview h2 {
+      font-family: var(--font-display);
+      font-weight: 700;
+      font-size: 36px;
+      line-height: 1.1;
+      margin-bottom: 6px;
+    }
+
+    .body-preview h2 em {
+      font-weight: 300;
+      font-style: italic;
+    }
+
+    .body-preview p {
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.72;
+      color: var(--color-muted);
+      max-width: 54ch;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="meta">font-pairing-skill · Fraunces + Inter · Premium Editorial</div>
+
+  <div class="row">
+    <span class="size-tag">64px</span>
+    <span class="sample" style="font-family:var(--font-display);font-weight:700;font-size:64px">Headline</span>
+  </div>
+  <div class="row">
+    <span class="size-tag">48px</span>
+    <span class="sample" style="font-family:var(--font-display);font-weight:700;font-size:48px">Title</span>
+  </div>
+  <div class="row">
+    <span class="size-tag">32px</span>
+    <span class="sample" style="font-family:var(--font-display);font-weight:300;font-style:italic;font-size:32px">Subheading, warm italic</span>
+  </div>
+  <div class="row">
+    <span class="size-tag">24px</span>
+    <span class="sample" style="font-family:var(--font-body);font-weight:500;font-size:24px">Section label</span>
+  </div>
+  <div class="row">
+    <span class="size-tag">16px</span>
+    <span class="sample" style="font-family:var(--font-body);font-size:16px">Body text — minimum readable size on mobile</span>
+  </div>
+  <div class="row">
+    <span class="size-tag">13px</span>
+    <span class="sample" style="font-family:var(--font-body);font-size:13px;color:var(--color-muted)">Caption / meta / timestamp</span>
+  </div>
+
+  <div class="body-preview">
+    <h2>Fraunces display<br><em>meets Inter body.</em></h2>
+    <p>Display serifs lead with personality. Body faces carry the reading. The pairing works when optical weight is matched — a heavy heading needs a body face with enough character to hold its own alongside it.</p>
+  </div>
+</body>
+</html>

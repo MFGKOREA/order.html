@@ -301,6 +301,12 @@
       "skillPath": "skills/finishing-a-development-branch/SKILL.md",
       "computedHash": "4f571e7befb8b0946d9d7770232c818812412e9ab1dfb811f847edfba1fc6275"
     },
+    "font-pairing-skill": {
+      "source": "bilioveloso/font-pairing-skill",
+      "sourceType": "github",
+      "skillPath": "SKILL.md",
+      "computedHash": "62539b74348468a53f6264f75b03b63a27bfc1889ec461f193a0f454d3f233b7"
+    },
     "frontend-design": {
       "source": "anthropics/skills",
       "sourceType": "github",
