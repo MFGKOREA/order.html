@@ -52,6 +52,8 @@ STATUS_RE = re.compile(r"^#?(\d+)\s*번?\s*(완료|실패)\s*(.*)$")
 ASKING_RE = re.compile(r"(몇|얼마|언제|됐어|됐나|했어|했나|했니|인가|일까|어때)")
 # Verbs that change something somewhere. Only these make an unlisted request a refused command;
 # "확인해줘" or "알려줘" are questions and go on to the AIs.
+# Questions that ask for a judgment, not a lookup: they go to the AIs with the data as context.
+JUDGE_RE = re.compile(r"(많을|적을|바쁠|한가할|붐빌|몰릴|예상해|예측|추천|분석|비교|왜|어느날|무슨날|좋을까|해야할까|어떻게해)")
 COMMAND_RE = re.compile(r"(눌러|넣어|보내|올려|등록|취소|바꿔|변경|삭제|결제|승인|진행해|재부팅|재시작|꺼줘|켜줘)")
 ORDER_STATUS_RE = re.compile(r"(했어|됐어|됐나|했나|했니|들어갔|넣었|현황|내역|상태)")
 SCHEDULE_RE = re.compile(r"(hr|스케[쥴줄]|schedule|근무표)", re.I)
@@ -299,6 +301,8 @@ def route(text, cache_dir, queue, now=None):
     topics = [k for k, words in TOPIC_WORDS.items() if any(w in compact for w in words)]
     if "roster" in topics and "boh" in topics:  # "오늘 출근 누구?" asks for the roster, not the BOH report
         topics.remove("boh")
+    if topics and JUDGE_RE.search(compact):
+        return Reply("ask", "")
     if topics:
         items, lines = find_items(t, known_items(cache_dir)), []
         for k in topics:

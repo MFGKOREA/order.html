@@ -2,8 +2,8 @@
 
 Credentials: OPENAI_API_KEY on the machine that runs this. In a Claude cloud environment, a
 network secret saved for api.openai.com is injected by the proxy instead, so no variable is needed.
-Model: GPT_MODEL, default gpt-5-mini.
-GPT_REASONING_EFFORT: default "minimal" (fastest for gpt-5-mini); set it empty to use the model default.
+Model: GPT_MODEL, default gpt-4o-mini. GPT_MAX_TOKENS: answer cap, default 300.
+GPT_REASONING_EFFORT: default "minimal" for reasoning models (gpt-5*, o*); ignored for gpt-4o-mini.
 GPT_PRIORITY=1: OpenAI priority processing (faster, higher price).
 """
 import json
@@ -12,8 +12,12 @@ import os
 import httpx2  # the SDK's own HTTP library (installed with it)
 from openai import DefaultHttpx2Client, OpenAI
 
-MODEL = os.environ.get("GPT_MODEL", "gpt-5-mini")
-REASONING_EFFORT = os.environ.get("GPT_REASONING_EFFORT", "minimal")
+MODEL = os.environ.get("GPT_MODEL", "gpt-4o-mini")
+# Only reasoning models (gpt-5*, o*) accept reasoning_effort; gpt-4o-mini does not.
+_REASONING = MODEL.startswith(("gpt-5", "o1", "o3", "o4"))
+REASONING_EFFORT = os.environ.get("GPT_REASONING_EFFORT", "minimal") if _REASONING else ""
+# Answers are 3 short lines; the cap keeps a ~$5 credit from running away.
+MAX_TOKENS = int(os.environ.get("GPT_MAX_TOKENS", "300"))
 PRIORITY = os.environ.get("GPT_PRIORITY") == "1"
 # Set by the hub for the cost meter: on_usage(model, input_tokens, output_tokens) after each answer.
 on_usage = None
@@ -62,6 +66,7 @@ def _lines(c, question, system):
         messages=[{"role": "system", "content": system},
                   {"role": "user", "content": question}],
         stream=True,
+        max_completion_tokens=MAX_TOKENS,
         stream_options={"include_usage": True},  # the last chunk reports tokens, for the cost meter
     )
     if REASONING_EFFORT:

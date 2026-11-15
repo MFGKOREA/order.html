@@ -149,11 +149,23 @@ def warm_all(warmers, err=None):
             print(f"warm {name}: {error or 'OK'}", file=err, flush=True)
 
 
-def load_ais():
-    import ask_claude
-    import ask_gpt
-    return ({"Claude": ask_claude.lines, "GPT": ask_gpt.lines},
-            {"Claude": ask_claude.warm, "GPT": ask_gpt.warm})
+def load_ais(env=None):
+    """The AIs this PC can reach. With only one key set, only that AI is loaded and the other is
+    skipped (its work goes to the one that is there). With neither key set, both are loaded, for a
+    cloud environment whose proxy injects the keys."""
+    import os
+    env = os.environ if env is None else env
+    have = {"Claude": bool(env.get("ANTHROPIC_API_KEY")), "GPT": bool(env.get("OPENAI_API_KEY"))}
+    if not any(have.values()):
+        have = dict.fromkeys(have, True)
+    askers, warmers = {}, {}
+    if have["Claude"]:
+        import ask_claude
+        askers["Claude"], warmers["Claude"] = ask_claude.lines, ask_claude.warm
+    if have["GPT"]:
+        import ask_gpt
+        askers["GPT"], warmers["GPT"] = ask_gpt.lines, ask_gpt.warm
+    return askers, warmers
 
 
 def main(argv=None):

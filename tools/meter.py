@@ -19,6 +19,11 @@ def _env(name, default):
     return float(os.environ.get(name, default))
 
 
+# Per-model prices (USD per million tokens) that differ from the provider default.
+MODEL_PRICES = {"gpt-4o-mini": (0.15, 0.60)}
+DAILY_CALLS = int(os.environ.get("GPT_DAILY_CALLS", "200"))  # OpenAI answers per day, then GPT stops
+
+
 def default_prices():
     return {"openai": (_env("GPT_PRICE_IN", 0.25), _env("GPT_PRICE_OUT", 2.00)),
             "anthropic": (_env("CLAUDE_PRICE_IN", 4.0), _env("CLAUDE_PRICE_OUT", 20.0))}
@@ -64,6 +69,8 @@ class Meter:
     def record(self, provider, model, input_tokens, output_tokens):
         """One answer's usage. Returns its cost in USD."""
         p_in, p_out = self.prices[provider]
+        if model in MODEL_PRICES and not os.environ.get("GPT_PRICE_IN"):
+            p_in, p_out = MODEL_PRICES[model]
         usd = (input_tokens * p_in + output_tokens * p_out) / 1_000_000
         if model.endswith(":fast"):
             usd *= 2
@@ -101,12 +108,16 @@ class Meter:
         for message in fire:
             self.alert(message)
 
+    def calls(self, provider, day):
+        return sum(1 for r in self.records
+                   if r["provider"] == provider and datetime.fromisoformat(r["at"]).date() == day)
+
     def blocked(self, provider="openai"):
-        """True once today's OpenAI spend reaches the daily cap."""
+        """True once today's OpenAI spend reaches the daily cap, or today's calls reach DAILY_CALLS."""
         if provider != "openai":
             return False
         day = self.clock().date()
-        return self.spent("openai", day=day) >= self.cap(day)
+        return self.spent("openai", day=day) >= self.cap(day) or self.calls("openai", day) >= DAILY_CALLS
 
 
 DATA_KINDS = {"inventory", "inbound", "sales", "boh", "multi", "tasks", "roster", "promotions"}

@@ -13,10 +13,13 @@ Everything written there passes the personal-information filter first (tools/pri
 private words go in <state>/private_terms.txt). Requests can also be typed into the hub's window.
 
 Usage: python3 tools/hub.py --drive "<Drive folder Pickle reads>" [--ai]
+       python3 tools/hub.py --drive "<…>" --board   (게시판 확인 once; also "게시판 확인" typed in the window)
+--ai uses whichever of ANTHROPIC_API_KEY / OPENAI_API_KEY is set; with only OpenAI, GPT does Claude's part.
 """
 import argparse
 import hashlib
 import json
+import re
 import sys
 import threading
 import time
@@ -33,7 +36,45 @@ import privacy  # noqa: E402
 import router  # noqa: E402
 
 INBOX, OUTBOX, TASKS, BOARD = "요청.txt", "답.txt", "작업.txt", "게시판.txt"
+OPEN_RE = re.compile(r"^## \[대기\] (Q-\d{8}-\d{3}) \d{1,2}:\d{2} (.+?) → (.+)$")
+DONE_RE = re.compile(r"\[완료\] (Q-\d{8}-\d{3})")
 KEEP_ANSWERS = 1  # 답.txt holds only the latest answer, so Pickle reads the fewest tokens
+
+
+def open_remy_questions(board_text):
+    """(qid, question) for each '→ 레미' question on the board that has no [완료] line yet."""
+    asked, done = [], set(DONE_RE.findall(board_text))
+    for line in board_text.splitlines():
+        m = OPEN_RE.match(line.strip())
+        if m and "레미" in m[3] and m[1] not in done and m[1] not in (q for q, _ in asked):
+            asked.append((m[1], m[2]))
+    return asked
+
+
+def answer_board(drive, cache, ask, now=None, system=None):
+    """게시판 확인 (prompts/remy.txt): answer each open '→ 레미' question with `ask` (GPT) from the
+    cached data, and append one 'Q번호 답: 결론: … / 근거: … / 확인 필요: …' line per question to
+    요청.txt, where the hub checks and delivers it. Returns the lines written."""
+    drive, now = Path(drive), now or datetime.now()
+    try:
+        board = (drive / BOARD).read_text(encoding="utf-8-sig")
+    except FileNotFoundError:
+        return []
+    system = system or pipeline.load_prompt("gpt")
+    out = []
+    for qid, question in open_remy_questions(board):
+        data = pipeline.gather(question, cache, now)
+        env = pipeline.envelope(qid, question, ["레미"], data, now, requester="게시판")
+        parsed = pipeline.parse_answer("\n".join(ask(json.dumps(env, ensure_ascii=False), system)))
+        if not parsed:
+            continue
+        check = parsed["확인 필요"]
+        check = "레미 화면 확인 전 자료 기준 답" + ("" if check in ("", "없음") else f"; {check}")
+        out.append(f"{qid} 답: 결론: {parsed['결론']} / 근거: {parsed['근거']} / 확인 필요: {check}")
+    if out:
+        with (drive / INBOX).open("a", encoding="utf-8") as f:
+            f.write("".join(line + "\n" for line in out))
+    return out
 
 
 def _digest(lines):
@@ -211,7 +252,10 @@ class Hub:
                 print(answer, file=out, flush=True)
 
         for line in inp:
-            if line.strip():
+            if line.strip() == "게시판 확인" and "GPT" in (self.pipeline.askers or {}):
+                for written in answer_board(self.drive, self.cache, self.pipeline.askers["GPT"]):
+                    say(written)
+            elif line.strip():
                 self.handle(line.strip(), say, requester="신우님")
 
 
@@ -222,6 +266,8 @@ def main(argv=None):
     p.add_argument("--state", help="logs, alerts, spend, private words (default: <cache>/.hub)")
     p.add_argument("--interval", type=float, default=0.05, help="seconds between checks (default 0.05)")
     p.add_argument("--ai", action="store_true", help="answer free questions with Claude and GPT (needs API keys)")
+    p.add_argument("--board", action="store_true",
+                   help="게시판 확인 once: GPT answers open '→ 레미' questions into 요청.txt, then exit")
     p.add_argument("--weekly", action="store_true", help="print this week's summary so far and exit")
     args = p.parse_args(argv)
     state = Path(args.state or Path(args.cache) / ".hub")
@@ -234,16 +280,31 @@ def main(argv=None):
     if not args.drive:
         p.error("--drive is required")
 
+    if args.board:
+        import ask_gpt
+        m = meter.Meter(state / "usage.jsonl")
+        if m.blocked("openai"):
+            print("GPT 오늘 한도 도달", file=sys.stderr)
+            return 1
+        ask_gpt.on_usage = lambda model, i, o: m.record("openai", model, i, o)
+        for line in answer_board(args.drive, args.cache, ask_gpt.lines):
+            print(line)
+        return 0
+
     askers = None
     if args.ai:
         askers, warmers = ai_board.load_ais()
         ai_board.warm_all(warmers)
     hub = Hub(args.cache, args.drive, state, askers)
     if args.ai:
-        import ask_claude
-        import ask_gpt
-        ask_gpt.on_usage = lambda model, i, o: hub.meter.record("openai", model, i, o)
-        ask_claude.on_usage = lambda model, i, o: hub.meter.record("anthropic", model, i, o)
+        if "GPT" in askers:
+            import ask_gpt
+            ask_gpt.on_usage = lambda model, i, o: hub.meter.record("openai", model, i, o)
+        if "Claude" in askers:
+            import ask_claude
+            ask_claude.on_usage = lambda model, i, o: hub.meter.record("anthropic", model, i, o)
+        else:
+            print("Claude: ANTHROPIC_API_KEY 없음, 건너뜀 (GPT가 대신 답함)", file=sys.stderr, flush=True)
     threading.Thread(target=hub.console, daemon=True).start()
     print(f"hub ready: {args.drive} (requests can be typed here too; Ctrl+C stops)", file=sys.stderr, flush=True)
     try:

@@ -18,7 +18,7 @@ import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor, wait
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -109,6 +109,27 @@ def gather(question, cache_dir, now):
     except router.DATA_ERRORS:
         pass
     if any(w in compact for w in router.TOPIC_WORDS["sales"]):
+        try:
+            lines.append(f"{pr.fmt_sales(pr.load(cache_dir, 'sales'))} (POS {_file_stamp(cache_dir, 'sales')})")
+        except router.DATA_ERRORS:
+            pass
+    if any(w in compact for w in router.TOPIC_WORDS["promotions"]):
+        try:
+            start = now.date() - timedelta(days=now.weekday())
+            when = _file_stamp(cache_dir, "promotions")
+            lines += [f"{line} (매장 {when})" for line in
+                      pr.promotion_lines(pr.load(cache_dir, "promotions"), start, start + timedelta(days=6))]
+        except router.DATA_ERRORS:
+            pass
+    if any(w in compact for w in router.TOPIC_WORDS["roster"]):
+        try:
+            data, when = pr.load(cache_dir, "roster"), _file_stamp(cache_dir, "roster")
+            lines.append(f"{pr.fmt_roster(data, now.date(), now.date())} (HR {when})")
+        except router.DATA_ERRORS:
+            pass
+    if any(w in compact for w in ("손님", "고객", "바쁠", "붐빌", "몰릴")) and \
+            any(w in compact for w in router.TOPIC_WORDS["promotions"]) and \
+            not any(w in compact for w in router.TOPIC_WORDS["sales"]):  # busy days during promotions
         try:
             lines.append(f"{pr.fmt_sales(pr.load(cache_dir, 'sales'))} (POS {_file_stamp(cache_dir, 'sales')})")
         except router.DATA_ERRORS:
@@ -441,6 +462,11 @@ class Pipeline:
             return {**record, "answer": hit["answer"], "status": "완료", "cached": True}
 
         notes = []
+        if "Claude" not in self.askers and "GPT" in self.askers and "Claude" in answerers + [checker]:
+            answerers = list(dict.fromkeys("GPT" if a == "Claude" else a for a in answerers))
+            if checker == "GPT":
+                checker = None  # GPT would only check its own answer
+            record["targets"] = answerers
         if self.blocked("GPT") and ("GPT" in answerers or checker == "GPT"):
             answerers = list(dict.fromkeys("Claude" if a == "GPT" else a for a in answerers))
             if checker == "GPT":

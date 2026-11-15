@@ -316,7 +316,8 @@ class WireFormat(unittest.TestCase):
         path, headers, body = self.posts()[0]
         self.assertEqual(path, "/v1/chat/completions")
         self.assertEqual(headers["authorization"], "Bearer test-key")
-        self.assertEqual((body["model"], body["stream"], body["reasoning_effort"]), ("gpt-5-mini", True, "minimal"))
+        self.assertEqual((body["model"], body["stream"], body["max_completion_tokens"]), ("gpt-4o-mini", True, 300))
+        self.assertNotIn("reasoning_effort", body)  # gpt-4o-mini is not a reasoning model
         self.assertEqual(body["messages"][0], {"role": "system", "content": ab.SYSTEM})
         self.assertNotIn("service_tier", body)
 
@@ -337,7 +338,7 @@ class WireFormat(unittest.TestCase):
             list(self.claude.lines("q", ab.SYSTEM))
         finally:
             self.gpt.on_usage = self.claude.on_usage = None
-        self.assertEqual(seen, [("gpt", "gpt-5-mini", 12, 34), ("claude", "claude-opus-5-5", 1, 5)])
+        self.assertEqual(seen, [("gpt", "gpt-4o-mini", 12, 34), ("claude", "claude-opus-5-5", 1, 5)])
         self.assertEqual(self.posts()[0][2]["stream_options"], {"include_usage": True})
 
     def test_hub_end_to_end_through_the_sdks(self):
