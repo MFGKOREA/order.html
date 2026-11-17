@@ -171,6 +171,8 @@ label.sw input:checked + span { color: var(--fg); }
 .days input:focus { outline: none; background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--fg); }
 .cats { grid-area: cats; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; min-width: 0; }
 .cats select { appearance: none; -webkit-appearance: none; max-width: 100%; border: 0; border-radius: 999px; padding: 5px 24px 5px 11px; font-size: 13px; font-weight: 600; background: var(--fill-2) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23707070' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 8px center; color: var(--fg); cursor: pointer; }
+.cats .owarn { flex-basis: 100%; font-size: 12px; font-weight: 700; color: var(--rose-ink); background: var(--rose); border-radius: 8px; padding: 5px 9px; }
+.pkgbar .chg span.warn { background: var(--rose); color: var(--rose-ink); }
 .cats select.empty { color: var(--rose-ink); box-shadow: inset 0 0 0 1px var(--rose-line); }
 .cats .arrow { color: var(--chick-line); font-size: 12px; }
 .cats input.newcat { border: 0; background: var(--surface); box-shadow: inset 0 0 0 1.5px var(--fg); border-radius: 999px; padding: 5px 11px; font-size: 13px; font-weight: 600; width: 120px; }
@@ -561,6 +563,15 @@ function saveDraft() {
 /* ----- Open 출력 순서: 줄 순서(카테고리 화면)와 따로, NO 번호로 저장 ----- */
 const t = v => (v || '').trim();
 const isOpen = r => !!t(r.cells[C.OPEN]);
+/* Open 버튼 라벨은 일수 칸이 T인 품목만 맞게 찍는다 (T = 하루, 종료 오늘). 그 밖의 품목은 날짜가 틀리게 나온다 */
+function openRisk(r) {
+  const d = t(r.cells[C.DAYS]), h = t(r.cells[C.HOURS]);
+  if (/^t$/i.test(d)) return '';
+  if (!d && h) return 'Open으로 뽑으면 시간이 빠지고 날짜만 찍힙니다';
+  if (d === '0') return 'Open으로 뽑으면 종료일이 숨겨지지 않습니다';
+  if (d) return 'Open으로 뽑으면 종료일이 하루 늦게 찍힙니다';
+  return 'Open으로 뽑으면 일수가 비어 날짜가 틀리게 찍힙니다';
+}
 function seqFromNO(rows) { // 프린터는 OPEN 품목을 NO 순서로 출력 → NO에서 순서를 읽어 온다
   const open = rows.filter(isOpen).map((r, i) => ({ r, n: r.cells[C.NO] || '', i })).sort((x, y) => cmpNO(x.n, y.n) || x.i - y.i);
   rows.forEach(r => { r.seq = null; }); open.forEach((o, k) => { o.r.seq = k + 1; });
@@ -640,6 +651,8 @@ function renderBar() {
   if (mod) chg.insertAdjacentHTML('beforeend', `<span>수정 ${mod}</span>`);
   if (moved) chg.insertAdjacentHTML('beforeend', `<span>이동 ${moved}</span>`);
   if (openMoved) chg.insertAdjacentHTML('beforeend', `<span>Open 순서</span>`);
+  const nRisk = state.rows.filter(r => isOpen(r) && openRisk(r)).length;
+  if (nRisk) chg.insertAdjacentHTML('beforeend', `<span class="warn">Open 날짜 주의 ${nRisk}</span>`);
   if (del) chg.insertAdjacentHTML('beforeend', `<span class="del">삭제 ${del}</span>`);
   if (chg.childElementCount) bar.appendChild(chg);
   add(`<span class="count"><em>${state.rows.length}</em>품목</span>`);
@@ -682,6 +695,8 @@ function renderList() {
     fillSelect(li.querySelector('[data-k="1"]'), cat1, t(c[C.C1]));
     fillSelect(li.querySelector('[data-k="2"]'), distinct2(t(c[C.C1])), t(c[C.C2]));
     li.querySelector('[data-k="8"]').checked = !!t(c[C.OPEN]);
+    const risk = isOpen(r) ? openRisk(r) : '';
+    if (risk) { const w = document.createElement('span'); w.className = 'owarn'; w.textContent = risk; li.querySelector('.cats').appendChild(w); }
     frag.appendChild(li);
   });
   list.appendChild(frag);
@@ -705,7 +720,14 @@ const list = $('list');
 list.addEventListener('change', e => {
   const el = e.target, k = el.dataset.k; if (k === undefined) return;
   const li = el.closest('li'), idx = +li.dataset.idx, r = state.rows[idx];
-  if (el.type === 'checkbox') { r.cells[C.OPEN] = el.checked ? 'Y' : ''; r.seq = el.checked ? openOrder().length : null; renumberSeq(); li.classList.toggle('chg', !!rowStatus(r)); renderBar(); saveDraft(); if (state.tab === 'open' && !el.checked) renderList(); return; }
+  if (el.type === 'checkbox') {
+    r.cells[C.OPEN] = el.checked ? 'Y' : ''; r.seq = el.checked ? openOrder().length : null; renumberSeq(); saveDraft();
+    const risk = el.checked ? openRisk(r) : '';
+    if (risk) toast(`${risk}. 이 품목은 카테고리 화면에서 뽑으세요`);
+    const y = li.getBoundingClientRect().top; render();
+    const n = list.querySelector(`li[data-idx="${idx}"]`); if (n) window.scrollBy(0, n.getBoundingClientRect().top - y);
+    return;
+  }
   if (el.tagName === 'SELECT') {
     if (el.value === '__new__') {
       const inp = document.createElement('input'); inp.className = 'newcat'; inp.placeholder = k === '1' ? '새 카테고리 1' : '새 카테고리 2'; inp.dataset.k = k; inp.dataset.newcat = '1';
@@ -892,7 +914,7 @@ $('saveBtn').addEventListener('click', async () => {
     const saved = await deliver(name, out, 'pkg');
     const { added, mod, del, moved, openMoved } = changeSummary(), noCat = rows.filter(r => !r[C.C1] || !r[C.C2]).length;
     st.className = 'status ok';
-    st.textContent = `${saved} 저장 · 품목 ${rows.length}개 (추가 ${added} · 수정 ${mod} · 이동 ${moved} · 삭제 ${del}${openMoved ? ' · Open 순서 변경' : ''})` + (saved.endsWith('.zip') ? ' · ZIP 안의 .pkg를 꺼내 쓰세요.' : '') + (noCat ? ` · 카테고리가 빈 품목 ${noCat}개는 전체보기에서만 나옵니다.` : '');
+    st.textContent = `${saved} 저장 · 품목 ${rows.length}개 (추가 ${added} · 수정 ${mod} · 이동 ${moved} · 삭제 ${del}${openMoved ? ' · Open 순서 변경' : ''})` + (saved.endsWith('.zip') ? ' · ZIP 안의 .pkg를 꺼내 쓰세요.' : '') + (noCat ? ` · 카테고리가 빈 품목 ${noCat}개는 전체보기에서만 나옵니다.` : '') + (state.rows.some(r => isOpen(r) && openRisk(r)) ? ` · Open에 날짜가 틀리게 찍힐 품목 ${state.rows.filter(r => isOpen(r) && openRisk(r)).length}개가 있습니다.` : '');
     try { localStorage.removeItem(state.draftKey); } catch (_) { }
   } catch (e) { st.className = 'status bad'; st.textContent = e.message || String(e); }
 });
