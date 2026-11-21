@@ -1,2 +1,5 @@
 downloads/
 __pycache__/
+tools/hub.env.cmd
+*.env
+.env*

@@ -7,6 +7,7 @@ Files in the Drive folder Pickle reads (--drive):
   작업.txt                            pending actions + the 3 latest finished; 레미 does the 접수 lines
   요청.txt                            requests, one per line, appended by Pickle (or anyone)
   답.txt                              the latest answer, under "> request"
+  허브상태.txt                        '허브 정상 <time>' + today's AI spend, every minute
   게시판.txt                          the team's log: status tags, missing or late AIs, code (Pickle never reads it)
 
 Everything written there passes the personal-information filter first (tools/privacy.py; extra
@@ -36,6 +37,8 @@ import privacy  # noqa: E402
 import router  # noqa: E402
 
 INBOX, OUTBOX, TASKS, BOARD = "요청.txt", "답.txt", "작업.txt", "게시판.txt"
+HEALTH = "허브상태.txt"  # rewritten every HEARTBEAT seconds; an old time there means the hub is off
+HEARTBEAT = 60
 OPEN_RE = re.compile(r"^## \[대기\] (Q-\d{8}-\d{3}) \d{1,2}:\d{2} (.+?) → (.+)$")
 DONE_RE = re.compile(r"\[완료\] (Q-\d{8}-\d{3})")
 SLOT_PROVIDER = {"GPT": "openai", "Claude": "anthropic"}
@@ -167,6 +170,7 @@ class Hub:
         self.pool = ThreadPoolExecutor(max_workers=4)
         self._lock = threading.Lock()  # one request routed at a time: action ids never collide
         self._tasks_version, self._problems, self._week_checked = None, None, None
+        self._beat = None
 
     def alert(self, message):
         """Tell 신우님: the hub's window and <state>/alerts.log (never the Drive folder)."""
@@ -225,6 +229,16 @@ class Hub:
             pr.write_if_changed(self.drive / TASKS, text)
             self._tasks_version = self.queue.version
         self.weekly(now)
+        self.heartbeat(now)
+
+    def heartbeat(self, now):
+        """허브상태.txt: when the hub last ran and today's AI spend, so a stopped hub shows (Pickle
+        answers "허브 꺼짐" when the time there is more than a few minutes old)."""
+        if self._beat and (now - self._beat).total_seconds() < HEARTBEAT:
+            return
+        self._beat = now
+        text = f"허브 정상 {now:%Y-%m-%d %H:%M}\n{self.meter.status_line(now.date())}\n"
+        pr.write_if_changed(self.drive / HEALTH, self.filter.scrub(text)[0])
 
     def weekly(self, now):
         """On the first check of a new week, post last week's summary on the board (once)."""

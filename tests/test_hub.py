@@ -111,6 +111,16 @@ class HubTest(unittest.TestCase):
             self.assertEqual(self.read(hub.OUTBOX), f"> {question}\n{answer}\n")
         self.assertEqual(self.read(hub.TASKS), "#1 접수 11:00 발주 브로콜리 2개\n#2 접수 11:00 HR 스케줄 확정\n")
 
+    def test_heartbeat_file_once_a_minute(self):
+        h = self.make()
+        h.tick(NOW)
+        first = self.read(hub.HEALTH)
+        self.assertTrue(first.startswith(f"허브 정상 {NOW:%Y-%m-%d %H:%M}\nAI 오늘 $0.00 / $"))
+        h.tick(NOW + timedelta(seconds=30))
+        self.assertEqual(self.read(hub.HEALTH), first)
+        h.tick(NOW + timedelta(seconds=61))
+        self.assertIn(f"{NOW + timedelta(seconds=61):%H:%M}", self.read(hub.HEALTH))
+
     def test_remy_marks_a_task_done_without_replacing_pickles_answer(self):
         h = self.make()
         h.tick(NOW)
