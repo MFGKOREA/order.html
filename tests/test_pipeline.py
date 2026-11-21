@@ -73,6 +73,14 @@ class Answers(unittest.TestCase):
                                                  "확인 필요": "없음", "code": "```\n=SUM(B2:B9)\n```"})
         self.assertIsNone(pl.parse_answer("양파 20kg 발주하세요"))
 
+    def test_schema_gate_rejects_a_number_without_a_source_and_time(self):
+        parsed, why = pl.schema_gate("결론: 20kg → 근거: 재고 → 확인 필요: 없음")
+        self.assertIn("출처", why)
+        parsed, why = pl.schema_gate("결론: 20kg → 근거: 재고 (앱 11/13 11:00) → 확인 필요: 없음")
+        self.assertIsNone(why)
+        self.assertEqual(parsed["결론"], "20kg")
+        self.assertIsNotNone(pl.schema_gate("양파 20kg")[1])
+
     def test_problems(self):
         ok = pl.parse_answer(GOOD)
         self.assertIsNone(pl.problem(ok))

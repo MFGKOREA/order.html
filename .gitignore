@@ -1,4 +1,7 @@
 downloads/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
 __pycache__/
 tools/hub.env.cmd
 *.env

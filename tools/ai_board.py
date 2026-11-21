@@ -146,7 +146,8 @@ def warm_all(warmers, err=None):
     err = err or sys.stderr
     with ThreadPoolExecutor(max_workers=len(warmers) or 1) as pool:
         for name, error in pool.map(_warm, warmers.items()):
-            print(f"warm {name}: {error or 'OK'}", file=err, flush=True)
+            import hubkeys
+            print(f"warm {name}: {hubkeys.redact(error) or 'OK'}", file=err, flush=True)
 
 
 def load_ais(env=None):
@@ -154,8 +155,10 @@ def load_ais(env=None):
     skipped (its work goes to the one that is there). With neither key set, both are loaded, for a
     cloud environment whose proxy injects the keys."""
     import os
+    import hubkeys
     env = os.environ if env is None else env
-    have = {"Claude": bool(env.get("ANTHROPIC_API_KEY")), "GPT": bool(env.get("OPENAI_API_KEY"))}
+    have = {"Claude": bool(hubkeys.read_secret("ANTHROPIC_API_KEY", env)),
+            "GPT": bool(hubkeys.read_secret("OPENAI_API_KEY", env))}
     if not any(have.values()):
         have = dict.fromkeys(have, True)
     askers, warmers = {}, {}

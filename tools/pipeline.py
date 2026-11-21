@@ -190,6 +190,16 @@ def source_of(p):
     return ""
 
 
+def schema_gate(text, staff=()):
+    """(parsed, reason). Reject anything that is not 결론 / 근거 / 확인 필요, and any number or
+    name with no source and time. The caller sends it back once."""
+    raw = (text or "").replace(" → ", " / ")
+    if "\n" not in raw:
+        raw = REMY_SPLIT_RE.sub("\n", raw)
+    parsed = parse_answer(raw)
+    return parsed, problem(parsed, staff)
+
+
 def problem(parsed, staff=()):
     """Why an answer can't go out (None if it can): format, banned words, or a missing source."""
     if parsed is None:
@@ -531,9 +541,8 @@ class Pipeline:
             entry = self.pending.get(qid)
         if not entry:
             return f"{qid} 대기 질문 없음"
-        parsed = parse_answer(REMY_SPLIT_RE.sub("\n", text))
         items, staff = self.names()
-        why = problem(parsed, staff)
+        parsed, why = schema_gate(text, staff)
         if why:
             self.note(f"[레미] 반려 {qid}: {why}")
             return f"{qid} 반려: {why}"

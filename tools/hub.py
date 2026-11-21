@@ -33,12 +33,16 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ai_board  # noqa: E402
+import eventlog  # noqa: E402
+import hub_page  # noqa: E402
 import labor  # noqa: E402
 import meter  # noqa: E402
 import pickle_relay as pr  # noqa: E402
 import pipeline  # noqa: E402
 import privacy  # noqa: E402
+import retryq  # noqa: E402
 import router  # noqa: E402
+import hubkeys  # noqa: E402
 import sources  # noqa: E402
 
 INBOX, OUTBOX, TASKS, BOARD, LEDGER = "요청.txt", "답.txt", "작업.txt", "게시판.txt", "대화.txt"
@@ -189,56 +193,34 @@ class Outbox:
 
 
 class Ledger:
-    """대화.txt: the one append-only ledger in the Drive folder. Every AI reads it and appends a handoff."""
+    """대화.txt is the human mirror. The store is SQLite (WAL), one writer, idempotent lines."""
 
-    def __init__(self, path, state_path, scrub=None, alert=None, log=None):
+    def __init__(self, path, state_path, scrub=None, alert=None, log=None, secrets=()):
         self.path, self.scrub, self.alert = Path(path), scrub, alert
-        self.inbox = Inbox(self.path, state_path, log)  # lines already there are history
-        self.lock, self.mem = threading.RLock(), {}
-
-    def _read(self):
-        return self.inbox._read()
+        self.secrets, self.mem = list(secrets), {}
+        self.events = eventlog.EventLog(state_path, self.path)  # migrates an existing 대화.txt
 
     def add(self, rid, frm, to, status, body):
-        line = format_handoff(rid, frm, to, status, body)
+        line = hubkeys.redact(format_handoff(rid, frm, to, status, body), self.secrets)
         if self.scrub:
             line, hits = self.scrub(line)
             if hits and self.alert:
                 self.alert(f"개인정보 가림 대화.txt: {', '.join(hits)}")
-        with self.lock:
-            before = self.inbox._read()
-            self.path.parent.mkdir(parents=True, exist_ok=True)
-            with self.path.open("a", encoding="utf-8") as f:
-                f.write(line + "\n")
-            after = self.inbox._read()
-            own = len(before)
-            # Keep a line someone else appended in the same instant for the next poll.
-            if after[:own] == before and own < len(after) and after[own] == line:
-                self.inbox._save(after[:own + 1])
-            else:
-                self.inbox._save(after)
-            self.inbox._stamp = None
+        rec = parse_handoff(line)
+        if not rec:
+            return False
+        return self.events.add(line, rec)
 
     def poll(self):
-        with self.lock:
-            lines = self.inbox.poll()
-        return [rec for rec in (parse_handoff(line) for line in lines) if rec]
+        """Lines another AI appended to 대화.txt. Stored once, then handed back."""
+        return [rec for rec in (parse_handoff(line) for line in self.events.poll_new()) if rec]
 
     def next_rule_id(self, now):
-        """R-YYYYMMDD-NNN for an answer the rules wrote (no Q-id, no AI).
+        """R-YYYYMMDD-NNN for an answer the rules wrote (no Q-id, no AI)."""
+        return self.events.next_rule_id(now)
 
-        shortcut: two rule answers at the same instant can share an R-id. Upgrade when a second
-        writer appends rule lines; Q-ids already come from the pipeline lock.
-        """
-        day = now.strftime("%Y%m%d")
-        prefix, n = f"R-{day}-", 0
-        for line in self._read():
-            if line.startswith(prefix):
-                try:
-                    n = max(n, int(line[len(prefix):].split("|", 1)[0]))
-                except ValueError:
-                    pass
-        return f"{prefix}{n + 1:03d}"
+    def recent(self, n=12):
+        return self.events.recent(n)
 
     def record_rule(self, reply, now, requester):
         """A request the rules finished: data, a held order, or 확인 #번호. No AI call."""
@@ -314,8 +296,11 @@ class Hub:
         self.outbox = Outbox(self.drive / OUTBOX, scrub=self.filter.scrub, alert=self.alert)
         self.board = pipeline.Board(self.drive / BOARD, scrub=self.filter.scrub, alert=self.alert)
         self.meter = meter.Meter(self.state / "usage.jsonl", alert=self.alert)
-        self.ledger = Ledger(self.drive / LEDGER, self.state / "ledger.json", scrub=self.filter.scrub,
-                             alert=self.alert, log=self.log)
+        self.ledger = Ledger(self.drive / LEDGER, self.state / "ledger.sqlite", scrub=self.filter.scrub,
+                             alert=self.alert, log=self.log, secrets=hubkeys.secret_values(self.env))
+        self.retry = retryq.RetryQueue(self.state / "retry.sqlite")
+        self.page_port = None
+        self._now = None
         self.log_book = pipeline.Log(self.state / "envelopes.jsonl")  # every request; restarts, weekly summary
         self.pipeline = pipeline.Pipeline(
             self.cache, askers, board=self.board, deadline=deadline, log=self.log_book,
@@ -330,6 +315,7 @@ class Hub:
 
     def alert(self, message):
         """Tell 신우님: the hub's window and <state>/alerts.log (never the Drive folder)."""
+        message = hubkeys.redact(message, hubkeys.secret_values(self.env))
         line = f"{datetime.now():%Y-%m-%d %H:%M:%S} {message}"
         print(line, file=self.log, flush=True)
         self.state.mkdir(parents=True, exist_ok=True)
@@ -359,12 +345,13 @@ class Hub:
         elif reply.kind != "ask":
             reply_to(reply.text)
         else:
-            self.pool.submit(self.pipeline.run, request, reply_to, requester)
+            self.pool.submit(self._run_request, request, reply_to, requester, None, None)
         return reply.kind
 
     def tick(self, now=None):
         """One pass: refresh answer files, answer new requests, refresh 작업.txt. Well under 1 ms idle."""
         now = now or datetime.now()
+        self._now = now
         _, problems = self.feed.step(now)
         if problems != self._problems:
             for problem in problems:
@@ -380,6 +367,8 @@ class Hub:
                         quiet=("status", "remy_answer"))
         for rec in self.ledger.poll():
             self._take(rec)
+        for job in self.retry.claim(now):
+            self.pool.submit(self._replay, job)
         self.queue.refresh()
         if self.queue.version != self._tasks_version:
             lines = self.queue.view()
@@ -400,12 +389,90 @@ class Hub:
         if rec["status"] == "대기" and rec["to"] in ("Claude", "GPT"):
             self.pool.submit(self._run_named, rec)
 
+    def _job_key(self, request, requester, force):
+        return eventlog.line_key(f"{requester}|{force or ''}|{request}")
+
+    def _needs_retry(self, record):
+        """A finished AI call that produced no answer. Budget stops and 레미 waits are not retries."""
+        if not record or record.get("cached"):
+            return False
+        if record.get("answer") != pipeline.UNKNOWN:
+            return False
+        return any(name in (record.get("targets") or []) for name in ("Claude", "GPT"))
+
+    def _run_request(self, request, reply, requester, force, job_key):
+        self._now = self._now or datetime.now()
+        err = None
+        record = None
+        try:
+            if force:
+                record = self.pipeline.run(request, reply, requester, force=force)
+            else:
+                record = self.pipeline.run(request, reply, requester)
+        except Exception as exc:  # the queue, not the caller, decides whether this runs again
+            err = type(exc).__name__
+        if job_key:
+            if err or self._needs_retry(record):
+                if self.retry.fail(job_key, err or "답 없음", self._now) == "dead":
+                    self._bury(request, requester, force, err or "답 없음")
+            else:
+                self.retry.succeed(job_key)
+        elif err or self._needs_retry(record):
+            self.retry.note(self._job_key(request, requester, force),
+                            {"request": request, "requester": requester, "force": force},
+                            err or "답 없음", self._now)
+
+    def _replay(self, job):
+        payload = job["payload"]
+
+        def reply(answer, request=payload["request"]):
+            self.outbox.add(request, answer)
+
+        self._run_request(payload["request"], reply, payload["requester"], payload.get("force"), job["key"])
+
+    def _bury(self, request, requester, force, error):
+        self.ledger.add("재시도", requester or "허브", force or "GPT", "반려",
+                        f"결론: 재시도 끝 → 근거: {error} → 확인 필요: 신우님 확인")
+
     def _run_named(self, rec):
         """The handoff named the AI. Code Claude writes is still checked by GPT; the budget cap still applies."""
         def reply(answer, request=rec["body"]):
             self.outbox.add(request, answer)
 
-        self.pipeline.run(rec["body"], reply, rec["from"], force=rec["to"])
+        self._run_request(rec["body"], reply, rec["from"], rec["to"], None)
+
+    def request_confirm(self, task_id):
+        """Append `확인 #id` when that action is still 확인대기. One tap on the hub screen."""
+        try:
+            task_id = int(task_id)
+        except (TypeError, ValueError):
+            return False
+        if not any(line.startswith(f"#{task_id} 확인대기") for line in self.queue.view()):
+            return False
+        with (self.drive / INBOX).open("a", encoding="utf-8") as handle:
+            handle.write(f"확인 #{task_id}\n")
+        return True
+
+    def screen(self):
+        """What the hub page shows. Badges are 정상, 지연, or 끊김. No invented numbers."""
+        askers = self.pipeline.askers or {}
+
+        def ai(name, provider):
+            if name not in askers or self.meter.blocked(provider):
+                return "끊김"
+            if self.retry.open_count():
+                return "지연"
+            return "정상"
+
+        remy = "지연" if self.ledger.events.open_to("레미") else "정상"
+        badges = [("Claude", ai("Claude", "anthropic")), ("GPT", ai("GPT", "openai")), ("레미", remy), ("피클", "정상")]
+        confirms = []
+        for line in self.queue.view():
+            parts = line.split(" ", 3)
+            if len(parts) >= 4 and parts[1] == "확인대기":
+                confirms.append({"id": parts[0][1:], "text": parts[3]})
+        return {"badges": badges, "confirms": confirms, "timeline": self.ledger.recent(),
+                "spend": self.meter.status_line((self._now or datetime.now()).date())}
 
     def sync(self, now):
         return sources.sync(self.cache, now, self.env)
@@ -438,6 +505,10 @@ class Hub:
             return
         self._beat = now
         text = f"허브 정상 {now:%Y-%m-%d %H:%M}\n{self.meter.status_line(now.date())}\n"
+        for name, state in self.screen()["badges"]:
+            text += f"{name} {state}\n"
+        if self.page_port:
+            text += f"화면 http://127.0.0.1:{self.page_port}\n"
         if self._sync_problems:
             text += "\n".join(self._sync_problems) + "\n"
         pr.write_if_changed(self.drive / HEALTH, self.filter.scrub(text)[0])
@@ -528,6 +599,11 @@ def main(argv=None):
         else:
             print("Claude: ANTHROPIC_API_KEY 없음, 건너뜀 (GPT가 대신 답함)", file=sys.stderr, flush=True)
     threading.Thread(target=hub.console, daemon=True).start()
+    host = os.environ.get("HUB_HOST", "127.0.0.1")
+    port = int(os.environ.get("HUB_PORT", "8765"))
+    if hub_page.serve(lambda: hub_page.render(hub.screen()), hub.request_confirm, host, port):
+        hub.page_port = port
+        print(f"screen: http://{host}:{port}", file=sys.stderr, flush=True)
     print(f"hub ready: {args.drive} (requests can be typed here too; Ctrl+C stops)", file=sys.stderr, flush=True)
     try:
         while True:
