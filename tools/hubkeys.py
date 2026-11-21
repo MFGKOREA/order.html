@@ -4,7 +4,8 @@ import re
 import subprocess
 import sys
 
-NAMES = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "HR_BOARD_PASSWORD", "ORDER_APP_API")
+NAMES = ("ANTHROPIC_API_KEY", "OPENAI_API_KEY", "HR_BOARD_PASSWORD", "ORDER_APP_API",
+         "HUB_SYNC_SECRET", "HUB_SCREEN_PASSWORD")
 _KEY = re.compile(r"sk-(?:ant|proj)-[A-Za-z0-9_\-]{8,}|sk-[A-Za-z0-9]{12,}")
 _ASSIGNED = re.compile(r"(?i)(api[_-]?key|password|secret|token)\s*[=:]\s*\S+")
 

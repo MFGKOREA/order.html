@@ -1,0 +1,44 @@
+:root {
+  --ink: #f4efe4;
+  --muted: #b7ad9c;
+  --ground: #16130f;
+  --line: #3a342c;
+  --paper: #f3ead7;
+  --paper-ink: #1c160f;
+  --ok: #9dce8a;
+  --wait: #e2b15a;
+  --down: #e07a62;
+  --font: "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", sans-serif;
+  --measure: 40rem;
+}
+* { box-sizing: border-box; }
+html, body { overflow-x: clip; margin: 0; background: var(--ground); color: var(--ink); font-family: var(--font); }
+body { font-size: 1.25rem; line-height: 1.4; }
+main { max-width: var(--measure); margin: 0 auto; padding: 1.25rem 1rem 3rem; }
+h1 { font-size: 2rem; font-weight: 700; line-height: 1.2; margin: 0.25rem 0 1rem; }
+.mark { margin: 0; color: var(--muted); font-size: 1rem; }
+.ticket { margin: 0 0 0.75rem; }
+.ticket button, .empty, .ticket input {
+  width: 100%; min-height: 3.5rem; border: 1px solid var(--paper); border-radius: 4px;
+  background: var(--paper); color: var(--paper-ink); font: inherit; font-size: 1.5rem; text-align: left;
+  padding: 0.8rem 1rem;
+}
+.ticket button { cursor: pointer; }
+.ticket input { margin-bottom: 0.75rem; }
+button:focus-visible, a:focus-visible, input:focus-visible { outline: 3px solid var(--wait); outline-offset: 3px; }
+.empty { background: transparent; color: var(--muted); border-color: var(--line); display: block; }
+.who { list-style: none; margin: 1.5rem 0; padding: 0; border-top: 1px solid var(--line); }
+.who li { display: flex; justify-content: space-between; gap: 1rem; padding: 0.7rem 0; border-bottom: 1px solid var(--line); font-size: 1.35rem; }
+.who b { font-weight: 600; }
+[data-state="정상"] { color: var(--ok); }
+[data-state="지연"] { color: var(--wait); }
+[data-state="끊김"] { color: var(--down); }
+.rail { list-style: none; margin: 0; padding: 0; }
+.rail li { padding: 0.75rem 0; border-bottom: 1px solid var(--line); }
+.rail .when { display: block; color: var(--muted); font-size: 1rem; }
+.spend { color: var(--muted); font-size: 1rem; }
+h2 { font-size: 1rem; font-weight: 600; color: var(--muted); margin: 1.5rem 0 0.25rem; }
+.note { color: var(--down); }
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto; }
+}

@@ -1,9 +1,9 @@
 name: hub tests
 on:
   push:
-    paths: ["tools/**", "tests/**", "prompts/**", "requirements.txt", ".github/workflows/hub-tests.yml"]
+    paths: ["tools/**", "tests/**", "prompts/**", "kitchen/**", "requirements.txt", ".github/workflows/hub-tests.yml"]
   pull_request:
-    paths: ["tools/**", "tests/**", "prompts/**", "requirements.txt", ".github/workflows/hub-tests.yml"]
+    paths: ["tools/**", "tests/**", "prompts/**", "kitchen/**", "requirements.txt", ".github/workflows/hub-tests.yml"]
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -15,3 +15,7 @@ jobs:
           python-version: "3.13"
       - run: pip install -r requirements.txt
       - run: python -m unittest discover -s tests -v
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --test kitchen/test/*.test.js

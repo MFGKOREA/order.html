@@ -42,6 +42,7 @@ import pipeline  # noqa: E402
 import privacy  # noqa: E402
 import retryq  # noqa: E402
 import router  # noqa: E402
+import screen_sync  # noqa: E402
 import hubkeys  # noqa: E402
 import sources  # noqa: E402
 
@@ -301,6 +302,7 @@ class Hub:
         self.retry = retryq.RetryQueue(self.state / "retry.sqlite")
         self.page_port = None
         self._now = None
+        self._screen_at = None
         self.log_book = pipeline.Log(self.state / "envelopes.jsonl")  # every request; restarts, weekly summary
         self.pipeline = pipeline.Pipeline(
             self.cache, askers, board=self.board, deadline=deadline, log=self.log_book,
@@ -380,6 +382,7 @@ class Hub:
         self.weekly(now)
         self.refresh_sources(now)
         self.heartbeat(now)
+        self.sync_screen(now)
 
     def _take(self, rec):
         """A line another AI appended. 완료 to 피클 closes a waiting question. 대기 to Claude or GPT is their task."""
@@ -474,6 +477,29 @@ class Hub:
         return {"badges": badges, "confirms": confirms, "timeline": self.ledger.recent(),
                 "spend": self.meter.status_line((self._now or datetime.now()).date())}
 
+    def public_snapshot(self):
+        view = self.screen()
+        return {"at": (self._now or datetime.now()).isoformat(timespec="seconds"),
+                "badges": view["badges"], "confirms": view["confirms"],
+                "timeline": view["timeline"], "spend": view["spend"]}
+
+    def sync_screen(self, now):
+        """Push a redacted snapshot and apply signed confirm taps. No-op until the URL and secret are set."""
+        url = (self.env.get("HUB_SCREEN_URL") or "").strip()
+        secret = self.env.get("HUB_SYNC_SECRET") or ""
+        if not url or not secret:
+            return
+        if self._screen_at and (now - self._screen_at).total_seconds() < screen_sync.INTERVAL:
+            return
+        self._screen_at = now
+        try:
+            screen_sync.round_trip(
+                url, secret, self.public_snapshot(),
+                lambda commands: screen_sync.apply_signed_commands(self, secret, commands),
+                secrets=hubkeys.secret_values(self.env), now=now.timestamp())
+        except Exception as exc:
+            self.alert(f"화면 동기화 실패: {type(exc).__name__}")
+
     def sync(self, now):
         return sources.sync(self.cache, now, self.env)
 
@@ -507,7 +533,10 @@ class Hub:
         text = f"허브 정상 {now:%Y-%m-%d %H:%M}\n{self.meter.status_line(now.date())}\n"
         for name, state in self.screen()["badges"]:
             text += f"{name} {state}\n"
-        if self.page_port:
+        remote = (self.env.get("HUB_SCREEN_URL") or "").strip()
+        if remote:
+            text += f"화면 {remote}\n"
+        elif self.page_port:
             text += f"화면 http://127.0.0.1:{self.page_port}\n"
         if self._sync_problems:
             text += "\n".join(self._sync_problems) + "\n"
