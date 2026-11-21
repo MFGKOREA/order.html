@@ -8,6 +8,7 @@ Files in the Drive folder Pickle reads (--drive):
   요청.txt                            requests, one per line, appended by Pickle (or anyone)
   답.txt                              the latest answer, under "> request"
   허브상태.txt                        '허브 정상 <time>' + today's AI spend, every minute
+  노무.txt                            daily labor check: 52h, 미태그, 스케줄 없이 출근, 월 마감 (tools/labor.py)
   게시판.txt                          the team's log: status tags, missing or late AIs, code (Pickle never reads it)
 
 Everything written there passes the personal-information filter first (tools/privacy.py; extra
@@ -20,6 +21,7 @@ Usage: python3 tools/hub.py --drive "<Drive folder Pickle reads>" [--ai]
 import argparse
 import hashlib
 import json
+import os
 import re
 import sys
 import threading
@@ -30,15 +32,19 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import ai_board  # noqa: E402
+import labor  # noqa: E402
 import meter  # noqa: E402
 import pickle_relay as pr  # noqa: E402
 import pipeline  # noqa: E402
 import privacy  # noqa: E402
 import router  # noqa: E402
+import sources  # noqa: E402
 
 INBOX, OUTBOX, TASKS, BOARD = "요청.txt", "답.txt", "작업.txt", "게시판.txt"
 HEALTH = "허브상태.txt"  # rewritten every HEARTBEAT seconds; an old time there means the hub is off
 HEARTBEAT = 60
+LABOR = "노무.txt"  # daily labor check (tools/labor.py), every HEARTBEAT seconds
+SYNC_SECONDS = 300  # data sources (tools/sources.py) refresh, in the background
 OPEN_RE = re.compile(r"^## \[대기\] (Q-\d{8}-\d{3}) \d{1,2}:\d{2} (.+?) → (.+)$")
 DONE_RE = re.compile(r"\[완료\] (Q-\d{8}-\d{3})")
 SLOT_PROVIDER = {"GPT": "openai", "Claude": "anthropic"}
@@ -152,12 +158,16 @@ class Outbox:
 
 
 class Hub:
-    def __init__(self, cache_dir, drive_dir, state_dir, askers=None, log=None, deadline=pipeline.DEADLINE):
+    def __init__(self, cache_dir, drive_dir, state_dir, askers=None, log=None, deadline=pipeline.DEADLINE,
+                 confirm=None, env=None):
         self.cache, self.drive, self.state = Path(cache_dir), Path(drive_dir), Path(state_dir)
         self.log = log or sys.stderr
         self.filter = privacy.Filter(self.state / "private_terms.txt")
         self.feed = pr.Feed(self.cache, self.drive, scrub=self.filter.scrub)
-        self.queue = router.ActionQueue(self.state / "actions.jsonl")
+        if confirm is None:  # 발주·HR 확정 wait for "확인 #번호" unless HUB_CONFIRM=0
+            confirm = os.environ.get("HUB_CONFIRM", "1") != "0"
+        self.queue = router.ActionQueue(self.state / "actions.jsonl", confirm=confirm)
+        self.env = os.environ if env is None else env
         self.inbox = Inbox(self.drive / INBOX, self.state / "inbox.json", self.log)
         self.outbox = Outbox(self.drive / OUTBOX, scrub=self.filter.scrub, alert=self.alert)
         self.board = pipeline.Board(self.drive / BOARD, scrub=self.filter.scrub, alert=self.alert)
@@ -170,7 +180,8 @@ class Hub:
         self.pool = ThreadPoolExecutor(max_workers=4)
         self._lock = threading.Lock()  # one request routed at a time: action ids never collide
         self._tasks_version, self._problems, self._week_checked = None, None, None
-        self._beat = None
+        self._beat, self._synced, self.sync_thread, self._sync_problems = None, None, None, []
+        self.labor_alerted = labor.Alerted(self.state / "labor_alerted.json")
 
     def alert(self, message):
         """Tell 신우님: the hub's window and <state>/alerts.log (never the Drive folder)."""
@@ -229,7 +240,32 @@ class Hub:
             pr.write_if_changed(self.drive / TASKS, text)
             self._tasks_version = self.queue.version
         self.weekly(now)
+        self.refresh_sources(now)
         self.heartbeat(now)
+
+    def sync(self, now):
+        return sources.sync(self.cache, now, self.env)
+
+    def refresh_sources(self, now):
+        """Every SYNC_SECONDS, pull the order app and the HR board into the cache, on a thread so the
+        tick never waits on the network. Nothing happens when neither source is set."""
+        if not (self.env.get("ORDER_APP_API") or self.env.get("HR_BOARD_PASSWORD")):
+            return
+        if self.sync_thread and self.sync_thread.is_alive():
+            return
+        if self._synced and (now - self._synced).total_seconds() < SYNC_SECONDS:
+            return
+        self._synced = now
+
+        def run():
+            _, problems = self.sync(now)
+            for problem in problems:
+                if problem not in self._sync_problems:
+                    self.alert(problem)
+            self._sync_problems = problems
+
+        self.sync_thread = threading.Thread(target=run, daemon=True)
+        self.sync_thread.start()
 
     def heartbeat(self, now):
         """허브상태.txt: when the hub last ran and today's AI spend, so a stopped hub shows (Pickle
@@ -238,7 +274,14 @@ class Hub:
             return
         self._beat = now
         text = f"허브 정상 {now:%Y-%m-%d %H:%M}\n{self.meter.status_line(now.date())}\n"
+        if self._sync_problems:
+            text += "\n".join(self._sync_problems) + "\n"
         pr.write_if_changed(self.drive / HEALTH, self.filter.scrub(text)[0])
+        report, alerts = labor.report(self.cache, now)
+        pr.write_if_changed(self.drive / LABOR, self.filter.scrub(report)[0])
+        for message in self.labor_alerted.new(alerts):
+            self.alert(f"[노무] {message}")
+            self.board.note(f"[노무] {message}")
 
     def weekly(self, now):
         """On the first check of a new week, post last week's summary on the board (once)."""

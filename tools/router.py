@@ -35,6 +35,7 @@ TOPIC_WORDS = {"inventory": ("재고",), "inbound": ("입고",), "sales": ("그�
                "promotions": ("행사", "프로모션", "이벤트", "할인")}
 TOPIC_NAMES = {"inventory": "재고", "inbound": "입고", "sales": "매출", "boh": "BOH", "roster": "근무표",
                "promotions": "행사"}
+WAITING = "확인대기"
 DEDUPE_SECONDS = 60  # the same pending action again within this window is not queued twice
 
 
@@ -48,6 +49,7 @@ QTY_RE = re.compile(rf"(\d+(?:\.\d+)?)\s*({_alt(UNITS)})", re.I)
 KOREAN_QTY_RE = re.compile(rf"({_alt(KOREAN_NUMBERS)})\s*({_alt(UNITS)})", re.I)
 NUMBER_RE = re.compile(r"\d+(?:\.\d+)?")
 MONTH_DAY_RE = re.compile(r"(\d{1,2})\s*(?:/|월)\s*(\d{1,2})")
+CONFIRM_ID_RE = re.compile(r"^확인\s*#?(\d+)\s*번?$")
 STATUS_RE = re.compile(r"^#?(\d+)\s*번?\s*(완료|실패)\s*(.*)$")
 ASKING_RE = re.compile(r"(몇|얼마|언제|됐어|됐나|했어|했나|했니|인가|일까|어때)")
 # Verbs that change something somewhere. Only these make an unlisted request a refused command;
@@ -73,8 +75,10 @@ class Reply:
 class ActionQueue:
     """Append-only action log (JSON lines) that 레미 works through. Re-reads when another process writes."""
 
-    def __init__(self, path):
-        self.path = Path(path)
+    def __init__(self, path, confirm=False):
+        """confirm=True: a new action waits as 확인대기 until a "확인 #번호" line, so a misread request
+        never reaches 레미 by itself (레미 works only 접수 lines)."""
+        self.path, self.confirm = Path(path), confirm
         self.items, self._stamp = {}, None
         self.version = 0  # goes up on every change, so a view is rebuilt only when needed
         self.refresh()
@@ -108,11 +112,11 @@ class ActionQueue:
         self.refresh()
         for a in self.items.values():
             age = (now - datetime.fromisoformat(a["at"])).total_seconds()
-            if a["status"] == "접수" and a["text"] == action["text"] and 0 <= age <= DEDUPE_SECONDS:
+            if a["status"] in ("접수", WAITING) and a["text"] == action["text"] and 0 <= age <= DEDUPE_SECONDS:
                 return a["id"], True
         new_id = max(self.items, default=0) + 1
-        self._append({"id": new_id, "at": now.isoformat(timespec="seconds"), "status": "접수", "note": "",
-                      **action})
+        self._append({"id": new_id, "at": now.isoformat(timespec="seconds"),
+                      "status": WAITING if self.confirm else "접수", "note": "", **action})
         return new_id, False
 
     def set_status(self, task_id, status, note, now):
@@ -123,13 +127,21 @@ class ActionQueue:
                       "updated_at": now.isoformat(timespec="seconds")})
         return True
 
+    def confirm_task(self, task_id, now):
+        """확인대기 -> 접수. False when there is no such action waiting."""
+        self.refresh()
+        if self.items.get(task_id, {}).get("status") != WAITING:
+            return False
+        self._append({"id": task_id, "status": "접수", "note": "", "updated_at": now.isoformat(timespec="seconds")})
+        return True
+
     def view(self, finished=3):
         """Every pending (접수) action plus the latest `finished` done or failed ones, oldest first,
         e.g. '#3 접수 14:05 발주 브로콜리 2개'. Short, so Pickle and 레미 read few tokens."""
         self.refresh()
         ordered = sorted(self.items.values(), key=lambda a: a["id"])
-        done_ids = {a["id"] for a in ordered if a["status"] != "접수"}
-        keep = {a["id"] for a in ordered if a["status"] == "접수"} | set(sorted(done_ids)[-finished:] if finished else ())
+        done_ids = {a["id"] for a in ordered if a["status"] not in ("접수", WAITING)}
+        keep = {a["id"] for a in ordered if a["status"] in ("접수", WAITING)} | set(sorted(done_ids)[-finished:] if finished else ())
         lines = []
         for a in ordered:
             if a["id"] in keep:
@@ -193,9 +205,15 @@ def parse_quantities(text):
     return [(q, u) for _, q, u in sorted(found)]
 
 
+def _ask_confirm(queue, task_id):
+    return f" → \"확인 #{task_id}\" 보내면 접수" if queue.confirm else ""
+
+
 def _queued(queue, action, now, label):
     task_id, duplicate = queue.add(action, now)
-    return f"{label} #{task_id}" if not duplicate else f"{label} #{task_id} (이미 접수됨)"
+    if queue.confirm:
+        label = label.replace("접수", WAITING)
+    return f"{label} #{task_id}" + (" (이미 접수됨)" if duplicate else _ask_confirm(queue, task_id))
 
 
 def _order(t, cache_dir, now, queue):
@@ -218,7 +236,8 @@ def _order(t, cache_dir, now, queue):
         amount = f"{pr.fmt_qty(qty)}{unit}"
         action = {"type": "order", "item": item, "qty": qty, "unit": unit, "text": f"발주 {item} {amount}"}
         task_id, duplicate = queue.add(action, now)
-        lines.append(f"발주 접수 #{task_id}: {item} {amount}" + (" (이미 접수됨)" if duplicate else ""))
+        word = WAITING if queue.confirm else "접수"
+        lines.append(f"발주 {word} #{task_id}: {item} {amount}" + (" (이미 접수됨)" if duplicate else _ask_confirm(queue, task_id)))
         actions.append(action)
     return Reply("order" if actions else "held", "\n".join(lines), tuple(actions))
 
@@ -281,6 +300,10 @@ def route(text, cache_dir, queue, now=None):
     compact = re.sub(r"\s+", "", t).lower()
     asking = bool(ASKING_RE.search(compact))
 
+    m = CONFIRM_ID_RE.match(t.strip())
+    if m:
+        ok = queue.confirm_task(int(m[1]), now)
+        return Reply("status", f"#{m[1]} 접수" if ok else f"#{m[1]} 확인할 작업 없음")
     m = STATUS_RE.match(t)
     if m:
         done = queue.set_status(int(m[1]), m[2], m[3].strip(), now)

@@ -1,5 +1,6 @@
 import contextlib
 import io
+import json
 import shutil
 import sys
 import tempfile
@@ -93,8 +94,8 @@ class HubTest(unittest.TestCase):
     def tearDown(self):
         self.tmp.cleanup()
 
-    def make(self, askers=None):
-        return hub.Hub(self.cache, self.drive, self.state, askers, self.log)
+    def make(self, askers=None, confirm=False, env=None):
+        return hub.Hub(self.cache, self.drive, self.state, askers, self.log, confirm=confirm, env=env or {})
 
     def read(self, name):
         return (self.drive / name).read_text(encoding="utf-8")
@@ -110,6 +111,51 @@ class HubTest(unittest.TestCase):
             h.tick(NOW)
             self.assertEqual(self.read(hub.OUTBOX), f"> {question}\n{answer}\n")
         self.assertEqual(self.read(hub.TASKS), "#1 접수 11:00 발주 브로콜리 2개\n#2 접수 11:00 HR 스케줄 확정\n")
+
+    def test_orders_wait_for_confirm(self):
+        h = self.make(confirm=True)
+        h.tick(NOW)
+        append(self.drive / hub.INBOX, "브로콜리 2개 발주")
+        h.tick(NOW)
+        self.assertEqual(self.read(hub.OUTBOX), '> 브로콜리 2개 발주\n발주 확인대기 #1: 브로콜리 2개 → "확인 #1" 보내면 접수\n')
+        self.assertEqual(self.read(hub.TASKS), "#1 확인대기 11:00 발주 브로콜리 2개\n")
+        append(self.drive / hub.INBOX, "확인 #1")
+        h.tick(NOW)
+        self.assertEqual(self.read(hub.TASKS), "#1 접수 11:00 발주 브로콜리 2개\n")
+        append(self.drive / hub.INBOX, "확인 #9")
+        h.tick(NOW)
+        self.assertEqual(self.read(hub.TASKS), "#1 접수 11:00 발주 브로콜리 2개\n")
+
+    def test_labor_file_and_alerts_once(self):
+        (self.cache / "live_roster.json").write_text(json.dumps({"shifts": [
+            {"date": f"2026-11-{9 + i:02d}", "shift": "BOH", "name": "김민수", "start": "09:00", "end": "19:00",
+             "hours": 9.0} for i in range(6)] + [
+            {"date": "2026-11-13", "shift": "BOH", "name": "이지은", "start": "09:00", "end": "10:00", "hours": 1.0}]},
+            ensure_ascii=False), encoding="utf-8")
+        (self.cache / "live_boh_status.json").write_text(json.dumps({
+            "as_of": "11:00", "date": "2026-11-13", "events": [], "on_duty": 1, "off_duty": 0,
+            "rows": [{"name": "김민수", "in": "08:55", "out": ""}, {"name": "이지은", "in": "", "out": ""}]},
+            ensure_ascii=False), encoding="utf-8")
+        h = self.make()
+        h.tick(NOW)
+        text = self.read(hub.LABOR)
+        self.assertIn("52h 초과: 김민수 이번 주 54시간 (스케줄 기준)", text)
+        self.assertIn("출근 미태그: 이지은 09:00 출근 예정", text)
+        self.assertNotIn("퇴근 미태그", text)
+        alerts = (self.state / "alerts.log").read_text(encoding="utf-8")
+        h.tick(NOW + timedelta(minutes=2))
+        self.assertEqual((self.state / "alerts.log").read_text(encoding="utf-8"), alerts)  # once
+        self.assertEqual(alerts.count("52h 초과: 김민수"), 1)
+
+    def test_sources_sync_in_the_background(self):
+        calls = []
+        h = self.make(env={"ORDER_APP_API": "x"})
+        h.sync = lambda now: calls.append(now) or ([], [])
+        h.tick(NOW)
+        h.tick(NOW + timedelta(seconds=10))
+        h.tick(NOW + timedelta(seconds=hub.SYNC_SECONDS + 1))
+        h.sync_thread.join(1)
+        self.assertEqual(len(calls), 2)
 
     def test_heartbeat_file_once_a_minute(self):
         h = self.make()
