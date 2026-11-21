@@ -194,6 +194,21 @@ class Run(PipelineCase):
         self.assertEqual(len(gpt.calls), 0)
         self.assertIn("[GPT] 오늘 한도 도달", self.board())
 
+    def test_shared_budget_spent_stops_both_ais(self):
+        claude, gpt = FakeAI(GOOD), FakeAI(GOOD)
+        pl.Pipeline(FIX, {"Claude": claude, "GPT": gpt}, systems={}, board=pl.Board(self.board_path),
+                    clock=lambda: NOW, blocked=lambda slot: True).run("오늘 비 오면 손님 줄어?", self.replies.append)
+        self.assertEqual((len(claude.calls), len(gpt.calls)), (0, 0))
+        self.assertEqual(self.replies, [pl.LIMIT])
+
+    def test_claude_over_the_cap_hands_work_to_gpt(self):
+        claude, gpt = FakeAI(GOOD), FakeAI(GOOD)
+        pl.Pipeline(FIX, {"Claude": claude, "GPT": gpt}, systems={}, board=pl.Board(self.board_path),
+                    clock=lambda: NOW, blocked=lambda slot: slot == "Claude").run("엑셀 합계 수식 만들어줘", self.replies.append)
+        self.assertEqual(len(claude.calls), 0)
+        self.assertGreaterEqual(len(gpt.calls), 1)
+        self.assertIn("[Claude] 오늘 한도 도달", self.board())
+
     def test_no_ai_connected(self):
         self.make().run("오늘 비 오면 손님 줄어?", self.replies.append)
         self.assertEqual(self.replies, [pl.NO_AI])

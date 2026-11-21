@@ -285,18 +285,19 @@ class WireFormat(unittest.TestCase):
         self.assertEqual(headers["authorization"], "Bearer test-key")  # SDK 2.x sends keys as Bearer
         self.assertIn("server-side-fallback-2026-07-01", headers["anthropic-beta"])
         self.assertNotIn("fast-mode", headers["anthropic-beta"])
-        self.assertEqual((body["model"], body["stream"], body["fallbacks"]), ("claude-opus-5-5", True, "default"))
+        self.assertEqual((body["model"], body["stream"], body["fallbacks"]), ("claude-sonnet-5-5", True, "default"))
         self.assertEqual(body["output_config"], {"effort": "low"})
         self.assertEqual(body["system"], ab.SYSTEM)
         self.assertNotIn("speed", body)
         self.assertNotIn("thinking", body)
 
     def test_claude_fast_mode_and_fallback_to_standard_when_busy(self):
-        self.claude.FAST, _Mock.busy_fast = True, True
+        model = self.claude.MODEL
+        self.claude.FAST, self.claude.MODEL, _Mock.busy_fast = True, "claude-opus-5-5", True  # fast mode is Opus-only
         try:
             self.assertEqual(list(self.claude.lines("q", ab.SYSTEM)), ["안녕하세요", "양파 20kg 발주", "추가 설명"])
         finally:
-            self.claude.FAST = False
+            self.claude.FAST, self.claude.MODEL = False, model
         (_, h1, b1), (_, h2, b2) = self.posts()
         self.assertEqual(b1["speed"], "fast")
         self.assertIn("fast-mode-2026-02-01", h1["anthropic-beta"])
@@ -338,7 +339,7 @@ class WireFormat(unittest.TestCase):
             list(self.claude.lines("q", ab.SYSTEM))
         finally:
             self.gpt.on_usage = self.claude.on_usage = None
-        self.assertEqual(seen, [("gpt", "gpt-4o-mini", 12, 34), ("claude", "claude-opus-5-5", 1, 5)])
+        self.assertEqual(seen, [("gpt", "gpt-4o-mini", 12, 34), ("claude", "claude-sonnet-5-5", 1, 5)])
         self.assertEqual(self.posts()[0][2]["stream_options"], {"include_usage": True})
 
     def test_hub_end_to_end_through_the_sdks(self):

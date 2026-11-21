@@ -1,11 +1,13 @@
 """API spend and the weekly summary. Stdlib only.
 
 Prices are USD per million tokens, set with GPT_PRICE_IN / GPT_PRICE_OUT and CLAUDE_PRICE_IN /
-CLAUDE_PRICE_OUT. Defaults: gpt-5-mini 0.25 / 2.00 (its launch price; check the current one) and
-claude-opus-5-5 4 / 20 (fast mode costs double). OpenAI's monthly budget (OPENAI_MONTHLY_BUDGET,
-default $5) becomes a daily cap: budget ÷ days in the month. At 80% of the day's cap, or of the
-month's budget, 신우님 gets an alert; at 100% of the day's cap GPT stops for the day and its work
-goes to Claude.
+CLAUDE_PRICE_OUT. Defaults: gpt-5-mini 0.25 / 2.00 and claude-sonnet-5-5 3 / 15 (check the current
+prices); Opus models and gpt-4o-mini use MODEL_PRICES; fast mode costs double.
+
+One budget covers Claude and GPT together: HUB_MONTHLY_BUDGET (default $30) becomes a daily cap,
+budget ÷ days in the month, counted over both providers. At 80% of the day's cap, or of the month's
+budget, 신우님 gets an alert; at 100% of the day's cap both AIs stop for the day (data answers keep
+working). GPT also stops after GPT_DAILY_CALLS answers a day (default 200).
 """
 import calendar
 import json
@@ -20,21 +22,23 @@ def _env(name, default):
 
 
 # Per-model prices (USD per million tokens) that differ from the provider default.
-MODEL_PRICES = {"gpt-4o-mini": (0.15, 0.60)}
+MODEL_PRICES = {"gpt-4o-mini": (0.15, 0.60), "claude-opus-5-5": (4.0, 20.0), "claude-opus-5": (4.0, 20.0),
+                "claude-opus-4-8": (4.0, 20.0)}
+PROVIDERS = ("openai", "anthropic")
 DAILY_CALLS = int(os.environ.get("GPT_DAILY_CALLS", "200"))  # OpenAI answers per day, then GPT stops
 
 
 def default_prices():
     return {"openai": (_env("GPT_PRICE_IN", 0.25), _env("GPT_PRICE_OUT", 2.00)),
-            "anthropic": (_env("CLAUDE_PRICE_IN", 4.0), _env("CLAUDE_PRICE_OUT", 20.0))}
+            "anthropic": (_env("CLAUDE_PRICE_IN", 3.0), _env("CLAUDE_PRICE_OUT", 15.0))}
 
 
 class Meter:
-    """Spend per call in <state>/usage.jsonl; daily and monthly totals; the OpenAI cap."""
+    """Spend per call in <state>/usage.jsonl; daily and monthly totals; one cap for Claude + GPT."""
 
     def __init__(self, path, monthly_budget=None, clock=datetime.now, alert=None, prices=None):
         self.path, self.clock, self.alert = Path(path), clock, alert or (lambda message: None)
-        self.budget = _env("OPENAI_MONTHLY_BUDGET", 5.0) if monthly_budget is None else monthly_budget
+        self.budget = _env("HUB_MONTHLY_BUDGET", 30.0) if monthly_budget is None else monthly_budget
         self.prices = prices or default_prices()
         self.lock, self.alerted = threading.Lock(), set()
         self.records = self._read()
@@ -53,7 +57,7 @@ class Meter:
         return out
 
     def cap(self, day):
-        """OpenAI's daily cap: the month's budget spread over its days."""
+        """The daily cap (Claude + GPT): the month's budget spread over its days."""
         return self.budget / calendar.monthrange(day.year, day.month)[1]
 
     def spent(self, provider, day=None, month=None):
@@ -69,8 +73,10 @@ class Meter:
     def record(self, provider, model, input_tokens, output_tokens):
         """One answer's usage. Returns its cost in USD."""
         p_in, p_out = self.prices[provider]
-        if model in MODEL_PRICES and not os.environ.get("GPT_PRICE_IN"):
-            p_in, p_out = MODEL_PRICES[model]
+        base = model.removesuffix(":fast")
+        own = "GPT_PRICE_IN" if provider == "openai" else "CLAUDE_PRICE_IN"
+        if base in MODEL_PRICES and not os.environ.get(own):
+            p_in, p_out = MODEL_PRICES[base]
         usd = (input_tokens * p_in + output_tokens * p_out) / 1_000_000
         if model.endswith(":fast"):
             usd *= 2
@@ -82,20 +88,23 @@ class Meter:
             self.path.parent.mkdir(parents=True, exist_ok=True)
             with self.path.open("a", encoding="utf-8") as f:
                 f.write(json.dumps(rec) + "\n")
-        if provider == "openai":
-            self._check(now.date())
+        self._check(now.date())
         return usd
 
+    def total(self, day=None, month=None):
+        """USD spent by Claude and GPT together."""
+        return sum(self.spent(p, day=day, month=month) for p in PROVIDERS)
+
     def _check(self, day):
-        today, cap = self.spent("openai", day=day), self.cap(day)
-        month = self.spent("openai", month=(day.year, day.month))
+        today, cap = self.total(day=day), self.cap(day)
+        month = self.total(month=(day.year, day.month))
         checks = [  # highest level first; once a level fires, the lower one of the same span is done too
             ((day.isoformat(), 1.0), today >= cap,
-             f"OpenAI 오늘 한도 도달 (${today:.3f} / ${cap:.3f}): GPT를 멈추고 Claude로 넘김"),
+             f"AI 오늘 한도 도달 (${today:.3f} / ${cap:.3f}): Claude·GPT를 내일까지 멈춤"),
             ((day.isoformat(), 0.8), today >= 0.8 * cap,
-             f"OpenAI 비용 80%: 오늘 ${today:.3f} / 일일 한도 ${cap:.3f} (월 ${self.budget:g})"),
+             f"AI 비용 80%: 오늘 ${today:.3f} / 일일 한도 ${cap:.3f} (월 ${self.budget:g})"),
             ((f"{day:%Y-%m}", 0.8), month >= 0.8 * self.budget,
-             f"OpenAI 이번 달 80%: ${month:.2f} / ${self.budget:g}"),
+             f"AI 이번 달 80%: ${month:.2f} / ${self.budget:g}"),
         ]
         with self.lock:
             fire = []
@@ -113,11 +122,16 @@ class Meter:
                    if r["provider"] == provider and datetime.fromisoformat(r["at"]).date() == day)
 
     def blocked(self, provider="openai"):
-        """True once today's OpenAI spend reaches the daily cap, or today's calls reach DAILY_CALLS."""
-        if provider != "openai":
+        """True once today's Claude + GPT spend reaches the daily cap; GPT also after DAILY_CALLS answers."""
+        if provider not in PROVIDERS:
             return False
         day = self.clock().date()
-        return self.spent("openai", day=day) >= self.cap(day) or self.calls("openai", day) >= DAILY_CALLS
+        if self.total(day=day) >= self.cap(day):
+            return True
+        return provider == "openai" and self.calls("openai", day) >= DAILY_CALLS
+
+    def status_line(self, day):
+        return f"AI 오늘 ${self.total(day=day):.2f} / ${self.cap(day):.2f}, 이번 달 ${self.total(month=(day.year, day.month)):.2f} / ${self.budget:g}"
 
 
 DATA_KINDS = {"inventory", "inbound", "sales", "boh", "multi", "tasks", "roster", "promotions"}

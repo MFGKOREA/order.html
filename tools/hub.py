@@ -38,6 +38,7 @@ import router  # noqa: E402
 INBOX, OUTBOX, TASKS, BOARD = "요청.txt", "답.txt", "작업.txt", "게시판.txt"
 OPEN_RE = re.compile(r"^## \[대기\] (Q-\d{8}-\d{3}) \d{1,2}:\d{2} (.+?) → (.+)$")
 DONE_RE = re.compile(r"\[완료\] (Q-\d{8}-\d{3})")
+SLOT_PROVIDER = {"GPT": "openai", "Claude": "anthropic"}
 KEEP_ANSWERS = 1  # 답.txt holds only the latest answer, so Pickle reads the fewest tokens
 
 
@@ -162,7 +163,7 @@ class Hub:
         self.pipeline = pipeline.Pipeline(
             self.cache, askers, board=self.board, deadline=deadline, log=self.log_book,
             reply_for=lambda request: (lambda answer: self.outbox.add(request, answer)),
-            blocked=lambda slot: slot == "GPT" and self.meter.blocked("openai"))
+            blocked=lambda slot: self.meter.blocked(SLOT_PROVIDER.get(slot)))
         self.pool = ThreadPoolExecutor(max_workers=4)
         self._lock = threading.Lock()  # one request routed at a time: action ids never collide
         self._tasks_version, self._problems, self._week_checked = None, None, None
@@ -284,7 +285,7 @@ def main(argv=None):
         import ask_gpt
         m = meter.Meter(state / "usage.jsonl")
         if m.blocked("openai"):
-            print("GPT 오늘 한도 도달", file=sys.stderr)
+            print("AI 오늘 한도 도달", file=sys.stderr)
             return 1
         ask_gpt.on_usage = lambda model, i, o: m.record("openai", model, i, o)
         for line in answer_board(args.drive, args.cache, ask_gpt.lines):

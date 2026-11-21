@@ -33,6 +33,7 @@ LABELS = ("결론", "근거", "확인 필요")
 ANALYSIS_BANNED = tuple(w for w in pr.BANNED if w not in ("결론", "근거", "확인필요", "확인 필요"))
 UNKNOWN = "결론: 모름\n근거: 출처가 있는 답 없음\n확인 필요: 신우님 확인"
 NO_AI = "AI 연결 안 됨"
+LIMIT = "AI 오늘 한도 도달: 데이터 질문만 답함 (내일 다시)"
 
 CATEGORY_WORDS = (  # first match wins; compared without spaces, lower case
     ("browser", ("세콤", "hr", "사이트", "로그인", "화면", "스크래핑", "크롤링", "홈페이지", "브라우저", "웹페이지")),
@@ -467,13 +468,18 @@ class Pipeline:
             if checker == "GPT":
                 checker = None  # GPT would only check its own answer
             record["targets"] = answerers
-        if self.blocked("GPT") and ("GPT" in answerers or checker == "GPT"):
-            answerers = list(dict.fromkeys("Claude" if a == "GPT" else a for a in answerers))
-            if checker == "GPT":
-                checker = None
-                notes.append("GPT 오늘 한도 도달, 검증 못 함")
-            record["targets"] = answerers
-            self.note(f"[GPT] 오늘 한도 도달 {qid}: Claude로")
+        for slot, other in (("GPT", "Claude"), ("Claude", "GPT")):
+            if self.blocked(slot) and (slot in answerers or checker == slot):
+                if self.blocked(other):  # the shared budget is spent: neither AI answers today
+                    answerers = [a for a in answerers if a != slot]
+                    self.note(f"[{slot}] 오늘 한도 도달 {qid}")
+                else:
+                    answerers = list(dict.fromkeys(other if a == slot else a for a in answerers))
+                    self.note(f"[{slot}] 오늘 한도 도달 {qid}: {other}로")
+                if checker == slot:
+                    checker = None
+                    notes.append(f"{slot} 오늘 한도 도달, 검증 못 함")
+                record["targets"] = answerers
 
         self.status(qid, "대기", f"## [대기] {qid} {now:%H:%M} {q} → {', '.join(answerers)}",
                     요청=question, 질문=q, 대상=answerers, 요청자=requester, important=important, **done)
@@ -482,6 +488,10 @@ class Pipeline:
                 self.pending[qid] = {"request": question, "reply": reply, "key": key, "data": data}
             return record
         slots = [s for s in answerers if s in self.askers]
+        if not answerers:
+            reply(LIMIT)
+            self.status(qid, "완료", f"[완료] {qid} {LIMIT}", answer=LIMIT, seconds=0.0, **done)
+            return {**record, "answer": LIMIT, "status": "완료"}
         if not slots:
             reply(NO_AI)
             self.status(qid, "완료", f"[완료] {qid} {NO_AI}", answer=NO_AI, seconds=0.0, **done)

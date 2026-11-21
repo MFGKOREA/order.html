@@ -45,18 +45,18 @@ class Spend(MeterCase):
         m.record("openai", "gpt-5-mini", tokens_for(0.15 * cap), 0)  # 85%
         m.record("openai", "gpt-5-mini", 10, 0)  # still 85%: no second alert
         self.assertEqual(len(self.alerts), 1)
-        self.assertTrue(self.alerts[0].startswith("OpenAI 비용 80%: 오늘 $0.142 / 일일 한도 $0.167 (월 $5)"))
+        self.assertTrue(self.alerts[0].startswith("AI 비용 80%: 오늘 $0.142 / 일일 한도 $0.167 (월 $5)"))
         m.record("openai", "gpt-5-mini", tokens_for(0.2 * cap), 0)  # 105%
         self.assertTrue(m.blocked())
-        self.assertFalse(m.blocked("anthropic"))
+        self.assertTrue(m.blocked("anthropic"))  # one budget for both
         self.assertEqual(len(self.alerts), 2)
         self.assertIn("오늘 한도 도달", self.alerts[1])
-        self.assertIn("Claude로 넘김", self.alerts[1])
+        self.assertIn("Claude·GPT", self.alerts[1])
 
     def test_month_budget_alert(self):
         m = self.make(budget=0.5)
         m.record("openai", "gpt-5-mini", 1_700_000, 0)  # $0.425 = 85% of the month
-        self.assertTrue(any(a.startswith("OpenAI 이번 달 80%: $0.42 / $0.5") for a in self.alerts))
+        self.assertTrue(any(a.startswith("AI 이번 달 80%: $0.42 / $0.5") for a in self.alerts))
 
 
 class Weekly(unittest.TestCase):
@@ -87,3 +87,19 @@ class Weekly(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SharedBudget(MeterCase):
+    def test_claude_spend_counts_toward_the_same_cap(self):
+        m = self.make(budget=3.0)  # $0.10 a day in November
+        m.record("anthropic", "claude-sonnet-5-5", 0, 6000)  # $0.12 at $20/M
+        self.assertTrue(m.blocked("openai"))
+        self.assertTrue(m.blocked("anthropic"))
+        self.assertFalse(m.blocked("레미"))
+        self.assertIn("한도 도달", self.alerts[-1])
+
+    def test_default_budget_and_model_prices(self):
+        m = meter.Meter(self.path, clock=lambda: NOW, prices=None)
+        self.assertAlmostEqual(m.budget, 30.0)
+        self.assertAlmostEqual(m.record("anthropic", "claude-sonnet-5-5", 1_000_000, 0), 3.0)
+        self.assertAlmostEqual(m.record("anthropic", "claude-opus-5-5", 1_000_000, 0), 4.0)

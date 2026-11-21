@@ -17,7 +17,13 @@ NOW = datetime(2026, 11, 13, 14, 30)
 ANSWER = "결론: 금요일\n근거: 런치 세트 20% 할인 (매장 11/13 09:00)\n확인 필요: 없음"
 
 
+def _has(module):
+    import importlib.util
+    return importlib.util.find_spec(module) is not None
+
+
 class GptOnly(unittest.TestCase):
+    @unittest.skipUnless(_has("openai"), "pip install -r requirements.txt")
     def test_only_the_ai_with_a_key_is_loaded(self):
         askers, warmers = ai_board.load_ais({"OPENAI_API_KEY": "x"})
         self.assertEqual((list(askers), list(warmers)), (["GPT"], ["GPT"]))

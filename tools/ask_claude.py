@@ -1,7 +1,7 @@
 """Ask Claude one board question, streaming the answer line by line.
 
 Credentials: ANTHROPIC_API_KEY (or an `ant auth login` profile) on the machine that runs this.
-Model: CLAUDE_MODEL, default claude-opus-5-5.
+Model: CLAUDE_MODEL, default claude-sonnet-5-5 (Opus costs more; set CLAUDE_MODEL to use it).
 CLAUDE_FAST=1: Claude fast mode (up to 2.5x output speed, 2x price; Opus 5.5 / Opus 5 / Opus 4.8 only).
 """
 import json
@@ -10,7 +10,7 @@ import os
 import anthropic
 import httpx2  # the SDK's own HTTP library (installed with it)
 
-MODEL = os.environ.get("CLAUDE_MODEL", "claude-opus-5-5")
+MODEL = os.environ.get("CLAUDE_MODEL", "claude-sonnet-5-5")
 FAST = os.environ.get("CLAUDE_FAST") == "1"
 # Models that accept server-side refusal fallbacks (fallbacks="default").
 FALLBACK_MODELS = {"claude-opus-5-5", "claude-opus-5", "claude-fable-5-1", "claude-sonnet-5-5"}

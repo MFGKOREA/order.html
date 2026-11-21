@@ -125,11 +125,12 @@ Settings (environment variables on the PC):
 
 | Variable | Default | What it does |
 |---|---|---|
-| `CLAUDE_MODEL` | `claude-opus-5-5` | Claude model (runs at low effort) |
+| `CLAUDE_MODEL` | `claude-sonnet-5-5` | Claude model (runs at low effort). Opus costs more; fast mode works only on Opus |
 | `GPT_MODEL`, `GPT_REASONING_EFFORT` | `gpt-5-mini`, `minimal` | GPT model and reasoning level |
-| `OPENAI_MONTHLY_BUDGET` | `5` | USD per month. The daily cap is this ÷ the days in the month. At 80% of the day or the month 신우님 gets an alert; at 100% of the day GPT stops and its work goes to Claude |
+| `HUB_MONTHLY_BUDGET` | `30` | USD per month for Claude and GPT together. The daily cap is this ÷ the days in the month. At 80% of the day or the month 신우님 gets an alert; at 100% of the day both AIs stop until tomorrow and data answers keep working |
+| `GPT_DAILY_CALLS` | `200` | GPT answers per day, then GPT stops and its work goes to Claude |
 | `GPT_PRICE_IN`, `GPT_PRICE_OUT` | `0.25`, `2.00` | USD per million tokens. gpt-5-mini's launch price; set the current one |
-| `CLAUDE_PRICE_IN`, `CLAUDE_PRICE_OUT` | `4`, `20` | USD per million tokens. Fast mode is counted double |
+| `CLAUDE_PRICE_IN`, `CLAUDE_PRICE_OUT` | `3`, `15` | USD per million tokens for Sonnet (Opus uses 4 / 20 unless set). Fast mode is counted double |
 | `CLAUDE_FAST`, `GPT_PRIORITY` | off | Paid speed tiers (Claude fast mode: 2x price; OpenAI priority: set its price above) |
 
 The weekly summary (counts, average answer time, failures, spend) is posted on `게시판.txt` on the first check of each new week.
