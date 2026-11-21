@@ -1,1 +1,52 @@
-# order.html
+# 피클 허브
+
+매장 PC에서 도는 프로그램 하나. 피클(현정 매니저님)이 드라이브 `피클` 폴더에 질문을 쓰면, 허브가 데이터 질문은 AI 없이 바로 답하고 나머지는 Claude·GPT·레미에게 나눠 결론→근거→확인 필요로 답한다. 설계는 [DESIGN.md](DESIGN.md), 세부 운영은 [CLONE.md](CLONE.md).
+
+## 처음 한 번 (매장 PC, 윈도)
+
+1. 파이썬 3.12 이상 설치, 이 폴더에서 `pip install -r requirements.txt`
+2. `tools\hub.env.cmd.example`을 `tools\hub.env.cmd`로 복사하고 값을 채운다. 이 파일은 저장소에 올라가지 않는다.
+   - `PICKLE_DRIVE`: 구글 드라이브의 `피클` 폴더 경로
+   - `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`: 없는 쪽은 비워 둔다
+   - `ORDER_APP_API`: 발주앱 Apps Script 주소 (label-list `order-src/app.js`의 `DEFAULT_API`)
+   - `HR_BOARD_PASSWORD`: HR 보드 비밀번호
+3. `tools\install_autostart.cmd`를 한 번 실행한다. 이제 PC를 켜고 로그인하면 허브가 자동으로 켜지고, 꺼지면 10초 뒤 다시 켜진다.
+
+## 켜기 · 끄기 · 확인
+
+| 할 일 | 방법 |
+|---|---|
+| 지금 켜기 | `tools\start_hub.cmd` 더블클릭 |
+| 끄기 | 허브 창에서 Ctrl+C 두 번, 또는 창 닫기 |
+| 살아 있나 | 드라이브 `허브상태.txt`의 시각이 1~2분 안이면 정상 |
+| 오늘 AI 비용 | `허브상태.txt` 둘째 줄 (Claude+GPT 합산, 월 $30 한도) |
+| 노무 점검 | `노무.txt` (52시간, 출퇴근 미태그, 스케줄 없이 출근, 월 마감) |
+| 알림 기록 | `<cache>\.hub\alerts.log` |
+| 키 바꾸기 | `tools\hub.env.cmd` 수정 후 허브 창을 닫으면 10초 뒤 새 값으로 다시 켜짐 |
+| 업데이트 | 이 폴더에서 `git pull` 후 허브 창 닫기 |
+| 되돌리기 | `git log`로 이전 커밋을 찾아 `git checkout <커밋>` 후 허브 창 닫기 |
+
+## 발주·HR 확정은 두 번
+
+`브로콜리 2개 발주` → `발주 확인대기 #3 … "확인 #3" 보내면 접수`. `확인 #3`을 보내야 레미가 처리한다. 잘못 읽힌 요청이 바로 실행되지 않게 하는 장치다. 끄려면 `HUB_CONFIRM=0`.
+
+## 데이터가 오는 곳 (5분마다, 읽기만)
+
+| 답 파일 | 출처 |
+|---|---|
+| 재고 | 발주앱 시트 kv `input.<날짜>` 최근 입력값 |
+| 입고 | 발주앱 `misRecv.<날짜>` |
+| 매출 | 발주앱 `nowSales`, 목표는 `forecast` |
+| BOH | 발주앱 `hrStatus` (HR 출퇴근, BOH 위젯과 같은 자료) |
+| 행사 | 발주앱 `events` (컨벤션센터 행사) |
+| 근무표 | HR 보드 이번 주·다음 주 스케줄 |
+
+한 곳이 실패해도 나머지는 계속 갱신되고, 실패는 `허브상태.txt`와 알림에 이름만 남는다(비밀값은 남기지 않음). 한 번만 받아 보려면 `python tools/sources.py --cache downloads`.
+
+## 비용
+
+Claude 기본 모델은 `claude-sonnet-5-5`. Claude와 GPT를 합쳐 월 `HUB_MONTHLY_BUDGET`(기본 $30)을 날짜 수로 나눈 금액이 하루 한도다. 80%에서 알림, 100%면 그날은 두 AI 모두 멈추고 데이터 질문만 답한다. GPT는 하루 200회 제한도 있다.
+
+## 테스트
+
+`python -m unittest discover -s tests` (GitHub에서는 push마다 자동 실행).

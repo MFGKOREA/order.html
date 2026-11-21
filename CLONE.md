@@ -128,6 +128,9 @@ Settings (environment variables on the PC):
 | `CLAUDE_MODEL` | `claude-sonnet-5-5` | Claude model (runs at low effort). Opus costs more; fast mode works only on Opus |
 | `GPT_MODEL`, `GPT_REASONING_EFFORT` | `gpt-5-mini`, `minimal` | GPT model and reasoning level |
 | `HUB_MONTHLY_BUDGET` | `30` | USD per month for Claude and GPT together. The daily cap is this ÷ the days in the month. At 80% of the day or the month 신우님 gets an alert; at 100% of the day both AIs stop until tomorrow and data answers keep working |
+| `HUB_CONFIRM` | `1` | `1`: 발주·HR 확정은 `확인 #번호`가 와야 접수. `0`: 바로 접수 |
+| `ORDER_APP_API` | (없음) | 발주앱 Apps Script 주소. 있으면 5분마다 재고·입고·매출·BOH·행사 파일을 갱신 (읽기만) |
+| `HR_BOARD_PASSWORD` | (없음) | HR 보드 비밀번호. 있으면 5분마다 근무표를 갱신 (읽기만) |
 | `GPT_DAILY_CALLS` | `200` | GPT answers per day, then GPT stops and its work goes to Claude |
 | `GPT_PRICE_IN`, `GPT_PRICE_OUT` | `0.25`, `2.00` | USD per million tokens. gpt-5-mini's launch price; set the current one |
 | `CLAUDE_PRICE_IN`, `CLAUDE_PRICE_OUT` | `3`, `15` | USD per million tokens for Sonnet (Opus uses 4 / 20 unless set). Fast mode is counted double |
