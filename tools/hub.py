@@ -10,6 +10,7 @@ Files in the Drive folder Pickle reads (--drive):
   허브상태.txt                        '허브 정상 <time>' + today's AI spend, every minute
   노무.txt                            daily labor check: 52h, 미태그, 스케줄 없이 출근, 월 마감 (tools/labor.py)
   게시판.txt                          the team's log: status tags, missing or late AIs, code (Pickle never reads it)
+  대화.txt                            the shared ledger and handoff file: one line per handoff, every AI appends
 
 Everything written there passes the personal-information filter first (tools/privacy.py; extra
 private words go in <state>/private_terms.txt). Requests can also be typed into the hub's window.
@@ -40,7 +41,7 @@ import privacy  # noqa: E402
 import router  # noqa: E402
 import sources  # noqa: E402
 
-INBOX, OUTBOX, TASKS, BOARD = "요청.txt", "답.txt", "작업.txt", "게시판.txt"
+INBOX, OUTBOX, TASKS, BOARD, LEDGER = "요청.txt", "답.txt", "작업.txt", "게시판.txt", "대화.txt"
 HEALTH = "허브상태.txt"  # rewritten every HEARTBEAT seconds; an old time there means the hub is off
 HEARTBEAT = 60
 LABOR = "노무.txt"  # daily labor check (tools/labor.py), every HEARTBEAT seconds
@@ -49,6 +50,36 @@ OPEN_RE = re.compile(r"^## \[대기\] (Q-\d{8}-\d{3}) \d{1,2}:\d{2} (.+?) → (.
 DONE_RE = re.compile(r"\[완료\] (Q-\d{8}-\d{3})")
 SLOT_PROVIDER = {"GPT": "openai", "Claude": "anthropic"}
 KEEP_ANSWERS = 1  # 답.txt holds only the latest answer, so Pickle reads the fewest tokens
+# One line any AI can append. Statuses: who is waiting, who is checking, who must confirm.
+HANDOFF_STATUSES = ("대기", "처리중", "검증중", "확인대기", "접수", "완료", "반려", "한도")
+RULE_SOURCE = {  # rule answers never call an AI; the ledger still names the file the number came from
+    "inventory": ("재고", "앱"), "inbound": ("입고", "앱"), "sales": ("매출", "앱"),
+    "promotions": ("행사", "앱"), "boh": ("출퇴근", "HR"), "roster": ("근무표", "HR"), "multi": ("자료", "앱"),
+}
+TASK_ID_RE = re.compile(r"#(\d+)")
+STATUS_WORD_RE = re.compile(r"#(\d+)\s+(접수|완료|실패)")
+
+
+def format_handoff(rid, frm, to, status, body):
+    """One ledger line: id | from | to | status | body. Body is one line, no greeting."""
+    body = " ".join((body or "").split())
+    return f"{rid} | {frm} | {to} | {status} | {body}"
+
+
+def parse_handoff(line):
+    """The same line back into a dict, or None when it is not a handoff."""
+    parts = [part.strip() for part in (line or "").split("|", 4)]
+    if len(parts) != 5 or not parts[0] or parts[3] not in HANDOFF_STATUSES:
+        return None
+    return {"id": parts[0], "from": parts[1], "to": parts[2], "status": parts[3], "body": parts[4]}
+
+
+def arrow_result(text):
+    """결론 / 근거 / 확인 필요 as one line joined by arrows. '' when it is not that shape."""
+    parsed = pipeline.parse_answer(text or "")
+    if not parsed:
+        return ""
+    return f"결론: {parsed['결론']} → 근거: {parsed['근거']} → 확인 필요: {parsed['확인 필요']}"
 
 
 def open_remy_questions(board_text):
@@ -157,6 +188,117 @@ class Outbox:
             pr.write_if_changed(self.path, "\n".join(self.blocks) + "\n")
 
 
+class Ledger:
+    """대화.txt: the one append-only ledger in the Drive folder. Every AI reads it and appends a handoff."""
+
+    def __init__(self, path, state_path, scrub=None, alert=None, log=None):
+        self.path, self.scrub, self.alert = Path(path), scrub, alert
+        self.inbox = Inbox(self.path, state_path, log)  # lines already there are history
+        self.lock, self.mem = threading.RLock(), {}
+
+    def _read(self):
+        return self.inbox._read()
+
+    def add(self, rid, frm, to, status, body):
+        line = format_handoff(rid, frm, to, status, body)
+        if self.scrub:
+            line, hits = self.scrub(line)
+            if hits and self.alert:
+                self.alert(f"개인정보 가림 대화.txt: {', '.join(hits)}")
+        with self.lock:
+            before = self.inbox._read()
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            with self.path.open("a", encoding="utf-8") as f:
+                f.write(line + "\n")
+            after = self.inbox._read()
+            own = len(before)
+            # Keep a line someone else appended in the same instant for the next poll.
+            if after[:own] == before and own < len(after) and after[own] == line:
+                self.inbox._save(after[:own + 1])
+            else:
+                self.inbox._save(after)
+            self.inbox._stamp = None
+
+    def poll(self):
+        with self.lock:
+            lines = self.inbox.poll()
+        return [rec for rec in (parse_handoff(line) for line in lines) if rec]
+
+    def next_rule_id(self, now):
+        """R-YYYYMMDD-NNN for an answer the rules wrote (no Q-id, no AI).
+
+        shortcut: two rule answers at the same instant can share an R-id. Upgrade when a second
+        writer appends rule lines; Q-ids already come from the pipeline lock.
+        """
+        day = now.strftime("%Y%m%d")
+        prefix, n = f"R-{day}-", 0
+        for line in self._read():
+            if line.startswith(prefix):
+                try:
+                    n = max(n, int(line[len(prefix):].split("|", 1)[0]))
+                except ValueError:
+                    pass
+        return f"{prefix}{n + 1:03d}"
+
+    def record_rule(self, reply, now, requester):
+        """A request the rules finished: data, a held order, or 확인 #번호. No AI call."""
+        kind, text = reply.kind, reply.text or ""
+        if kind in ("order", "hr_confirm"):
+            for line in text.splitlines() or [text]:
+                found = TASK_ID_RE.search(line)
+                status = "확인대기" if "확인대기" in line else "접수"
+                self.add(f"#{found[1]}" if found else self.next_rule_id(now), requester, "레미", status, line)
+            return
+        if kind == "status":
+            found = STATUS_WORD_RE.match(text)
+            if not found:
+                self.add(self.next_rule_id(now), "허브", requester, "완료",
+                         f"결론: {text} → 근거: 규칙, 자료 없음 → 확인 필요: 없음")
+                return
+            if found[2] == "접수":
+                self.add(f"#{found[1]}", requester, "레미", "접수", text)
+            else:
+                self.add(f"#{found[1]}", "레미", "피클", "완료", text)
+            return
+        label = RULE_SOURCE.get(kind)
+        flat = " / ".join(line.strip() for line in text.splitlines() if line.strip())
+        if label:
+            name, source = label
+            body = f"결론: {flat} → 근거: {name} ({source} {now.month}/{now.day} {now:%H:%M}) → 확인 필요: 없음"
+        else:
+            body = f"결론: {flat} → 근거: 규칙, 자료 없음 → 확인 필요: 없음"
+        self.add(self.next_rule_id(now), "허브", requester, "완료", body)
+
+    def from_pipeline(self, qid, state, fields):
+        """One ledger line per status the pipeline already tracks. Remember from/to across the states."""
+        mem = self.mem.setdefault(qid, {})
+        if fields.get("요청자"):
+            mem["from"] = fields["요청자"]
+        if "대상" in fields:
+            mem["to"] = list(fields["대상"])
+        if fields.get("질문"):
+            mem["task"] = fields["질문"]
+        frm = mem.get("from") or "피클"
+        targets = mem.get("to") or []
+        to = ",".join(targets)
+        task = mem.get("task") or ""
+        if state == "대기":
+            self.add(qid, frm, to or "허브", "대기" if to else "한도", task)
+        elif state == "처리중":
+            self.add(qid, "허브", to or "허브", "처리중", task)
+        elif state == "검증중":
+            lead = fields.get("lead") or (targets[0] if targets else "Claude")
+            body = arrow_result(fields.get("review") or "") or task
+            self.add(qid, lead, fields.get("checker") or "GPT", "검증중", body)
+        elif state == "완료":
+            answer = fields.get("answer") or ""
+            if answer == pipeline.LIMIT:
+                self.add(qid, "허브", frm, "한도", answer)
+                return
+            who = "캐시" if fields.get("cached") else ((fields.get("answered") or [None])[0] or "허브")
+            self.add(qid, who, frm, "완료", arrow_result(answer) or answer)
+
+
 class Hub:
     def __init__(self, cache_dir, drive_dir, state_dir, askers=None, log=None, deadline=pipeline.DEADLINE,
                  confirm=None, env=None):
@@ -172,11 +314,14 @@ class Hub:
         self.outbox = Outbox(self.drive / OUTBOX, scrub=self.filter.scrub, alert=self.alert)
         self.board = pipeline.Board(self.drive / BOARD, scrub=self.filter.scrub, alert=self.alert)
         self.meter = meter.Meter(self.state / "usage.jsonl", alert=self.alert)
+        self.ledger = Ledger(self.drive / LEDGER, self.state / "ledger.json", scrub=self.filter.scrub,
+                             alert=self.alert, log=self.log)
         self.log_book = pipeline.Log(self.state / "envelopes.jsonl")  # every request; restarts, weekly summary
         self.pipeline = pipeline.Pipeline(
             self.cache, askers, board=self.board, deadline=deadline, log=self.log_book,
             reply_for=lambda request: (lambda answer: self.outbox.add(request, answer)),
-            blocked=lambda slot: self.meter.blocked(SLOT_PROVIDER.get(slot)))
+            blocked=lambda slot: self.meter.blocked(SLOT_PROVIDER.get(slot)),
+            on_status=self.ledger.from_pipeline)
         self.pool = ThreadPoolExecutor(max_workers=4)
         self._lock = threading.Lock()  # one request routed at a time: action ids never collide
         self._tasks_version, self._problems, self._week_checked = None, None, None
@@ -207,6 +352,8 @@ class Hub:
             self.log_book.write({"at": (now or datetime.now()).isoformat(timespec="seconds"), "상태": "완료",
                                  "route": "hub", "kind": reply.kind, "요청자": requester,
                                  "seconds": round(time.perf_counter() - start, 4)})
+        if reply.kind != "ask":  # rules answered it: the ledger records the handoff, no model call
+            self.ledger.record_rule(reply, now or datetime.now(), requester)
         if reply.kind in quiet:
             pass
         elif reply.kind != "ask":
@@ -231,6 +378,8 @@ class Hub:
             # kept out of 답.txt so they never replace Pickle's answer.
             self.handle(request, lambda answer, request=request: self.outbox.add(request, answer), now,
                         quiet=("status", "remy_answer"))
+        for rec in self.ledger.poll():
+            self._take(rec)
         self.queue.refresh()
         if self.queue.version != self._tasks_version:
             lines = self.queue.view()
@@ -242,6 +391,21 @@ class Hub:
         self.weekly(now)
         self.refresh_sources(now)
         self.heartbeat(now)
+
+    def _take(self, rec):
+        """A line another AI appended. 완료 to 피클 closes a waiting question. 대기 to Claude or GPT is their task."""
+        if rec["status"] == "완료" and rec["to"] in ("피클", "허브") and re.fullmatch(r"Q-\d{8}-\d{3}", rec["id"]):
+            self.pipeline.accept_remy(rec["id"], rec["body"].replace(" → ", " / "))
+            return
+        if rec["status"] == "대기" and rec["to"] in ("Claude", "GPT"):
+            self.pool.submit(self._run_named, rec)
+
+    def _run_named(self, rec):
+        """The handoff named the AI. Code Claude writes is still checked by GPT; the budget cap still applies."""
+        def reply(answer, request=rec["body"]):
+            self.outbox.add(request, answer)
+
+        self.pipeline.run(rec["body"], reply, rec["from"], force=rec["to"])
 
     def sync(self, now):
         return sources.sync(self.cache, now, self.env)

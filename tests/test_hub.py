@@ -324,6 +324,125 @@ class HubTest(unittest.TestCase):
         self.assertLess(elapsed, 0.5)
         self.assertIn("매장 당일 그로스 세일즈", self.read(hub.OUTBOX))
 
+    def ledger(self):
+        return self.read(hub.LEDGER)
+
+    def test_handoff_line_is_one_line_any_ai_can_parse(self):
+        line = hub.format_handoff("Q-20261113-001", "피클", "Claude", "대기", "공지문\n작성해줘")
+        self.assertEqual(line, "Q-20261113-001 | 피클 | Claude | 대기 | 공지문 작성해줘")
+        self.assertEqual(hub.parse_handoff(line),
+                         {"id": "Q-20261113-001", "from": "피클", "to": "Claude", "status": "대기", "body": "공지문 작성해줘"})
+        self.assertIsNone(hub.parse_handoff("안녕"))
+        self.assertIsNone(hub.parse_handoff("Q | 피클 | Claude | 인사 | 안녕"))
+
+    def test_code_goes_to_claude_then_gpt_and_pickle_gets_the_arrow_result(self):
+        calls = []
+
+        def claude(message, system):
+            calls.append(("Claude", json.loads(message)))
+            yield from "결론: 합계 수식\n근거: B열 (앱 11/13 11:00)\n확인 필요: 없음".splitlines()
+
+        def gpt(message, system):
+            calls.append(("GPT", json.loads(message)))
+            yield from "결론: 일치\n근거: B열 (앱 11/13 11:00)\n확인 필요: 없음".splitlines()
+
+        h = self.make({"Claude": claude, "GPT": gpt})
+        h.tick(NOW)
+        append(self.drive / hub.INBOX, "엑셀 합계 수식 만들어줘")
+        h.tick(NOW)
+        h.pool.shutdown(wait=True)
+        self.assertEqual([name for name, _ in calls], ["Claude", "GPT"])
+        self.assertEqual(calls[1][1]["상태"], "검증중")
+        self.assertIn("합계 수식", calls[1][1]["검토할답"])
+        self.assertIn("| Claude | GPT | 검증중 |", self.ledger())
+        self.assertIn("결론: 합계 수식 → 근거: B열 (앱 11/13 11:00) → 확인 필요: 없음", self.ledger())
+        self.assertIn("결론: 합계 수식\n근거: B열 (앱 11/13 11:00)\n확인 필요: 없음", self.read(hub.OUTBOX))
+
+    def test_analysis_stays_with_claude_and_a_named_handoff_is_not_reclassified(self):
+        calls = []
+
+        def claude(message, system):
+            calls.append("Claude")
+            yield from "결론: 양파 20kg 추가 발주\n근거: 재고 13.0개 (매장 11/13 09:00)\n확인 필요: 없음".splitlines()
+
+        def gpt(message, system):
+            calls.append("GPT")
+            yield from "결론: 쓰면 안 됨\n근거: 없음\n확인 필요: 없음".splitlines()
+
+        h = self.make({"Claude": claude, "GPT": gpt})
+        h.tick(NOW)
+        append(self.drive / hub.INBOX, "다음 주 화요일 양파 발주량?")
+        h.tick(NOW)
+        h.pool.shutdown(wait=True)
+        self.assertEqual(calls, ["Claude"])
+        self.assertNotIn("| GPT |", self.ledger())
+        h.pool = hub.ThreadPoolExecutor(max_workers=4)
+        calls.clear()
+        append(self.drive / hub.LEDGER, hub.format_handoff("H-1", "레미", "Claude", "대기", "오늘 비 오면 손님 줄어?"))
+        h.tick(NOW)
+        h.pool.shutdown(wait=True)
+        self.assertEqual(calls, ["Claude"])  # the line names Claude; the words would have gone to GPT
+
+    def test_pc_and_browser_are_a_remy_line_until_remy_writes_the_result(self):
+        calls = []
+        h = self.make({"Claude": lambda q, s: calls.append("Claude"), "GPT": lambda q, s: calls.append("GPT")})
+        h.tick(NOW)
+        append(self.drive / hub.INBOX, "컴퓨터 바탕화면 파일 열어줘", "세콤 출입 기록 확인해줘")
+        h.tick(NOW)
+        h.pool.shutdown(wait=True)
+        self.assertEqual(calls, [])
+        self.assertFalse((self.drive / hub.OUTBOX).exists())
+        waiting = [line for line in self.ledger().splitlines() if "| 레미 | 대기 |" in line]
+        self.assertEqual(len(waiting), 2)
+        for line, result in (
+            (waiting[0], "결론: 파일 열림 → 근거: 바탕화면 (웹 11/13 11:00) → 확인 필요: 없음"),
+            (waiting[1], "결론: 김민수 09:02 출입 → 근거: 출입 기록 (세콤 11/13 09:05) → 확인 필요: 없음"),
+        ):
+            qid = line.split("|", 1)[0].strip()
+            append(self.drive / hub.LEDGER, hub.format_handoff(qid, "레미", "피클", "완료", result))
+        h.pool = hub.ThreadPoolExecutor(max_workers=4)
+        h.tick(NOW)
+        self.assertIn("결론: 김민수 09:02 출입\n근거: 출입 기록 (세콤 11/13 09:05)\n확인 필요: 없음", self.read(hub.OUTBOX))
+        self.assertEqual(calls, [])
+
+    def test_confirm_and_the_monthly_cap_still_gate_ai_work(self):
+        calls = []
+
+        def gpt(message, system):
+            calls.append("GPT")
+            yield "결론: 쓰면 안 됨"
+
+        h = self.make({"GPT": gpt}, confirm=True)
+        h.tick(NOW)
+        append(self.drive / hub.INBOX, "브로콜리 2개 발주", "매장에 감자튀김 재고 몇개야", "오늘 출근 누구?")
+        h.tick(NOW)
+        ledger = self.ledger()
+        self.assertIn("| 피클 | 레미 | 확인대기 |", ledger)
+        self.assertNotIn("| 레미 | 접수 |", ledger)
+        self.assertIn("(앱 11/13 11:00)", ledger)
+        self.assertIn("(HR 11/13 11:00)", ledger)
+        self.assertEqual(calls, [])
+        append(self.drive / hub.INBOX, "확인 #1")
+        h.tick(NOW)
+        self.assertIn("#1 | 피클 | 레미 | 접수 |", self.ledger())
+        self.assertIn("#1 접수", self.read(hub.TASKS))
+        h.meter.budget = 0  # daily cap is the month's $30 spread over its days; $0 stops both AIs
+        append(self.drive / hub.INBOX, "오늘 비 오면 손님 줄어?")
+        h.tick(NOW)
+        h.pool.shutdown(wait=True)
+        self.assertEqual(calls, [])
+        self.assertIn("한도", self.ledger())
+        self.assertIn("AI 오늘 한도 도달: 데이터 질문만 답함 (내일 다시)", self.read(hub.OUTBOX))
+
+    def test_rule_answer_keeps_working_after_the_cap(self):
+        h = self.make(confirm=True)
+        h.meter.budget = 0
+        h.tick(NOW)
+        append(self.drive / hub.INBOX, "매장에 감자튀김 재고 몇개야")
+        h.tick(NOW)
+        self.assertIn("감자튀김: 예상 20.0개", self.read(hub.OUTBOX))
+        self.assertIn("(앱 11/13 11:00)", self.ledger())
+
 
 if __name__ == "__main__":
     unittest.main()

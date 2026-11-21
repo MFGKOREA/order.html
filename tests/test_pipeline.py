@@ -39,6 +39,7 @@ class Routing(unittest.TestCase):
             "다음 주 화요일 양파 발주량?": ("analysis", False, ["Claude"], None),
             "이 계산 맞는지 검증해줘": ("verify", False, ["GPT"], None),
             "세콤 출입 기록 확인해줘": ("browser", False, ["레미"], None),
+            "컴퓨터 바탕화면 파일 열어줘": ("pc", False, ["레미"], None),
             "오늘 비 오면 손님 줄어?": ("general", False, ["GPT"], None),
             "[중요] 다음 주 화요일 양파 발주량?": ("analysis", True, ["Claude", "GPT"], None),
         }

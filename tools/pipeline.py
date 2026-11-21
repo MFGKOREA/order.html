@@ -2,7 +2,7 @@
 
 - The question goes only to the AI that owns its kind: code, automation and documents go to
   Claude and then GPT checks them; analysis goes to Claude; checking and everything else go to
-  GPT; "[중요]" asks Claude and GPT at once; browser work goes to 레미, who answers later
+  GPT; "[중요]" asks Claude and GPT at once; PC and browser work goes to 레미, who answers later
   through 요청.txt ("Q-…-007 답: 결론: … / 근거: … / 확인 필요: …").
 - The AIs get the question in an envelope (prompts/claude.txt, prompts/gpt.txt) with the cache
   lines it touches as 자료, each tagged (출처 시각).
@@ -27,7 +27,7 @@ import router  # noqa: E402
 
 PROMPTS = Path(__file__).resolve().parent.parent / "prompts"
 DEADLINE = 10.0  # seconds: the "2중 전달 10초" standard
-SOURCES = ("HR", "세콤", "웹", "POS", "매장")
+SOURCES = ("HR", "세콤", "웹", "앱", "POS", "매장")
 LABELS = ("결론", "근거", "확인 필요")
 # Analysis answers may use their three labels; everything else banned for Pickle stays banned.
 ANALYSIS_BANNED = tuple(w for w in pr.BANNED if w not in ("결론", "근거", "확인필요", "확인 필요"))
@@ -36,6 +36,7 @@ NO_AI = "AI 연결 안 됨"
 LIMIT = "AI 오늘 한도 도달: 데이터 질문만 답함 (내일 다시)"
 
 CATEGORY_WORDS = (  # first match wins; compared without spaces, lower case
+    ("pc", ("pc", "컴퓨터", "바탕화면", "파일열어", "폴더열어", "창열어")),
     ("browser", ("세콤", "hr", "사이트", "로그인", "화면", "스크래핑", "크롤링", "홈페이지", "브라우저", "웹페이지")),
     ("build", ("코드", "스크립트", "자동화", "함수", "엑셀", "수식", "매크로", "버그", "에러", "오류", "프로그램",
                "파이썬", "python", "javascript", "자바스크립트", "api", "sql", "작성", "초안", "공지문", "보고서",
@@ -58,7 +59,7 @@ def load_prompt(name):
 
 
 def classify(question):
-    """(kind, important): kind is browser, build, verify, analysis or general."""
+    """(kind, important): kind is pc, browser, build, verify, analysis or general."""
     important = bool(IMPORTANT_RE.match(question))
     compact = re.sub(r"\s+", "", IMPORTANT_RE.sub("", question)).lower()
     for kind, words in CATEGORY_WORDS:
@@ -69,7 +70,7 @@ def classify(question):
 
 def plan(kind, important):
     """(answerers, checker) for a kind of question. Only [중요] calls both AIs."""
-    if kind == "browser":
+    if kind in ("browser", "pc"):
         return ["레미"], None
     if important:
         return ["Claude", "GPT"], None
@@ -280,8 +281,9 @@ class Log:
 
 class Pipeline:
     def __init__(self, cache_dir, askers=None, systems=None, board=None, deadline=DEADLINE, clock=datetime.now,
-                 log=None, reply_for=None, blocked=None):
+                 log=None, reply_for=None, blocked=None, on_status=None):
         self.cache_dir, self.askers, self.board, self.log = cache_dir, askers or {}, board, log
+        self.on_status = on_status  # (qid, state, fields) -> None; the hub ledger listens here
         self.blocked = blocked or (lambda slot: False)  # slot -> True when its spending cap is reached
         self.systems = systems if systems is not None else {"Claude": load_prompt("claude"), "GPT": load_prompt("gpt")}
         self.deadline, self.clock = deadline, clock
@@ -305,6 +307,8 @@ class Pipeline:
         self.note(line or f"[{state}] {qid}")
         if self.log:
             self.log.write({"id": qid, "at": self.clock().isoformat(timespec="seconds"), "상태": state, **fields})
+        if self.on_status:
+            self.on_status(qid, state, fields)
 
     def next_id(self, now):
         with self._lock:
@@ -440,13 +444,17 @@ class Pipeline:
                         key=entry["key"], data=entry["data"], date=self.clock().date().isoformat())
 
     # -- entry points --------------------------------------------------------------------------------
-    def run(self, question, reply, requester="피클"):
+    def run(self, question, reply, requester="피클", force=None):
         """Answer one free question: reply(text) gets the finished 3 lines. 레미's questions are
-        answered later (accept_remy). Returns a record of what happened."""
+        answered later (accept_remy). `force` is an AI named by a handoff line (대화.txt).
+        Returns a record of what happened."""
         start, now = time.perf_counter(), self.clock()
         kind, important = classify(question)
         q = IMPORTANT_RE.sub("", question).strip()
         answerers, checker = plan(kind, important)
+        if force in ("Claude", "GPT", "레미"):  # a handoff names the AI; code still gets GPT's check
+            answerers = [force]
+            checker = "GPT" if force == "Claude" and kind == "build" else None
         qid, key = self.next_id(now), cache_key(question)
         items, staff = self.names()
         data = gather(q, self.cache_dir, now)
@@ -500,7 +508,7 @@ class Pipeline:
         answers = self._round(qid, q, slots, data, staff, now)
         if checker and answers:
             if checker in self.askers:
-                self.status(qid, "검증중")
+                self.status(qid, "검증중", lead=answers[0][0], checker=checker, review=format_answer(answers[0][1]))
                 notes.append(self._verify(qid, q, checker, answers[0], data, now))
             else:
                 notes.append(f"{checker} 검증 못 함")
