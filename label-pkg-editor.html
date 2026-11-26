@@ -956,7 +956,7 @@ $('resetBtn').addEventListener('click', () => {
 $('csvOut').addEventListener('click', async () => {
   let rows; try { rows = lockedRows(); } catch (e) { toast(e.message); return; }
   const name = $('outName').value.replace(/\.pkg$/i, '') + '.csv';
-  try { await deliver(name, new TextEncoder().encode(toCSV(state.table.cols, rows)), 'csv'); toast('CSV를 저장했습니다'); } catch (e) { toast(e.message || String(e)); }
+  try { const r = await deliver(name, new TextEncoder().encode(toCSV(state.table.cols, rows)), 'csv'); toast(r.sure ? 'CSV를 저장했습니다' : 'CSV를 저장했습니다. 다운로드 폴더를 확인해 주세요'); } catch (e) { toast(e.message || String(e)); }
 });
 
 /* ----- 품목 추가: 원래 목록에서 골라 복사 (이름·일수는 원본 그대로) ----- */
@@ -1006,18 +1006,23 @@ $('addList').addEventListener('click', e => {
 
 /* ----- save ----- */
 async function deliver(filename, bytes, ext) {
-  if (window.claude && typeof window.claude.use === 'function') {
-    const dl = await window.claude.use('downloads');
-    if (!dl) throw new Error('이 화면에서는 파일 저장이 지원되지 않습니다. PC용 파일(label-pkg-editor.html)을 브라우저에서 열어 주세요.');
+  // 1) Claude 화면에서 저장 기능이 있으면 그것으로 저장 (.pkg는 허용 확장자가 아니라 ZIP에 담아 줌)
+  let dl = null;
+  if (window.claude && typeof window.claude.use === 'function') { try { dl = await window.claude.use('downloads'); } catch (_) { dl = null; } }
+  if (dl) {
     let name = filename, data = bytes;
     if (ext === 'pkg') { name = filename.replace(/\.pkg$/i, '') + '.zip'; data = makeZip(filename, bytes); }
-    try { await dl.save({ filename: name, data: new Blob([data]) }); }
-    catch (e) { if (e && e.code === 'declined') throw new Error('저장을 취소했습니다.'); throw new Error('저장에 실패했습니다: ' + (e && e.message ? e.message : e)); }
-    return name;
+    try { await dl.save({ filename: name, data: new Blob([data]) }); return { name, sure: true }; }
+    catch (err) {
+      if (err && err.code === 'declined') throw new Error('저장을 취소했습니다.');
+      if (!(err && /unavailable|not_granted|capability_disabled|capability_removed/.test(err.code || ''))) throw new Error('저장에 실패했습니다: ' + (err && err.message ? err.message : err));
+    }
   }
-  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' })); a.download = filename; document.body.appendChild(a); a.click();
-  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
-  return filename;
+  // 2) 저장 기능이 없는 화면(링크를 바로 연 페이지, PC에 받은 html 파일)은 브라우저 다운로드로 .pkg 그대로 저장
+  const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([bytes], { type: 'application/octet-stream' })); a.download = filename; a.rel = 'noopener'; document.body.appendChild(a); a.click();
+  setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 4000);
+  let framed = true; try { framed = window.self !== window.top; } catch (_) { framed = true; }
+  return { name: filename, sure: !framed };
 }
 $('saveBtn').addEventListener('click', async () => {
   const st = $('saveStatus'); st.className = 'status'; st.textContent = '패키지를 만드는 중…';
@@ -1031,10 +1036,10 @@ $('saveBtn').addEventListener('click', async () => {
     const out = PKG.build(ents);
     PKG.parse(out.buffer.slice(0));
     let name = $('outName').value.trim() || suggestName(state.fileName); if (!/\.pkg$/i.test(name)) name += '.pkg';
-    const saved = await deliver(name, out, 'pkg');
+    const res = await deliver(name, out, 'pkg'), saved = res.name;
     const { added, mod, del, moved, openMoved } = changeSummary(), noCat = rows.filter(r => !r[C.C1] || !r[C.C2]).length;
     st.className = 'status ok';
-    st.textContent = `${saved} 저장 · 품목 ${rows.length}개 (추가 ${added} · 수정 ${mod} · 이동 ${moved} · 삭제 ${del}${openMoved ? ' · Open 순서 변경' : ''}${fixing ? ' · Open 라벨 날짜 규칙 적용' : ''})` + (saved.endsWith('.zip') ? ' · ZIP 안의 .pkg를 꺼내 쓰세요.' : '') + (noCat ? ` · 카테고리가 빈 품목 ${noCat}개는 전체보기에서만 나옵니다.` : '') + (state.rows.some(r => isOpen(r) && openRisk(r)) ? ` · Open에 날짜가 틀리게 찍힐 품목 ${state.rows.filter(r => isOpen(r) && openRisk(r)).length}개가 있습니다.` : '');
+    st.textContent = `${saved} 저장 · 품목 ${rows.length}개 (추가 ${added} · 수정 ${mod} · 이동 ${moved} · 삭제 ${del}${openMoved ? ' · Open 순서 변경' : ''}${fixing ? ' · Open 라벨 날짜 규칙 적용' : ''})` + (saved.endsWith('.zip') ? ' · ZIP 안의 .pkg를 꺼내 쓰세요.' : res.sure ? ' · 다운로드 폴더에 저장했습니다.' : ' · 다운로드가 시작되지 않았다면 이 페이지를 Chrome이나 Edge 새 탭에서 열거나, 받은 PC용 파일(label-pkg-editor.html)로 다시 저장해 주세요.') + (noCat ? ` · 카테고리가 빈 품목 ${noCat}개는 전체보기에서만 나옵니다.` : '') + (state.rows.some(r => isOpen(r) && openRisk(r)) ? ` · Open에 날짜가 틀리게 찍힐 품목 ${state.rows.filter(r => isOpen(r) && openRisk(r)).length}개가 있습니다.` : '');
     try { localStorage.removeItem(state.draftKey); } catch (_) { }
   } catch (e) { st.className = 'status bad'; st.textContent = e.message || String(e); }
 });
