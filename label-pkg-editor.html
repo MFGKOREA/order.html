@@ -648,7 +648,7 @@ function openBuffer(buf, name) {
   state.fixOn = state.openFix === 'needed'; renderFix();
   state.origRows = table.rows.map(r => r.slice());
   state.rows = table.rows.map((r, i) => ({ cells: r.slice(), orig: i, src: i, seq: null }));
-  seqFromNO(state.rows);
+  seqFromNO(state.rows); state.origSeq = state.rows.map(r => r.seq);
   try { localStorage.setItem(LS_LAST, JSON.stringify({ name: clean, date: Date.now(), b64: b64enc(new Uint8Array(buf)) })); } catch (_) { }
   $('q').value = '';
   $('v-edit').hidden = false; $('v-save').hidden = false;
@@ -662,17 +662,21 @@ function checkDraft() {
   let d = null; try { d = JSON.parse(localStorage.getItem(state.draftKey) || 'null'); } catch (_) { }
   const bar = $('draftbar');
   if (!d || !Array.isArray(d.rows)) { bar.hidden = true; return; }
-  const same = d.rows.length === state.rows.length && d.rows.every((r, i) => r.orig === state.rows[i].orig && r.cells.join('\u0001') === state.rows[i].cells.join('\u0001'));
+  const same = d.rows.length === state.rows.length && d.rows.every((r, i) => r.orig === state.rows[i].orig && (r.seq ?? null) === (state.rows[i].seq ?? null) && r.cells.join('\u0001') === state.rows[i].cells.join('\u0001'));
   if (same) { bar.hidden = true; return; }
   const when = new Date(d.at); $('draftWhen').textContent = `${when.getMonth() + 1}월 ${when.getDate()}일 ${String(when.getHours()).padStart(2, '0')}:${String(when.getMinutes()).padStart(2, '0')}에 편집하던 내용`;
   bar.hidden = false; bar._draft = d;
 }
 $('draftKeep').addEventListener('click', () => { const d = $('draftbar')._draft; if (d) { state.rows = d.rows.filter(r => r.src != null && state.origRows[r.src]).map(r => { const cells = state.origRows[r.src].slice(); EDITABLE.forEach(k => { cells[k] = r.cells[k] ?? ''; }); return { cells, orig: r.orig, src: r.src, seq: r.seq ?? null }; }); renumberSeq(); } $('draftbar').hidden = true; render(); toast('이어서 편집합니다'); });
 $('draftDrop').addEventListener('click', () => { try { localStorage.removeItem(state.draftKey); } catch (_) { } $('draftbar').hidden = true; });
-function saveDraft() {
-  clearTimeout(draftTimer);
-  draftTimer = setTimeout(() => { try { const { added, mod, del, moved } = changeSummary(); if (added || mod || del || moved) localStorage.setItem(state.draftKey, JSON.stringify({ at: Date.now(), rows: state.rows })); else localStorage.removeItem(state.draftKey); } catch (_) { } }, 400);
+function isDirty() { // 원래 파일과 하나라도 다르면 (Open 순서만 바꾼 경우 포함) 임시 저장
+  if (state.rows.length !== state.origRows.length) return true;
+  return state.rows.some((r, i) => r.orig !== i || (r.seq ?? null) !== (state.origSeq[i] ?? null) || r.cells.some((v, k) => t(v) !== t(state.origRows[i][k])));
 }
+function writeDraft() { try { if (!state.draftKey) return; if (isDirty()) localStorage.setItem(state.draftKey, JSON.stringify({ at: Date.now(), rows: state.rows })); else localStorage.removeItem(state.draftKey); } catch (_) { } }
+function saveDraft() { clearTimeout(draftTimer); draftTimer = setTimeout(writeDraft, 300); }
+window.addEventListener('pagehide', () => { clearTimeout(draftTimer); writeDraft(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden') { clearTimeout(draftTimer); writeDraft(); } });
 
 /* ----- Open 출력 순서: 줄 순서(카테고리 화면)와 따로, NO 번호로 저장 ----- */
 const t = v => (v || '').trim();
