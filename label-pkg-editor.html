@@ -247,6 +247,30 @@ html.dragging, html.dragging * { cursor: grabbing !important; -webkit-user-selec
 .sheet-note { font-size: 12px; color: var(--muted); }
 html.sheet-open, html.sheet-open body { overflow: hidden; }
 @media (min-width: 700px) { .sheet { align-items: center; } .sheet-card { border-radius: 20px; } }
+/* 빠른 Open 세팅 */
+.quick { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 2px 10px; }
+.quick .btn { min-height: 38px; padding: 7px 14px; font-size: 14px; }
+.quick .btn[aria-pressed="true"] { background: var(--fg); color: var(--bg); box-shadow: none; }
+.list.selmode .grip { cursor: pointer; }
+.list.selmode .grip svg { display: none; }
+.list.selmode .grip::before { content: ""; width: 20px; height: 20px; border-radius: 50%; box-shadow: inset 0 0 0 2px var(--chick-line); }
+.list.selmode .item { cursor: pointer; }
+.list.selmode .item.picked { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
+.list.selmode .item.picked .grip::before { box-shadow: none; background: var(--accent) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='white' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E") center / 14px no-repeat; }
+.selbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 35; padding: 10px max(16px, env(safe-area-inset-right, 0px)) calc(10px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); background: var(--surface); box-shadow: 0 -6px 24px rgba(0, 0, 0, .12), 0 -1px 0 var(--line); }
+.selbar-in { max-width: 640px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.selbar-in #selCount { flex: 1 1 100%; font-size: 14px; font-weight: 800; }
+.selbar .btn { min-height: 38px; padding: 7px 12px; font-size: 14px; }
+html.selmode-on body { padding-bottom: 150px; }
+html.selmode-on .toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+.toast .undo { margin-left: 12px; font-weight: 800; color: var(--accent); text-decoration: underline; text-underline-offset: 2px; }
+.impbody { display: grid; gap: 10px; overflow: auto; min-height: 0; flex: 1 1 auto; }
+.impsec { background: var(--surface); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.impsec b { font-weight: 800; }
+.impsec ul { margin: 6px 0 0; padding-left: 18px; font-size: 13px; color: var(--muted); display: grid; gap: 2px; }
+.impsec.warn { background: var(--rose); color: var(--rose-ink); }
+.impsec.warn ul { color: var(--rose-ink); }
+.improw { display: flex; justify-content: flex-end; gap: 8px; }
 @media (pointer: coarse) { input, select { font-size: 16px !important; } .days input { width: 50px; } }
 @media (prefers-reduced-motion: reduce) { .seg button::after, label.sw input, label.sw input::after, button { transition: none; } }
 </style>
@@ -313,6 +337,13 @@ html.sheet-open, html.sheet-open body { overflow: hidden; }
       </div>
     </div>
 
+    <div class="quick">
+      <button class="btn" type="button" id="importOpenBtn"><svg class="ic"><use href="#i-copy"/></svg>지난 파일에서 Open 가져오기</button>
+      <button class="btn" type="button" id="selBtn" aria-pressed="false">여러 개 선택</button>
+      <button class="btn" type="button" id="sortCatBtn" hidden>카테고리 순서로 정렬</button>
+      <input type="file" id="importInput" accept=".pkg,application/octet-stream" hidden>
+    </div>
+
     <ul class="list" id="list"></ul>
     <div class="foot"><span id="countInfo"></span><span id="hint"></span></div>
   </section>
@@ -327,6 +358,31 @@ html.sheet-open, html.sheet-open body { overflow: hidden; }
       <div class="search"><svg class="ic"><use href="#i-search"/></svg><input type="search" id="addQ" placeholder="원래 목록에서 품목 찾기" aria-label="원래 목록에서 품목 찾기" autocomplete="off"></div>
       <ul class="picks" id="addList"></ul>
       <p class="sheet-note">원래 목록에 있는 품목만 추가됩니다. 이름과 일수는 원본 그대로 들어갑니다.</p>
+    </div>
+  </div>
+
+  <div class="selbar" id="selbar" hidden>
+    <div class="selbar-in">
+      <span id="selCount"></span>
+      <button type="button" class="btn" id="selAll">보이는 것 모두</button>
+      <button type="button" class="btn green" id="selOn">Open 켜기</button>
+      <button type="button" class="btn" id="selOff">Open 끄기</button>
+      <button type="button" class="btn" id="selTop">맨 위로</button>
+      <button type="button" class="btn" id="selBottom">맨 아래로</button>
+      <button type="button" class="btn dark" id="selDone">완료</button>
+    </div>
+  </div>
+
+  <div class="sheet" id="impSheet" hidden role="dialog" aria-modal="true" aria-labelledby="impTitle">
+    <div class="sheet-bg" data-close></div>
+    <div class="sheet-card">
+      <div class="sheet-hd">
+        <div><b id="impTitle">Open 가져오기</b><span id="impFrom"></span></div>
+        <button type="button" class="x" data-close aria-label="닫기"><svg class="ic"><use href="#i-x"/></svg></button>
+      </div>
+      <div class="impbody" id="impBody"></div>
+      <p class="sheet-note">품목명·일수는 지금 파일 것을 씁니다. 가져온 뒤에도 "되돌리기"로 취소할 수 있습니다.</p>
+      <div class="improw"><button type="button" class="btn" data-close>취소</button><button type="button" class="btn green" id="impApply">가져오기</button></div>
     </div>
   </div>
 
@@ -616,12 +672,19 @@ function makeZip(name, data) {
 
 /* ===== App ===== */
 const $ = id => document.getElementById(id);
-const state = { entries: null, tableEntry: null, table: null, rows: [], origRows: [], fileName: '', info: null, tab: 'all', f1: '', f2: '', q: '', draftKey: '', openFix: 'na', fixOn: false };
+const state = { entries: null, tableEntry: null, table: null, rows: [], origRows: [], fileName: '', info: null, tab: 'all', f1: '', f2: '', q: '', draftKey: '', openFix: 'na', fixOn: false, selMode: false, sel: new Set() };
 const LS_LAST = 'mfg-label-pkg-last';
 const C = { NO: 0, C1: 1, C2: 2, ITEM: 3, DAYS: 4, HOURS: 5, OPEN: 8 };
 /* 바꿀 수 있는 칸은 카테고리 1·2와 OPEN뿐. 품목명·일수·시간·시작일·종료일은 저장할 때 원본 그대로 다시 써 넣는다 */
 const EDITABLE = new Set([C.C1, C.C2, C.OPEN]);
 let toastTimer = null, draftTimer = null;
+function toastUndo(msg, snap) {
+  toast(msg); const el = document.querySelector('.toast'); if (!el) return;
+  const b = document.createElement('button'); b.type = 'button'; b.className = 'undo'; b.textContent = '되돌리기';
+  b.addEventListener('click', () => { state.rows = snap; state.sel.clear(); renumberSeq(); render(); el.remove(); toast('되돌렸습니다'); });
+  el.appendChild(b); clearTimeout(toastTimer); toastTimer = setTimeout(() => el.remove(), 6000);
+}
+const snapRows = () => state.rows.map(r => ({ ...r, cells: r.cells.slice() }));
 function toast(msg) { let t = document.querySelector('.toast'); if (!t) { t = document.createElement('div'); t.className = 'toast'; document.body.appendChild(t); } t.textContent = msg; clearTimeout(toastTimer); toastTimer = setTimeout(() => t.remove(), 2400); }
 function b64enc(u8) { let s = ''; for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000)); return btoa(s); }
 function b64dec(s) { const b = atob(s), u = new Uint8Array(b.length); for (let i = 0; i < b.length; i++) u[i] = b.charCodeAt(i); return u.buffer; }
@@ -792,12 +855,13 @@ function renderChips() {
 }
 function renderList() {
   const list = $('list'); list.innerHTML = '';
+  list.classList.toggle('selmode', state.selMode);
   const vis = visible();
   const cat1 = distinct(C.C1);
   const frag = document.createDocumentFragment();
   vis.forEach((idx, vi) => {
     const r = state.rows[idx], c = r.cells, st = rowStatus(r);
-    const li = document.createElement('li'); li.className = 'item' + (st ? ' chg' : ''); li.dataset.idx = idx;
+    const li = document.createElement('li'); li.className = 'item' + (st ? ' chg' : '') + (state.selMode && state.sel.has(r) ? ' picked' : ''); li.dataset.idx = idx;
     li.innerHTML = `
       <button type="button" class="grip" aria-label="끌어서 순서 바꾸기" tabindex="-1"><svg class="ic"><use href="#i-grip"/></svg></button>
       <div class="main">${state.tab === 'open' ? `<button type="button" class="no jump" aria-label="${r.seq}번째. 눌러서 몇 번째로 옮길지 입력">${r.seq || ''}</button>` : `<span class="no">${idx + 1}</span>`}<span class="name"></span><span class="days"></span></div>
@@ -824,6 +888,8 @@ function renderList() {
   $('countInfo').innerHTML = vis.length === state.rows.length ? `<b>${state.rows.length}</b>개` : `<b>${vis.length}</b>개 표시 · 전체 ${state.rows.length}개`;
   $('hint').textContent = state.tab === 'open' ? 'Open을 누르면 이 순서대로 출력됩니다. 번호를 누르면 몇 번째로 옮길지 바로 입력할 수 있습니다. 여기서 옮겨도 카테고리 화면 순서는 안 바뀝니다.' : (state.f1 ? '프린터 화면에도 이 순서로 나옵니다. 손잡이를 끌거나 화살표로 옮기세요.' : '카테고리를 고르면 프린터 화면과 같은 순서로 보입니다.');
   $('qClear').hidden = !state.q;
+  $('sortCatBtn').hidden = state.tab !== 'open';
+  renderSelBar();
 }
 function fillSelect(sel, values, cur) {
   sel.innerHTML = '';
@@ -861,6 +927,10 @@ list.addEventListener('change', e => {
   }
 });
 list.addEventListener('click', e => {
+  if (state.selMode) { // 여러 개 선택: 줄을 누르면 선택/해제 (카테고리·Open 칸은 그대로 동작)
+    const li = e.target.closest('li.item');
+    if (li && !e.target.closest('select, input, label, .ops, .jump, .jumpin')) { const r = state.rows[+li.dataset.idx]; if (state.sel.has(r)) state.sel.delete(r); else state.sel.add(r); li.classList.toggle('picked', state.sel.has(r)); renderSelBar(); return; }
+  }
   const j = e.target.closest('button.jump');
   if (j) {
     const idx = +j.closest('li').dataset.idx, n = openOrder().length, cur = state.rows[idx].seq;
@@ -900,7 +970,7 @@ function move(from, target, before) {
 /* 끌어서 옮기기: 손잡이를 잡고 끌면 화면 위·아래 끝에서 저절로 스크롤 (오래 대고 있을수록 빨라짐) */
 let drag = null;
 list.addEventListener('pointerdown', e => {
-  const g = e.target.closest('.grip'); if (!g || e.button > 0) return;
+  const g = e.target.closest('.grip'); if (!g || e.button > 0 || state.selMode) return;
   const li = g.closest('li.item'); if (!li) return; e.preventDefault();
   const rect = li.getBoundingClientRect();
   const ghost = li.cloneNode(true); ghost.classList.add('ghost'); ghost.classList.remove('chg');
@@ -949,7 +1019,7 @@ function dragTick(now) {
 }
 
 /* ----- tabs, search, tools ----- */
-function setTab(tab) { state.tab = tab; $('tabAll').setAttribute('aria-selected', String(tab === 'all')); $('tabOpen').setAttribute('aria-selected', String(tab === 'open')); renderList(); }
+function setTab(tab) { state.tab = tab; state.sel.clear(); $('tabAll').setAttribute('aria-selected', String(tab === 'all')); $('tabOpen').setAttribute('aria-selected', String(tab === 'open')); renderList(); }
 $('tabAll').addEventListener('click', () => setTab('all')); $('tabOpen').addEventListener('click', () => setTab('open'));
 $('q').addEventListener('input', () => { state.q = $('q').value.trim(); renderList(); });
 $('qClear').addEventListener('click', () => { $('q').value = ''; state.q = ''; renderList(); $('q').focus(); });
@@ -961,6 +1031,123 @@ $('csvOut').addEventListener('click', async () => {
   let rows; try { rows = lockedRows(); } catch (e) { toast(e.message); return; }
   const name = $('outName').value.replace(/\.pkg$/i, '') + '.csv';
   try { const r = await deliver(name, new TextEncoder().encode(toCSV(state.table.cols, rows)), 'csv'); toast(r.sure ? 'CSV를 저장했습니다' : 'CSV를 저장했습니다. 다운로드 폴더를 확인해 주세요'); } catch (e) { toast(e.message || String(e)); }
+});
+
+/* ----- 여러 개 선택 ----- */
+function renderSelBar() {
+  const bar = $('selbar'); bar.hidden = !state.selMode; document.documentElement.classList.toggle('selmode-on', state.selMode);
+  $('selBtn').setAttribute('aria-pressed', String(state.selMode)); $('selBtn').textContent = state.selMode ? '선택 끝내기' : '여러 개 선택';
+  if (!state.selMode) return;
+  const n = [...state.sel].filter(r => state.rows.includes(r)).length;
+  $('selCount').textContent = n ? `${n}개 선택` : '줄을 눌러 고르세요';
+  const open = state.tab === 'open';
+  $('selOn').hidden = open; $('selOff').textContent = open ? 'Open에서 빼기' : 'Open 끄기';
+  ['selOn', 'selOff', 'selTop', 'selBottom'].forEach(id => { $(id).disabled = !n; });
+}
+function selected() { return state.rows.filter(r => state.sel.has(r)); }
+$('selBtn').addEventListener('click', () => { state.selMode = !state.selMode; state.sel.clear(); renderList(); });
+$('selDone').addEventListener('click', () => { state.selMode = false; state.sel.clear(); renderList(); });
+$('selAll').addEventListener('click', () => { const vis = visible().map(i => state.rows[i]); const all = vis.every(r => state.sel.has(r)); vis.forEach(r => all ? state.sel.delete(r) : state.sel.add(r)); renderList(); });
+$('selOn').addEventListener('click', () => {
+  const pick = selected().filter(r => !isOpen(r)); if (!pick.length) { toast('고른 품목은 이미 모두 Open에 있습니다'); return; }
+  const bad = openFixed() ? [] : pick.filter(r => openRisk(r));
+  const ok = pick.filter(r => !bad.includes(r)); if (!ok.length) { toast('일수가 T인 품목만 Open에 넣을 수 있습니다. 저장 칸의 Open 라벨 날짜 규칙을 켜세요'); return; }
+  const snap = snapRows(); let n = openOrder().length;
+  ok.forEach(r => { r.cells[C.OPEN] = 'Y'; r.seq = ++n; }); renumberSeq(); state.sel.clear(); render();
+  toastUndo(`${ok.length}개를 Open 맨 끝에 넣었습니다` + (bad.length ? ` (${bad.length}개는 날짜 규칙이 꺼져 있어 뺐습니다)` : ''), snap);
+});
+$('selOff').addEventListener('click', () => {
+  const pick = selected().filter(isOpen); if (!pick.length) { toast('고른 품목 중 Open에 있는 것이 없습니다'); return; }
+  const snap = snapRows(); pick.forEach(r => { r.cells[C.OPEN] = ''; r.seq = null; }); renumberSeq(); state.sel.clear(); render();
+  toastUndo(`${pick.length}개를 Open에서 뺐습니다`, snap);
+});
+function moveSelected(toTop) {
+  const pick = selected(); if (!pick.length) return; const snap = snapRows();
+  if (state.tab === 'open') {
+    const ord = openOrder().map(o => o.r), sel = ord.filter(r => state.sel.has(r)), rest = ord.filter(r => !state.sel.has(r));
+    (toTop ? [...sel, ...rest] : [...rest, ...sel]).forEach((r, k) => { r.seq = k + 1; });
+  } else { // 보이는 목록(고른 카테고리)의 맨 위·맨 아래로
+    const vis = visible().map(i => state.rows[i]).filter(r => !state.sel.has(r));
+    const rest = state.rows.filter(r => !state.sel.has(r));
+    let at = vis.length ? rest.indexOf(toTop ? vis[0] : vis[vis.length - 1]) + (toTop ? 0 : 1) : (toTop ? 0 : rest.length);
+    rest.splice(at, 0, ...pick); state.rows = rest;
+  }
+  const n = pick.length; state.sel.clear(); render(); window.scrollTo({ top: toTop ? $('list').getBoundingClientRect().top + window.scrollY - 120 : document.body.scrollHeight, behavior: 'smooth' });
+  toastUndo(`${n}개를 맨 ${toTop ? '위' : '아래'}로 옮겼습니다`, snap);
+}
+$('selTop').addEventListener('click', () => moveSelected(true));
+$('selBottom').addEventListener('click', () => moveSelected(false));
+
+/* ----- Open 순서를 카테고리 화면 순서로 ----- */
+$('sortCatBtn').addEventListener('click', () => {
+  const snap = snapRows(); state.rows.forEach((r, i) => { if (isOpen(r)) r.seq = i; }); renumberSeq(); render();
+  toastUndo('Open 순서를 카테고리 화면 순서로 맞췄습니다', snap);
+});
+
+/* ----- 지난 파일에서 Open 가져오기: 그 파일의 Open 목록과 순서를 그대로 (교체) ----- */
+const normName = s => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
+function similar(a, b) { // 0~1, 글자 편집 거리 기준
+  if (a === b) return 1; const m = a.length, n = b.length; if (!m || !n) return 0;
+  let prev = Array.from({ length: n + 1 }, (_, j) => j);
+  for (let i = 1; i <= m; i++) { const cur = [i]; for (let j = 1; j <= n; j++) cur[j] = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + (a[i - 1] === b[j - 1] ? 0 : 1)); prev = cur; }
+  return 1 - prev[n] / Math.max(m, n);
+}
+function planImport(oldOpen) {
+  const rows = state.rows.map(r => ({ ...r, cells: r.cells.slice(), _open: false }));
+  const cat = c => t(c[C.C1]) + '|' + t(c[C.C2]);
+  const life = c => [t(c[C.DAYS]), t(c[C.HOURS]), t(c[6]), t(c[7])].join('|');
+  const full = c => cat(c) + '|' + t(c[C.ITEM]) + '|' + life(c);
+  const used = new Set(), extra = [], rep = { exact: 0, renamed: [], copied: [], missing: [] };
+  const best = (c, pool) => { let bi = -1, bs = 0; pool.forEach(i => { const s = similar(normName(rows[i].cells[C.ITEM]), normName(c[C.ITEM])); if (s > bs) { bs = s; bi = i; } }); return bs >= 0.85 ? bi : -1; };
+  const idxs = rows.map((r, i) => i);
+  oldOpen.forEach((c, k) => {
+    const seq = k + 1, take = i => { used.add(i); rows[i]._open = true; rows[i].seq = seq; };
+    let i = idxs.find(i => !used.has(i) && full(rows[i].cells) === full(c)); if (i !== undefined) { take(i); rep.exact++; return; }
+    i = best(c, idxs.filter(i => !used.has(i) && cat(rows[i].cells) === cat(c) && life(rows[i].cells) === life(c)));
+    if (i >= 0) { take(i); rep.renamed.push([c, rows[i].cells]); return; }
+    let base = best(c, idxs.filter(i => cat(rows[i].cells) === cat(c) && life(rows[i].cells) === life(c)));
+    if (base < 0) base = best(c, idxs.filter(i => life(rows[i].cells) === life(c)));
+    if (base >= 0) { const cells = rows[base].cells.slice(); cells[C.C1] = c[C.C1]; cells[C.C2] = c[C.C2]; extra.push({ base, row: { cells, orig: null, src: rows[base].src, seq, _open: true } }); rep.copied.push([c, cells]); return; }
+    rep.missing.push(c);
+  });
+  const out = []; rows.forEach((r, i) => { out.push(r); extra.filter(x => x.base === i).forEach(x => out.push(x.row)); });
+  let off = 0;
+  out.forEach(r => { if (r._open) { if (!t(r.cells[C.OPEN])) r.cells[C.OPEN] = 'Y'; } else { if (t(r.cells[C.OPEN])) off++; r.cells[C.OPEN] = ''; r.seq = null; } delete r._open; });
+  rep.off = off; rep.total = oldOpen.length;
+  return { rows: out, rep };
+}
+let pendingImport = null;
+const impSheet = $('impSheet');
+$('importOpenBtn').addEventListener('click', () => $('importInput').click());
+$('importInput').addEventListener('change', async e => {
+  const f = e.target.files[0]; e.target.value = ''; if (!f) return;
+  let E; try { E = PKG.parse(await f.arrayBuffer()); } catch (err) { toast(err.message || String(err)); return; }
+  const te = E.find(x => x.kind === 'c' && /\/tables\/[^/]+\.xml$/.test(x.path)); if (!te) { toast('이 파일에는 품목 테이블이 없습니다'); return; }
+  const T = PKG.parseTable(te.raw);
+  if (T.cols.join('|') !== state.table.cols.join('|')) { toast('품목 테이블의 열 구성이 달라 가져올 수 없습니다'); return; }
+  const oldOpen = T.rows.map((c, i) => ({ c, i })).filter(x => t(x.c[C.OPEN])).sort((x, y) => cmpNO(x.c[C.NO], y.c[C.NO]) || x.i - y.i).map(x => x.c);
+  if (!oldOpen.length) { toast('그 파일에는 Open 품목이 없습니다'); return; }
+  pendingImport = planImport(oldOpen);
+  const r = pendingImport.rep, fname = f.name.replace(/^[0-9a-f]{8}-/i, '');
+  $('impFrom').textContent = fname;
+  const line = c => `${t(c[C.C1])} › ${t(c[C.C2])} · ${t(c[C.ITEM])}`;
+  const box = $('impBody'); box.innerHTML = '';
+  const add = (cls, title, items) => { const sec = document.createElement('div'); sec.className = 'impsec ' + cls; const h = document.createElement('b'); h.textContent = title; sec.appendChild(h); if (items && items.length) { const ul = document.createElement('ul'); items.forEach(s => { const li = document.createElement('li'); li.textContent = s; ul.appendChild(li); }); sec.appendChild(ul); } box.appendChild(sec); };
+  add('', `Open ${r.total}개를 그 파일 순서 그대로 가져옵니다`, null);
+  add('', `그대로 맞는 품목 ${r.exact}개`, null);
+  if (r.renamed.length) add('', `이름이 바뀐 품목 ${r.renamed.length}개는 지금 파일 이름으로 넣습니다`, r.renamed.map(([o, n]) => `${t(o[C.ITEM])} → ${t(n[C.ITEM])}`));
+  if (r.copied.length) add('', `한 장 더 뽑거나 다른 카테고리에 있던 ${r.copied.length}개는 복사해서 넣습니다`, r.copied.map(([o]) => line(o)));
+  if (r.missing.length) add('warn', `지금 파일에 없는 품목 ${r.missing.length}개는 넣지 않습니다`, r.missing.map(line));
+  if (r.off) add('', `지금 Open에 켜져 있던 것 중 ${r.off}개는 꺼집니다`, null);
+  impSheet.hidden = false; document.documentElement.classList.add('sheet-open');
+});
+function closeImp() { impSheet.hidden = true; document.documentElement.classList.remove('sheet-open'); pendingImport = null; }
+impSheet.addEventListener('click', e => { if (e.target.closest('[data-close]')) closeImp(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !impSheet.hidden) closeImp(); });
+$('impApply').addEventListener('click', () => {
+  if (!pendingImport) return; const snap = snapRows(), r = pendingImport.rep;
+  state.rows = pendingImport.rows; renumberSeq(); closeImp(); state.sel.clear(); setTab('open'); render();
+  toastUndo(`Open ${r.total - r.missing.length}개를 가져왔습니다` + (r.missing.length ? ` (${r.missing.length}개는 지금 파일에 없어 뺐습니다)` : ''), snap);
 });
 
 /* ----- 품목 추가: 원래 목록에서 골라 복사 (이름·일수는 원본 그대로) ----- */
