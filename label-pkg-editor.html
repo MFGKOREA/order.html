@@ -874,13 +874,20 @@ function cmpNO(x, y) { // 프린터는 Open 라벨을 번호(숫자) 순서로 �
 function openOrder() { return state.rows.map((r, i) => ({ r, i })).filter(x => isOpen(x.r)).sort((x, y) => (x.r.seq ?? 1e9) - (y.r.seq ?? 1e9) || x.i - y.i); }
 function renumberSeq() { openOrder().forEach((o, k) => { o.r.seq = k + 1; }); }
 function assignNO(rows) {
-  // 1) Open 순서를 안 바꿨으면 원래 NO를 그대로 둔다
+  // 프린터는 NO 칸을 글자 순서로 정렬해 Open을 출력한다 (열 정의 sort="string").
+  // 그래서 "1, 10, 100, 11…"처럼 섞이지 않게 자릿수를 맞춘 번호(001, 002…)를 쓴다.
   const want = openOrder().map(o => o.i);
+  const strCmp = (x, y) => (x < y ? -1 : x > y ? 1 : 0);
+  // 1) 원래 번호로도 글자 순서·숫자 순서 모두 지금 Open 순서와 같으면 그대로 둔다
   const keep = rows.map(r => r.orig !== null ? state.origRows[r.orig][C.NO] : '');
   const uniq = keep.every(v => v !== '') && new Set(keep).size === keep.length;
-  if (uniq) { const got = want.slice().sort((x, y) => cmpNO(keep[x], keep[y]) || x - y); if (got.every((v, k) => v === want[k])) return keep; }
-  // 2) 바꿨으면 줄 순서대로 번호를 매기되, Open 품목끼리만 번호를 바꿔 Open 순서를 맞춘다
-  const no = rows.map((r, i) => String(i + 1));
+  if (uniq) {
+    const byNum = want.slice().sort((x, y) => cmpNO(keep[x], keep[y]) || x - y), byStr = want.slice().sort((x, y) => strCmp(keep[x], keep[y]) || x - y);
+    if (byNum.every((v, k) => v === want[k]) && byStr.every((v, k) => v === want[k])) return keep;
+  }
+  // 2) 아니면 줄 순서대로 자릿수 맞춘 번호를 매기고, Open 품목끼리만 번호를 바꿔 Open 순서를 맞춘다
+  const w = Math.max(3, String(rows.length).length);
+  const no = rows.map((r, i) => String(i + 1).padStart(w, '0'));
   const slots = want.slice().sort((x, y) => x - y).map(i => no[i]);
   want.forEach((i, k) => { no[i] = slots[k]; });
   return no;
