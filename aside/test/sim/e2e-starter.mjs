@@ -67,6 +67,17 @@ for (const [name, job, page, fam] of kinds) {
   r = await E.asideRun(page, "shadow");
   ok(d.salesPush.status === "done" && r.ok === true && r.summary.nDiff === 0 && r.summary.same >= 1 && snap(fam) === b4, `섀도 ${name}: ${r.text} (GW Agent 흉내 ${n}일) · 시트 그대로`);
 }
+// 시간대별 매출(hourShare 한 칸) · MIS 메뉴 살펴보기(기록만 남김)
+d = await E.gwRead({ kind: "hour", from: "2026-11-12", to: "2026-11-12" }, "hour-main.html");
+const hsB = JSON.stringify(D().hourShare);
+shadowReq({ kind: "hour", from: "2026-11-12", to: "2026-11-12" });
+r = await E.asideRun("hour-main.html", "shadow");
+ok(d.salesPush.status === "done" && hsB && r.ok === true && r.summary.nDiff === 0 && r.summary.same === 1 && JSON.stringify(D().hourShare) === hsB, `섀도 hour: ${r.text} · hourShare 그대로`);
+d = await E.gwRead({ kind: "scout" }, "scout-main.html");
+const scB = JSON.stringify(D().gwScout);
+shadowReq({ kind: "scout" });
+r = await E.asideRun("scout-main.html", "shadow");
+ok(d.salesPush.status === "done" && r.ok === true && r.captures.includes("gwScout") && JSON.stringify(D().gwScout) === scB, `섀도 scout: 끝까지 돎 · gwScout 그대로 (기록 칸은 같음/다름으로 세지 않음)`);
 // Gross: 읽기 코드가 스스로 견줘서 같은 날은 안 씀 → 쓸 게 없으면 다름 0
 d = await E.gwRead({ from: "2026-10-20", to: "2026-10-24" }, "sales-main.html");
 const fcB = JSON.stringify(D().forecast);

@@ -3,7 +3,16 @@
 order.html 저장소에서 **클로드 코드가 일을 맡기고, 집 PC의 어사이드·그록 봇이 하고, 피클이 알리는** 곳입니다.
 label-list 저장소의 `docs/aside/` 와 같은 방식입니다. 규칙은 여기에 다시 쓰지 않고 label-list 원본을 가리킵니다.
 
-연결 진행 상황: [`connect.md`](connect.md) · GW Agent → 어사이드 이전 계획: [`migrate-gw-agent.md`](migrate-gw-agent.md)
+연결 진행 상황: [`connect.md`](connect.md)
+
+**GW Agent → 매장 PC 어사이드 이전** (11.28 KM 결정)
+| 문서 | 무엇 |
+|---|---|
+| [`migrate-gw-agent.md`](migrate-gw-agent.md) | 계획: 옮길 일 15가지 · 순서 · 되돌리는 법 |
+| [`design-aside-ops.md`](design-aside-ops.md) | 설계: 어사이드가 운전하고 코드가 읽는다 |
+| [`runbook-store-pc.md`](runbook-store-pc.md) | 매장 PC 연결 순서 · 끄는 법 |
+| [`verify-report.md`](verify-report.md) | 검증·되돌려 보기 결과 |
+| [`../../aside/`](../../aside/) | 코드 |
 
 ```
 클로드 코드 (클라우드) ── task-*.md + T-*.json push ──▶ GitHub  MFGKOREA/order.html

@@ -76,11 +76,12 @@
 
   <details class="card" id="setBox">
     <summary>설정 (KM 만 바꿈 · 시트 asideCfg 에 저장)</summary>
+    <div class="row">확인 글자 <input type="text" id="fOk" size="6" placeholder="KM"> <span class="chip">아래 [저장] 단추를 누르기 전에 먼저 넣기</span></div>
     <div class="row">이 PC 한도 <select id="fCap"><option value="off">보기만 (움직이지 않음)</option><option value="shadow">섀도까지</option><option value="live">실제까지</option></select> <button type="button" id="saveCap">이 PC 에 저장</button> <span class="chip">매장 PC 한 대에서만 켭니다</span></div>
     <div class="row">읽기 <select id="fReads"><option value="off">꺼짐</option><option value="shadow">섀도 (GW Agent 와 같이 돌려 맞춰 보기)</option><option value="live">실제 (GW Agent 확장을 끈 뒤)</option></select>
       발주 <select id="fOrders"><option value="off">꺼짐</option><option value="live">실제</option></select></div>
     <div class="row">섀도 종류 <input type="text" id="fKinds" size="34" placeholder="recv,orders,xfer,sets,menu,gross"> 시각 <input type="text" id="fTimes" size="16" placeholder="10:40,15:40"></div>
-    <div class="row">확인 글자 <input type="text" id="fOk" size="6" placeholder="KM"> <button type="button" id="saveCfg">시트에 저장</button> <button type="button" id="reload">설정 다시 읽기</button> <span id="cfgMsg" class="chip hide"></span></div>
+    <div class="row"><button type="button" id="saveCfg">시트에 저장</button> <button type="button" id="reload">설정 다시 읽기</button> <span id="cfgMsg" class="chip hide"></span></div>
     <div class="row">발주 시트 주소 <input type="text" id="fApi" size="40" placeholder="비워 두면 발주앱에서 찾음"> 가게 키 <input type="text" id="fKey" size="10" placeholder="잠겼을 때만"> <button type="button" id="saveApi">이 PC 에 저장</button></div>
   </details>
 
