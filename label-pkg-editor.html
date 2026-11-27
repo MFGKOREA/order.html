@@ -323,7 +323,8 @@ html.cmp-on .app { max-width: 1040px; }
 .rrow .from { color: var(--muted); overflow-wrap: anywhere; }
 .rrow .arr { color: var(--muted); }
 .rrow b { font-weight: 700; overflow-wrap: anywhere; }
-.rrow .cat { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
+.rrow .cat { grid-column: 1 / 3; font-size: 12px; color: var(--muted); align-self: center; }
+.rrow .split { justify-self: end; min-height: 34px; padding: 5px 12px; font-size: 13px; }
 .prow { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 12px; border-radius: 12px; background: var(--fill-2); cursor: pointer; }
 .prow.on { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
 .prow input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent-text); flex: none; }
@@ -1221,7 +1222,9 @@ $('sortCatBtn').addEventListener('click', () => {
 });
 
 /* ----- 지난 파일에서 Open 가져오기: 그 파일의 Open 목록과 순서를 그대로 (교체) ----- */
-const RENAME_SIM = 0.8; // 같은 카테고리·같은 일수에서 이름이 이 정도로 비슷하면 이름만 바뀐 라벨로 본다 (화면에 A → B로 보여 줌)
+const RENAME_SIM = 0.9; // 같은 카테고리·같은 일수에서 이름이 거의 같을 때만 이름이 바뀐 라벨로 본다 (화면에 A → B로 보여 주고, 아니면 사용자가 나눌 수 있음)
+const noRename = new Set(); // 사용자가 "다른 라벨"이라고 한 이름 쌍
+const pairKey = (o, n) => normName(o) + '\u0001' + normName(n);
 const normName = s => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
 function similar(a, b) { // 0~1, 글자 편집 거리 기준
   if (a === b) return 1; const m = a.length, n = b.length; if (!m || !n) return 0;
@@ -1235,7 +1238,7 @@ function planImport(oldOpen) {
   const life = c => [t(c[C.DAYS]), t(c[C.HOURS]), t(c[6]), t(c[7])].join('|');
   const full = c => cat(c) + '|' + t(c[C.ITEM]) + '|' + life(c);
   const used = new Set(), extra = [], rep = { exact: 0, renamed: [], copied: [], missing: [] };
-  const best = (c, pool) => { let bi = -1, bs = 0; pool.forEach(i => { const s = similar(normName(rows[i].cells[C.ITEM]), normName(c[C.ITEM])); if (s > bs) { bs = s; bi = i; } }); return bs >= RENAME_SIM ? bi : -1; };
+  const best = (c, pool) => { let bi = -1, bs = 0; pool.forEach(i => { if (noRename.has(pairKey(c[C.ITEM], rows[i].cells[C.ITEM]))) return; const s = similar(normName(rows[i].cells[C.ITEM]), normName(c[C.ITEM])); if (s > bs) { bs = s; bi = i; } }); return bs >= RENAME_SIM ? bi : -1; };
   const idxs = rows.map((r, i) => i);
   oldOpen.forEach((c, k) => {
     const seq = k + 1, take = i => { used.add(i); rows[i]._open = true; rows[i].seq = seq; };
@@ -1398,7 +1401,7 @@ function loadSlot(which, buf, name) {
     const E = PKG.parse(buf), te = E.find(x => x.kind === 'c' && /\/tables\/[^/]+\.xml$/.test(x.path));
     if (!te) throw new Error('품목 테이블이 없는 파일입니다');
     const T = PKG.parseTable(te.raw), nOpen = T.rows.filter(c => t(c[C.OPEN])).length;
-    state.pair[which] = { buf, name: clean, T, nOpen, edited: OpenFix.status(E) === 'done' };
+    state.pair[which] = { buf, name: clean, T, nOpen, edited: OpenFix.status(E) === 'done' }; noRename.clear();
     $(which + 'Name').textContent = clean; $(which + 'Meta').textContent = `품목 ${T.rows.length}개 · Open ${nOpen}개`;
     $(which === 'old' ? 'dropOld' : 'dropNew').classList.add('done'); $('openErr').textContent = '';
   } catch (e) { state.pair[which] = null; renderPairSlots(); $(which + 'Meta').textContent = e.message || String(e); return; }
@@ -1435,7 +1438,7 @@ function diffTables(oldRows, newRows) { // 품목 단위(카테고리·이름·�
     const o = O.get(k);
     let hit = [...nLeft].find(nk => { const n = N.get(nk); return cat(n) === cat(o) && normName(n[C.ITEM]) === normName(o[C.ITEM]); });
     if (hit) { nLeft.delete(hit); lifeChanged.push([o, N.get(hit)]); return; }
-    let best = null, bs = 0; nLeft.forEach(nk => { const n = N.get(nk); if (cat(n) !== cat(o) || lifeOf(n) !== lifeOf(o)) return; const s = similar(normName(n[C.ITEM]), normName(o[C.ITEM])); if (s > bs) { bs = s; best = nk; } });
+    let best = null, bs = 0; nLeft.forEach(nk => { const n = N.get(nk); if (cat(n) !== cat(o) || lifeOf(n) !== lifeOf(o) || noRename.has(pairKey(o[C.ITEM], n[C.ITEM]))) return; const s = similar(normName(n[C.ITEM]), normName(o[C.ITEM])); if (s > bs) { bs = s; best = nk; } });
     if (best && bs >= RENAME_SIM) { nLeft.delete(best); renamed.push([o, N.get(best)]); return; }
     deleted.push(o);
   });
@@ -1448,7 +1451,7 @@ function showCmp(on) {
   $('v-cmp').hidden = !on; $('v-open').hidden = on; document.documentElement.classList.toggle('cmp-on', on);
   if (on) { $('v-edit').hidden = true; $('v-save').hidden = true; window.scrollTo({ top: 0 }); }
 }
-$('cmpBtn').addEventListener('click', () => {
+function runCompare(keepKeys) {
   const P = state.pair; if (!P.old || !P.new) return;
   if (!openBuffer(P.new.buf.slice(0), P.new.name, true)) return;
   const oldOpen = P.old.T.rows.map((c, i) => ({ c, i })).filter(x => t(x.c[C.OPEN])).sort((x, y) => cmpNO(x.c[C.NO], y.c[C.NO]) || x.i - y.i).map(x => x.c);
@@ -1460,6 +1463,7 @@ $('cmpBtn').addEventListener('click', () => {
   const nCarried = nAllDel - diff.deleted.length;
   $('delNote').hidden = !nCarried; $('delNote').textContent = nCarried ? `Open용으로 복사해 둔 ${nCarried}개는 새 라벨에도 다시 복사합니다.` : '';
   pendingPair = { diff, plan, picked: new Set(), missKeys };
+  if (keepKeys) diff.added.forEach((c, i) => { if (keepKeys.has(itemKey(c))) pendingPair.picked.add(i); });
   const r = plan ? plan.rep : { total: 0, missing: [] };
   $('cmpFiles').innerHTML = '<span class="ftag">기존</span><b></b><span class="arr">→</span><span class="ftag new">새 라벨</span><b></b>';
   const fb = $('cmpFiles').querySelectorAll('b'); fb[0].textContent = P.old.name; fb[1].textContent = P.new.name;
@@ -1480,12 +1484,18 @@ $('cmpBtn').addEventListener('click', () => {
   const ren = $('renList'); ren.innerHTML = ''; $('renBox').hidden = !diff.renamed.length; $('renN').textContent = diff.renamed.length;
   diff.renamed.forEach(([o, n]) => {
     const li = document.createElement('li'); li.className = 'rrow';
-    li.innerHTML = '<span class="from"></span><span class="arr">→</span><b></b><span class="cat"></span>';
+    li.innerHTML = '<span class="from"></span><span class="arr">→</span><b></b><span class="cat"></span><button type="button" class="btn split">다른 라벨입니다</button>';
     li.querySelector('.from').textContent = t(o[C.ITEM]); li.querySelector('b').textContent = t(n[C.ITEM]); li.querySelector('.cat').textContent = catText(n) + ' · ' + lifeText(n);
+    li.querySelector('.split').addEventListener('click', () => { // 이름 변경이 아니라 서로 다른 라벨: 삭제 + 새로 추가로 나눈다
+      noRename.add(pairKey(o[C.ITEM], n[C.ITEM]));
+      const keep = new Set([...pendingPair.picked].map(i => itemKey(pendingPair.diff.added[i])));
+      runCompare(keep); toast(`다른 라벨로 나눴습니다: ${t(o[C.ITEM])} / ${t(n[C.ITEM])}`);
+    });
     ren.appendChild(li);
   });
   renderPick(); showCmp(true);
-});
+}
+$('cmpBtn').addEventListener('click', () => runCompare());
 function renderPick() {
   const { diff, picked } = pendingPair, ul = $('addPick'); ul.innerHTML = '';
   diff.added.forEach((c, i) => {
