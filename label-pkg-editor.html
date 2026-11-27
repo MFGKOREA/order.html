@@ -398,6 +398,7 @@ html.cmp-on .app { max-width: 1040px; }
       <section class="group cmpcol">
         <div class="colhd"><h2>삭제된 라벨 <span class="n del" id="delN"></span></h2><span class="sub">새 라벨에 없어서 뺍니다</span></div>
         <ul class="clist" id="delList"></ul>
+        <p class="sub" id="delNote" hidden></p>
       </section>
       <section class="group cmpcol addcol">
         <div class="colhd"><h2>새로 추가된 라벨 <span class="n add" id="addN"></span></h2><button class="btn" type="button" id="addAll">모두 선택</button></div>
@@ -985,7 +986,7 @@ function renderList() {
         <button type="button" data-act="up" aria-label="위로" ${vi === 0 ? 'disabled' : ''}><svg class="ic"><use href="#i-up"/></svg></button>
         <button type="button" data-act="down" aria-label="아래로" ${vi === vis.length - 1 ? 'disabled' : ''}><svg class="ic"><use href="#i-down"/></svg></button>
         <button type="button" data-act="dup" aria-label="복사 (한 장 더)" title="복사 (한 장 더)"><svg class="ic"><use href="#i-copy"/></svg></button>
-        <button type="button" data-act="del" class="del" aria-label="삭제"><svg class="ic"><use href="#i-trash"/></svg></button>
+        ${state.tab === 'open' ? '<button type="button" data-act="out" class="del" aria-label="Open에서 빼기" title="Open에서 빼기"><svg class="ic"><use href="#i-x"/></svg></button>' : '<button type="button" data-act="del" class="del" aria-label="품목 삭제" title="품목 삭제"><svg class="ic"><use href="#i-trash"/></svg></button>'}
       </div>`;
     li.querySelector('.name').textContent = c[C.ITEM] || '(이름 없음)';
     if (state.newKeys.size && state.newKeys.has(itemKey(c))) li.querySelector('.name').insertAdjacentHTML('afterbegin', '<em class="newb">NEW</em>');
@@ -1060,11 +1061,20 @@ list.addEventListener('click', e => {
   }
   const b = e.target.closest('button[data-act]'); if (!b) return;
   const li = b.closest('li'), idx = +li.dataset.idx, r = state.rows[idx], vis = visible(), vi = vis.indexOf(idx);
-  if (b.dataset.act === 'del') { state.rows.splice(idx, 1); toast(`삭제: ${r.cells[C.ITEM] || '(이름 없음)'}`); render(); return; }
+  if (b.dataset.act === 'out') { // Open에서만 뺀다. 품목은 카테고리 화면에 남긴다 (한 장 더 뽑으려고 복사한 줄만 지움)
+    const snap = snapRows(), name = r.cells[C.ITEM] || '(이름 없음)', how = takeOut(r); renumberSeq(); render();
+    toastUndo(how === 'copy' ? `한 장 더 뽑던 줄을 지웠습니다: ${name}` : `Open에서 뺐습니다: ${name}. 카테고리 화면에는 그대로 있습니다`, snap); return;
+  }
+  if (b.dataset.act === 'del') { const snap = snapRows(); state.rows.splice(idx, 1); renumberSeq(); render(); toastUndo(`품목 삭제: ${r.cells[C.ITEM] || '(이름 없음)'}. 프린터 카테고리 화면에서도 없어집니다`, snap); return; }
   if (b.dataset.act === 'dup') { state.rows.splice(idx + 1, 0, { cells: r.cells.slice(), orig: null, src: r.src, seq: r.seq ? r.seq + 0.5 : null }); renumberSeq(); render(); const n = list.querySelector(`li[data-idx="${idx + 1}"]`); if (n) { n.scrollIntoView({ block: 'nearest' }); } toast(state.tab === 'open' ? '복사했습니다. Open에서 한 장 더 출력됩니다' : '복사했습니다. 카테고리를 바꿔 다른 화면에도 넣을 수 있습니다'); return; }
   if (b.dataset.act === 'up' && vi > 0) move(idx, vis[vi - 1], true);
   if (b.dataset.act === 'down' && vi < vis.length - 1) move(idx, vis[vi + 1], false);
 });
+function takeOut(r) { // 같은 품목 줄이 또 있으면(여러 장용 복사) 줄을 지우고, 하나뿐이면 Open만 끈다
+  const key = itemKey(r.cells), dup = state.rows.some(x => x !== r && itemKey(x.cells) === key);
+  if (dup) { state.rows.splice(state.rows.indexOf(r), 1); return 'copy'; }
+  r.cells[C.OPEN] = ''; r.seq = null; return 'off';
+}
 function moveOpenTo(from, pos) {
   const ord = openOrder().map(o => o.i).filter(i => i !== from); ord.splice(pos - 1, 0, from); ord.forEach((i, k) => { state.rows[i].seq = k + 1; });
   render(); const li = list.querySelector(`li[data-idx="${from}"]`); if (li) { li.scrollIntoView({ block: 'center' }); flash(li); }
@@ -1174,7 +1184,7 @@ $('selOn').addEventListener('click', () => {
 });
 $('selOff').addEventListener('click', () => {
   const pick = selected().filter(isOpen); if (!pick.length) { toast('고른 품목 중 Open에 있는 것이 없습니다'); return; }
-  const snap = snapRows(); pick.forEach(r => { r.cells[C.OPEN] = ''; r.seq = null; }); renumberSeq(); state.sel.clear(); render();
+  const snap = snapRows(); pick.forEach(r => { if (state.tab === 'open') takeOut(r); else { r.cells[C.OPEN] = ''; r.seq = null; } }); renumberSeq(); state.sel.clear(); render();
   toastUndo(`${pick.length}개를 Open에서 뺐습니다`, snap);
 });
 function moveSelected(toTop) {
@@ -1433,6 +1443,11 @@ $('cmpBtn').addEventListener('click', () => {
   const oldOpen = P.old.T.rows.map((c, i) => ({ c, i })).filter(x => t(x.c[C.OPEN])).sort((x, y) => cmpNO(x.c[C.NO], y.c[C.NO]) || x.i - y.i).map(x => x.c);
   const diff = diffTables(P.old.T.rows, P.new.T.rows), plan = oldOpen.length ? planImport(oldOpen) : null;
   const missKeys = new Set(plan ? plan.rep.missing.map(itemKey) : []);
+  // 기존 파일에서 Open용으로 다른 카테고리에 복사해 둔 줄은 새 라벨에도 다시 복사되므로 "삭제"가 아니다
+  const carried = new Set(plan ? [...plan.rep.copied, ...plan.rep.renamed].map(([o]) => itemKey(o)) : []);
+  const nAllDel = diff.deleted.length; diff.deleted = diff.deleted.filter(c => !carried.has(itemKey(c)));
+  const nCarried = nAllDel - diff.deleted.length;
+  $('delNote').hidden = !nCarried; $('delNote').textContent = nCarried ? `Open용으로 복사해 둔 ${nCarried}개는 새 라벨에도 다시 복사합니다.` : '';
   pendingPair = { diff, plan, picked: new Set(), missKeys };
   const r = plan ? plan.rep : { total: 0, missing: [] };
   $('cmpFiles').innerHTML = '<span class="ftag">기존</span><b></b><span class="arr">→</span><span class="ftag new">새 라벨</span><b></b>';
