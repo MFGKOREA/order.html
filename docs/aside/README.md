@@ -3,6 +3,8 @@
 order.html 저장소에서 **클로드 코드가 일을 맡기고, 집 PC의 어사이드·그록 봇이 하고, 피클이 알리는** 곳입니다.
 label-list 저장소의 `docs/aside/` 와 같은 방식입니다. 규칙은 여기에 다시 쓰지 않고 label-list 원본을 가리킵니다.
 
+연결 진행 상황: [`connect.md`](connect.md)
+
 ```
 클로드 코드 (클라우드) ── task-*.md + T-*.json push ──▶ GitHub  MFGKOREA/order.html
                                                          docs/aside/tasks/
