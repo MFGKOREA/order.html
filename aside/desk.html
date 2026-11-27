@@ -1,0 +1,214 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>어사이드 책상</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#16202a; --sub:#5b6875; --line:#dde2e8; --go:#0b6bcb; --ok:#11734b; --warn:#a15c00; --bad:#b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12161b; --card:#1b2129; --ink:#e8edf2; --sub:#9aa7b4; --line:#2c3541; --go:#6fb1ff; --ok:#5fd0a0; --warn:#f0b35a; --bad:#ff8a80; } }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui, "Malgun Gothic", sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:16px; }
+  h1 { font-size:18px; margin:4px 0 12px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .chip { font-size:12px; font-weight:700; padding:2px 8px; border-radius:999px; border:1px solid var(--line); color:var(--sub); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; margin:0 0 12px; }
+  #instr { border-width:2px; }
+  #instr[data-code="READ"], #instr[data-code="ARM"] { border-color:var(--go); }
+  #instr[data-code="STOP"] { border-color:var(--bad); }
+  #instr[data-code="CLOSE"] { border-color:var(--ok); }
+  #instr .now { font-size:13px; color:var(--sub); }
+  #instr .title { font-size:26px; font-weight:800; margin:2px 0 4px; }
+  #instr .why { color:var(--sub); margin-bottom:8px; overflow-wrap:anywhere; }
+  ol { margin:6px 0 0; padding-left:22px; }
+  textarea { width:100%; height:74px; font:12px/1.4 ui-monospace, Consolas, monospace; border:1px solid var(--line); border-radius:8px; padding:8px; background:transparent; color:var(--ink); resize:vertical; }
+  button, select, input[type=text] { font:inherit; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); }
+  button { cursor:pointer; }
+  .row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:8px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  td { padding:4px 6px; border-top:1px solid var(--line); vertical-align:top; overflow-wrap:anywhere; }
+  td:first-child { color:var(--sub); width:34%; }
+  #log { font:12px/1.5 ui-monospace, Consolas, monospace; white-space:pre-wrap; color:var(--sub); max-height:220px; overflow:auto; }
+  .hide { display:none; }
+  a.bm { display:inline-block; padding:4px 10px; border:1px dashed var(--go); border-radius:8px; color:var(--go); text-decoration:none; font-weight:700; }
+  summary { cursor:pointer; font-weight:700; }
+</style>
+</head>
+<body>
+<main>
+  <h1>어사이드 책상 <span class="chip" id="cReads">읽기 –</span><span class="chip" id="cOrders">발주 –</span><span class="chip" id="cNet">시트 –</span></h1>
+
+  <!-- 어사이드는 이 상자만 보면 됨: data-code 와 글 -->
+  <section class="card" id="instr" data-code="IDLE" aria-live="polite">
+    <div class="now">지금 할 일 · <span id="iCode">IDLE</span> · <span id="iSince"></span></div>
+    <div class="title" id="iTitle">불러오는 중</div>
+    <div class="why" id="iWhy"></div>
+    <ol id="iSteps"></ol>
+    <div id="codeBox" class="hide">
+      <div class="row"><b>시작 코드</b> <button id="copy" type="button">복사</button> <span id="copied" class="chip hide">복사됨</span></div>
+      <textarea id="code" readonly spellcheck="false"></textarea>
+    </div>
+    <div class="row">
+      <button type="button" data-stuck="로그인 창이 나옴">막힘: 로그인 창</button>
+      <button type="button" data-stuck="GW 가 안 열림 (인터넷·VPN)">막힘: GW 가 안 열림</button>
+      <button type="button" data-stuck="시작 코드가 실행되지 않음">막힘: 시작 코드 실행 안 됨</button>
+      <button type="button" id="resume" class="hide">다시 시작 (KM)</button>
+    </div>
+  </section>
+
+  <section class="card">
+    <table>
+      <tr><td>마지막 결과</td><td id="sLast">–</td></tr>
+      <tr><td>섀도 마지막 맞춰 보기</td><td id="sShadow">–</td></tr>
+      <tr><td>잇단 실패</td><td id="sFails">0</td></tr>
+      <tr><td>시트 요청 칸</td><td id="sReq">–</td></tr>
+      <tr><td>매장 PC 소식 (misAgent)</td><td id="sAgent">–</td></tr>
+      <tr><td>GW Agent 진단 (gwDiag)</td><td id="sDiag">–</td></tr>
+      <tr><td>시트 읽은 때</td><td id="sRead">–</td></tr>
+    </table>
+  </section>
+
+  <details class="card">
+    <summary>북마크 (한 번만 북마크 막대로 끌어다 두기)</summary>
+    <p>어사이드가 코드를 직접 실행하지 못할 때 쓰는 길입니다. MIS 첫 화면에서 누릅니다.</p>
+    <div class="row"><a class="bm" id="bmShadow" href="#">어사이드 읽기(섀도)</a><a class="bm" id="bmLive" href="#">어사이드 읽기(실제)</a><a class="bm" id="bmOrder" href="#">어사이드 발주 대기</a></div>
+  </details>
+
+  <details class="card" id="setBox">
+    <summary>설정 (KM 만 바꿈 · 시트 asideCfg 에 저장)</summary>
+    <div class="row">읽기 <select id="fReads"><option value="off">꺼짐</option><option value="shadow">섀도 (GW Agent 와 같이 돌려 맞춰 보기)</option><option value="live">실제 (GW Agent 확장을 끈 뒤)</option></select>
+      발주 <select id="fOrders"><option value="off">꺼짐</option><option value="live">실제</option></select></div>
+    <div class="row">섀도 종류 <input type="text" id="fKinds" size="34" placeholder="recv,orders,xfer,sets,menu,gross"> 시각 <input type="text" id="fTimes" size="16" placeholder="10:40,15:40"></div>
+    <div class="row">확인 글자 <input type="text" id="fOk" size="6" placeholder="KM"> <button type="button" id="saveCfg">시트에 저장</button> <button type="button" id="reload">설정 다시 읽기</button> <span id="cfgMsg" class="chip hide"></span></div>
+    <div class="row">발주 시트 주소 <input type="text" id="fApi" size="40" placeholder="비워 두면 발주앱에서 찾음"> 가게 키 <input type="text" id="fKey" size="10" placeholder="잠겼을 때만"> <button type="button" id="saveApi">이 PC 에 저장</button></div>
+  </details>
+
+  <details class="card"><summary>기록 (이 PC 에만 남음)</summary><div id="log"></div></details>
+</main>
+
+<script src="https://mfgkorea.github.io/label-list/gw-agent/auto.js"></script>
+<script src="https://mfgkorea.github.io/label-list/gw-agent/periodic.js"></script>
+<script src="desk-core.js"></script>
+<script>
+// 책상 화면: 20초마다 시트 상태를 보고 desk-core.js 의 판단을 화면에 보여 줌. 시트에 쓰는 것도 판단이 시킨 것만
+(() => {
+  const $ = (id) => document.getElementById(id), D = self.AsideDesk, MIN = 60e3;
+  const LL = "https://mfgkorea.github.io/label-list/";
+  const HERE = location.href.replace(/[^/]*([?#].*)?$/, "");
+  const Q = new URLSearchParams(location.search);
+  const TICK = Math.max(3e3, +(Q.get("tick") || 20e3));
+  const ls = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
+  let API = Q.get("api") || ls.get("asideApi") || "", KEY = ls.get("asideKey") || "";
+  let st = {}; try { st = JSON.parse(ls.get("asideDeskSt") || "{}") || {}; } catch (e) { st = {}; }
+  let full = null, fullAt = 0, fullFailAt = 0, plan, planAt = 0, light = {}, lightAt = 0, netOk = null, cur = null, logs = [];
+  try { logs = JSON.parse(ls.get("asideDeskLog") || "[]"); } catch (e) {}
+
+  const hm = (t) => (t ? new Date(t + 9 * 3600e3).toISOString().slice(11, 16) : "–");
+  const ago = (t, now) => (!t ? "–" : now - t < MIN ? "방금" : now - t < 90 * MIN ? Math.round((now - t) / MIN) + "분 전" : Math.round((now - t) / 3600e3) + "시간 전");
+  const log = (msg) => { logs.push(hm(Date.now()) + " " + msg); logs = logs.slice(-80); ls.set("asideDeskLog", JSON.stringify(logs)); $("log").textContent = logs.slice().reverse().join("\n"); };
+  const getJson = async (url, ms = 30e3) => { const c = new AbortController(), t = setTimeout(() => c.abort(), ms); try { return await (await fetch(url, { signal: c.signal, cache: "no-store" })).json(); } finally { clearTimeout(t); } };
+  const withKey = (u) => u + (KEY ? "&k=" + encodeURIComponent(KEY) : "");
+  const post = async (body) => {
+    for (let t = 0; t < 3; t++) {
+      try { const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ ...body, k: KEY }) }); const j = await r.json(); if (j && j.ok) return true; }
+      catch (e) {}
+      await new Promise((ok) => setTimeout(ok, 1500 * (t + 1)));
+    }
+    log("시트에 못 씀: " + body.key); return false;
+  };
+  // 발주 시트 주소: 이 저장소에는 적지 않음 → 발주앱(label-list)의 자동 대기 코드에 적힌 것을 찾아 씀
+  async function findApi() {
+    if (API) return true;
+    try { const t = await (await fetch(LL + "mis-agent.js?t=" + Date.now(), { cache: "no-store" })).text(); const m = /const API = "(https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec)"/.exec(t); if (m) { API = m[1]; return true; } } catch (e) {}
+    return false;
+  }
+  async function readFull(now) {
+    try { const j = await getJson(withKey(API + "?api=1&t=" + now), 45e3); if (!j || !j.ok || !j.data) throw new Error("x"); full = j.data; fullAt = Date.now(); return true; }
+    catch (e) { fullFailAt = Date.now(); log("시트 전체를 못 읽음"); return false; }
+  }
+  async function readPlan(now) {
+    if (now - planAt < 30 * MIN) return;
+    try { const p = await getJson(LL + "gw-plan.json?t=" + now, 8e3); if (Array.isArray(p)) plan = p; } catch (e) {}
+    planAt = now;
+  }
+
+  function render(r, now) {
+    const i = r.instr, box = $("instr");
+    box.dataset.code = i.code; box.dataset.mode = i.mode || ""; box.dataset.job = i.job || "";
+    $("iCode").textContent = i.code; $("iSince").textContent = hm(i.since) + " 부터";
+    $("iTitle").textContent = i.title + (i.urgent ? " (급함)" : ""); $("iWhy").textContent = i.why || "";
+    $("iSteps").replaceChildren(...D.steps(i).map((s) => { const li = document.createElement("li"); li.textContent = s; return li; }));
+    const needCode = i.code === "READ" || i.code === "ARM";
+    $("codeBox").classList.toggle("hide", !needCode);
+    if (needCode) $("code").value = D.snippet(HERE, i.mode, i.job);
+    $("resume").classList.toggle("hide", !(r.st.stop && !i.soft));
+    document.title = `[${i.code}] 어사이드 책상`;
+    const c = r.cfg;
+    $("cReads").textContent = "읽기 " + ({ off: "꺼짐", shadow: "섀도", live: "실제" })[c.reads];
+    $("cOrders").textContent = "발주 " + ({ off: "꺼짐", live: "실제" })[c.orders];
+    $("cNet").textContent = netOk === null ? "시트 –" : netOk ? "시트 연결됨" : "시트 연결 안 됨";
+    const s = r.st, sp = light.salesPush || {}, mp = light.misPush || {}, ag = light.misAgent || {}, dg = light.gwDiag || {};
+    $("sLast").textContent = s.last ? `${hm(s.last.at)} ${s.last.ok ? "성공" : "실패"} · ${s.last.text}` : "–";
+    $("sShadow").textContent = s.shadowLast ? `${hm(s.shadowLast.at)} ${s.shadowLast.kind || ""} · 같음 ${s.shadowLast.same} · 다름 ${s.shadowLast.nDiff} · 없음 ${s.shadowLast.nMiss}` : "–";
+    $("sFails").textContent = String(s.fails || 0) + (s.stop ? " · 멈춤: " + s.stop.why : "");
+    $("sReq").textContent = `매출 요청 ${sp.status || "없음"} (${ago(sp.at, now)}) · 발주 전송 ${mp.status || "없음"} (${mp.date || "–"})`;
+    $("sAgent").textContent = ag.at ? `${ago(ag.at, now)} · ${ag.ver || ""}${ag.grid ? " · 주문등록 화면" : ""}` : "–";
+    $("sDiag").textContent = dg.code ? `${dg.code} · ${ago(dg.at, now)}` : "없음";
+    $("sRead").textContent = `상태 ${hm(lightAt)} · 전체 ${hm(fullAt)}`;
+  }
+
+  let busy = false;
+  async function tick() {
+    if (busy) return; busy = true;
+    try {
+      const now = Date.now();
+      if (!(await findApi())) { netOk = false; $("iTitle").textContent = "발주 시트 주소를 못 찾음"; $("iWhy").textContent = "인터넷을 확인하거나 설정에서 주소를 넣어 주세요"; return; }
+      try { const v = await getJson(withKey(API + "?api=1&status=1&t=" + now), 20e3); light = (v && (v.status || {})) || {}; lightAt = Date.now(); netOk = !!(v && v.ok); if (v && v.auth) netOk = false; }
+      catch (e) { netOk = false; }
+      await readPlan(now);
+      if (!fullAt && !fullFailAt) await readFull(now);
+      let r;
+      for (let k = 0; k < 2; k++) { // 판단이 "시트 전체가 필요하다"고 하면 읽고 한 번 더
+        r = D.decide({ now: Date.now(), cfg: (full || {}).asideCfg, light, full, fullAt, fullFailAt, plan, st }, self);
+        st = r.st;
+        for (const a of r.acts) { if (a.type === "post") await post(a.body); else if (a.type === "log") log(a.msg); }
+        if (!r.wantFull || !(await readFull(Date.now()))) break;
+      }
+      ls.set("asideDeskSt", JSON.stringify(st));
+      cur = r; render(r, Date.now());
+    } finally { busy = false; }
+  }
+
+  // 뒤에 깔린 탭은 브라우저가 타이머를 늦춤 → 워커 타이머로 깨움 (못 만들면 보통 타이머)
+  try { const w = new Worker(URL.createObjectURL(new Blob([`setInterval(function(){postMessage(1)},${TICK})`], { type: "text/javascript" }))); w.onmessage = tick; } catch (e) {}
+  setInterval(tick, Math.max(TICK, 30e3)); tick();
+
+  // ---- 단추 ----
+  $("copy").onclick = async () => { $("code").select(); try { await navigator.clipboard.writeText($("code").value); } catch (e) { document.execCommand("copy"); } $("copied").classList.remove("hide"); setTimeout(() => $("copied").classList.add("hide"), 1500); };
+  document.querySelectorAll("[data-stuck]").forEach((b) => { b.onclick = async () => {
+    const why = b.dataset.stuck, now = Date.now();
+    st.stop = { at: now, why: "어사이드가 알림: " + why, auto: 0 }; if (st.run) { st.tried = st.tried || {}; st.tried[st.run.id] = now; st.run = null; }
+    ls.set("asideDeskSt", JSON.stringify(st)); log("막힘: " + why);
+    if (API) await post({ action: "set", key: "asideDiag", value: { at: now, code: "stuck", why, ver: D.VER } });
+    tick();
+  }; });
+  $("resume").onclick = () => { st.stop = null; st.fails = 0; ls.set("asideDeskSt", JSON.stringify(st)); log("다시 시작"); tick(); };
+  $("reload").onclick = async () => { await readFull(Date.now()); tick(); };
+  $("saveApi").onclick = () => { API = $("fApi").value.trim() || ""; KEY = $("fKey").value.trim(); ls.set("asideApi", API); ls.set("asideKey", KEY); fullAt = 0; fullFailAt = 0; tick(); };
+  $("saveCfg").onclick = async () => {
+    const msg = (t) => { $("cfgMsg").textContent = t; $("cfgMsg").classList.remove("hide"); };
+    if ($("fOk").value.trim() !== "KM") return msg("확인 글자가 달라요");
+    const cfg = { reads: $("fReads").value, orders: $("fOrders").value, shadow: { kinds: $("fKinds").value.split(/[,\s]+/).filter(Boolean), times: $("fTimes").value.split(/[,\s]+/).filter(Boolean) }, at: Date.now(), by: "desk" };
+    if (!cfg.shadow.kinds.length) delete cfg.shadow.kinds; if (!cfg.shadow.times.length) delete cfg.shadow.times;
+    msg((await post({ action: "set", key: "asideCfg", value: cfg })) ? "저장됨" : "저장 실패"); $("fOk").value = "";
+    await readFull(Date.now()); tick();
+  };
+  const bm = (mode, job) => "javascript:" + encodeURIComponent(D.snippet(HERE, mode, job));
+  $("bmShadow").href = bm("shadow", "read"); $("bmLive").href = bm("live", "read"); $("bmOrder").href = bm("live", "order");
+  $("setBox").addEventListener("toggle", () => { const c = D.mergeCfg((full || {}).asideCfg); $("fReads").value = c.reads; $("fOrders").value = c.orders; $("fKinds").value = c.shadow.kinds.join(","); $("fTimes").value = c.shadow.times.join(","); $("fApi").value = ls.get("asideApi") || ""; $("fKey").value = KEY; });
+  $("log").textContent = logs.slice().reverse().join("\n");
+  self.__desk = { tick, state: () => ({ st, light, fullAt, cur }) };
+})();
+</script>
+</body>
+</html>
