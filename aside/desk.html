@@ -36,7 +36,7 @@
 </head>
 <body>
 <main>
-  <h1>어사이드 책상 <span class="chip" id="cReads">읽기 –</span><span class="chip" id="cOrders">발주 –</span><span class="chip" id="cNet">시트 –</span></h1>
+  <h1>어사이드 책상 <span class="chip" id="cReads">읽기 –</span><span class="chip" id="cOrders">발주 –</span><span class="chip" id="cNet">시트 –</span><span class="chip" id="cCap">이 PC –</span></h1>
 
   <!-- 어사이드는 이 상자만 보면 됨: data-code 와 글 -->
   <section class="card" id="instr" data-code="IDLE" aria-live="polite">
@@ -76,6 +76,7 @@
 
   <details class="card" id="setBox">
     <summary>설정 (KM 만 바꿈 · 시트 asideCfg 에 저장)</summary>
+    <div class="row">이 PC 한도 <select id="fCap"><option value="off">보기만 (움직이지 않음)</option><option value="shadow">섀도까지</option><option value="live">실제까지</option></select> <button type="button" id="saveCap">이 PC 에 저장</button> <span class="chip">매장 PC 한 대에서만 켭니다</span></div>
     <div class="row">읽기 <select id="fReads"><option value="off">꺼짐</option><option value="shadow">섀도 (GW Agent 와 같이 돌려 맞춰 보기)</option><option value="live">실제 (GW Agent 확장을 끈 뒤)</option></select>
       발주 <select id="fOrders"><option value="off">꺼짐</option><option value="live">실제</option></select></div>
     <div class="row">섀도 종류 <input type="text" id="fKinds" size="34" placeholder="recv,orders,xfer,sets,menu,gross"> 시각 <input type="text" id="fTimes" size="16" placeholder="10:40,15:40"></div>
@@ -99,6 +100,7 @@
   const TICK = Math.max(3e3, +(Q.get("tick") || 20e3));
   const ls = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   let API = Q.get("api") || ls.get("asideApi") || "", KEY = ls.get("asideKey") || "";
+  let CAP = ls.get("asideCap") || "off"; // 이 PC 한도: KM 이 이 PC 에서 직접 켠 데까지만 움직임
   if (Q.get("fresh")) { ls.set("asideDeskSt", "{}"); ls.set("asideDeskLog", "[]"); } // ?fresh=1 : 기억해 둔 것을 지우고 처음부터
   let st = {}; try { st = JSON.parse(ls.get("asideDeskSt") || "{}") || {}; } catch (e) { st = {}; }
   let full = null, fullAt = 0, fullFailAt = 0, plan, planAt = 0, light = {}, lightAt = 0, netOk = null, cur = null, logs = [];
@@ -153,6 +155,8 @@
     $("cReads").textContent = "읽기 " + ({ off: "꺼짐", shadow: "섀도", live: "실제" })[c.reads];
     $("cOrders").textContent = "발주 " + ({ off: "꺼짐", live: "실제" })[c.orders];
     $("cNet").textContent = netOk === null ? "시트 –" : netOk ? "시트 연결됨" : "시트 연결 안 됨";
+    const want = D.mergeCfg((full || {}).asideCfg);
+    $("cCap").textContent = "이 PC " + ({ off: "보기만", shadow: "섀도까지", live: "실제까지" })[CAP] + (CAP === "off" && (want.reads !== "off" || want.orders !== "off") ? ` (시트 설정: 읽기 ${want.reads} · 발주 ${want.orders})` : "");
     const s = r.st, sp = light.salesPush || {}, mp = light.misPush || {}, ag = light.misAgent || {}, dg = light.gwDiag || {};
     $("sLast").textContent = s.last ? `${hm(s.last.at)} ${s.last.ok ? "성공" : "실패"} · ${s.last.text}` : "–";
     $("sShadow").textContent = s.shadowLast ? `${hm(s.shadowLast.at)} ${s.shadowLast.kind || ""} · 같음 ${s.shadowLast.same} · 다름 ${s.shadowLast.nDiff} · 없음 ${s.shadowLast.nMiss}` : "–";
@@ -175,7 +179,7 @@
       if (!fullAt && !fullFailAt) await readFull(now);
       let r;
       for (let k = 0; k < 2; k++) { // 판단이 "시트 전체가 필요하다"고 하면 읽고 한 번 더
-        r = D.decide({ now: Date.now(), cfg: (full || {}).asideCfg, light, full, fullAt, fullFailAt, plan, st }, self);
+        r = D.decide({ now: Date.now(), cfg: D.clampCfg((full || {}).asideCfg, CAP), light, full, fullAt, fullFailAt, plan, st }, self);
         st = r.st;
         for (const a of r.acts) { if (a.type === "post") await post(a.body); else if (a.type === "log") log(a.msg); }
         if (!r.wantFull || !(await readFull(Date.now()))) break;
@@ -192,13 +196,15 @@
   // ---- 단추 ----
   $("copy").onclick = async () => { $("code").select(); try { await navigator.clipboard.writeText($("code").value); } catch (e) { document.execCommand("copy"); } $("copied").classList.remove("hide"); setTimeout(() => $("copied").classList.add("hide"), 1500); };
   document.querySelectorAll("[data-stuck]").forEach((b) => { b.onclick = async () => {
-    const r = D.stuck(st, Date.now(), b.dataset.stuck, (full || {}).asideCfg);
+    if (CAP === "off") return; // 보기만 하는 PC 에서는 아무것도 안 함
+    const r = D.stuck(st, Date.now(), b.dataset.stuck, D.clampCfg((full || {}).asideCfg, CAP));
     st = r.st; ls.set("asideDeskSt", JSON.stringify(st)); log("막힘: " + b.dataset.stuck);
     if (API) for (const b2 of r.posts) await post(b2);
     tick();
   }; });
   $("resume").onclick = () => { st.stop = null; st.fails = 0; st.stops = 0; ls.set("asideDeskSt", JSON.stringify(st)); log("다시 시작"); tick(); };
   $("reload").onclick = async () => { await readFull(Date.now(), true); tick(); };
+  $("saveCap").onclick = () => { if ($("fOk").value.trim() !== "KM") { $("cfgMsg").textContent = "확인 글자가 달라요"; $("cfgMsg").classList.remove("hide"); return; } CAP = $("fCap").value; ls.set("asideCap", CAP); $("fOk").value = ""; log("이 PC 한도: " + CAP); tick(); };
   $("saveApi").onclick = () => { API = $("fApi").value.trim() || ""; KEY = $("fKey").value.trim(); ls.set("asideApi", API); ls.set("asideKey", KEY); fullAt = 0; fullFailAt = 0; tick(); };
   $("saveCfg").onclick = async () => {
     const msg = (t) => { $("cfgMsg").textContent = t; $("cfgMsg").classList.remove("hide"); };
@@ -210,7 +216,7 @@
   };
   const bm = (mode, job) => "javascript:" + encodeURIComponent(D.snippet(HERE, mode, job));
   $("bmShadow").href = bm("shadow", "read"); $("bmLive").href = bm("live", "read"); $("bmOrder").href = bm("live", "order");
-  $("setBox").addEventListener("toggle", () => { const c = D.mergeCfg((full || {}).asideCfg); $("fReads").value = c.reads; $("fOrders").value = c.orders; $("fKinds").value = c.shadow.kinds.join(","); $("fTimes").value = c.shadow.times.join(","); $("fApi").value = ls.get("asideApi") || ""; $("fKey").value = KEY; });
+  $("setBox").addEventListener("toggle", () => { const c = D.mergeCfg((full || {}).asideCfg); $("fCap").value = CAP; $("fReads").value = c.reads; $("fOrders").value = c.orders; $("fKinds").value = c.shadow.kinds.join(","); $("fTimes").value = c.shadow.times.join(","); $("fApi").value = ls.get("asideApi") || ""; $("fKey").value = KEY; });
   $("log").textContent = logs.slice().reverse().join("\n");
   self.__desk = { tick, state: () => ({ st, light, fullAt, cur, stats }) };
 })();

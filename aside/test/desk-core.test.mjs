@@ -28,6 +28,16 @@ test("설정은 정해진 값만 받음", () => {
   assert.equal(c.shadow.slotMin, 180); assert.equal(c.lim.pickup, 10 * MIN); assert.equal(c.lim.run, 5 * MIN);
 });
 
+test("이 PC 한도: 시트 설정이 무엇이든 허락한 데까지만", () => {
+  const live = { reads: "live", orders: "live", shadow: { kinds: ["recv"] } };
+  assert.deepEqual([D.clampCfg(live, "off").reads, D.clampCfg(live, "off").orders], ["off", "off"]);
+  assert.deepEqual([D.clampCfg(live, "shadow").reads, D.clampCfg(live, "shadow").orders], ["shadow", "off"]);
+  assert.deepEqual([D.clampCfg(live, "live").reads, D.clampCfg(live, "live").orders], ["live", "live"]);
+  assert.deepEqual([D.clampCfg(live, undefined).reads, D.clampCfg(live, "zzz").orders], ["off", "off"]);
+  assert.equal(D.clampCfg({ reads: "shadow" }, "live").reads, "shadow"); assert.deepEqual(D.clampCfg(live, "shadow").shadow, { kinds: ["recv"] });
+  assert.equal(D.clampCfg(undefined, "live").reads, "off");
+});
+
 test("섀도 요청 모양: 어제까지 · 메뉴/세트는 다시 읽기(force) · Gross 는 이번 주 월요일부터", () => {
   const now = at("2026-11-26", "10:40"); // 목요일
   const r = D.shadowBundle(now, ["recv", "menu", "sets", "gross", "now", "zzz", "recv"]);
@@ -177,6 +187,15 @@ test("발주(orders live): 대기 탭이 꺼져 있으면 켜라고 하고, 폰�
   r = go(t + 9 * MIN, { light: { misPush: mp } });
   const e = posts(r, "misPush")[0]; assert.equal(e.patch.status, "error"); assert.match(e.patch.text, /MIS에 직접 넣어 주세요/);
   r = go(t + 10 * MIN, { light: { misPush: mp } }); assert.equal(posts(r, "misPush").length, 0, "같은 전송에는 한 번만 알림");
+});
+
+test("읽기가 잇달아 실패해 쉬는 중이어도 발주 대기 탭은 켜 두게 함 · [막힘]이면 시키지 않음", () => {
+  const cfg = { reads: "live", orders: "live" }, t = at("2026-11-30", "10:00"), armed = { misAgent: { at: t, grid: true, ver: "5" } };
+  const st = { day: "2026-11-30", fails: 3, stops: 1, stop: { at: t, until: t + 60 * MIN, kind: "read", why: "잇달아 3번 실패" } };
+  let r = D.decide({ now: t + MIN, cfg, st, light: { misAgent: { at: t + MIN, grid: true, ver: "5" } } }); assert.equal(r.instr.code, "STOP", "대기 탭이 살아 있으면 그냥 쉼");
+  r = D.decide({ now: t + 10 * MIN, cfg, st, light: armed }); assert.equal(r.instr.code, "ARM", "대기 탭이 죽으면 쉬는 중에도 다시 켜게 함"); assert.equal(r.instr.job, "order");
+  const k = D.stuck({ day: "2026-11-30" }, t, "GW 가 안 열림 (인터넷·VPN)", cfg);
+  r = D.decide({ now: t + 10 * MIN, cfg, st: k.st, light: armed }); assert.equal(r.instr.code, "STOP", "GW 자체가 안 되면 발주 대기도 시키지 않음");
 });
 
 test("실제(live): 당일 되풀이(12·16·20시)는 label-list 의 판단 그대로", { skip: !LL }, () => {

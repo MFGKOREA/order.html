@@ -10,6 +10,8 @@ const D = () => E.data(), sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 const T = kday(Date.now()), OFF = Date.parse(T + "T10:39:40+09:00") - Date.now();
 await E.ctx.addInitScript((off) => { const RD = Date; class SD extends RD { constructor(...a) { if (a.length) super(...a); else super(RD.now() + off); } static now() { return RD.now() + off; } } window.Date = SD; }, OFF);
 const vnow = () => Date.now() + OFF;
+// 이 PC 한도: 시험하는 책상은 "실제까지" 허락된 매장 PC 라고 침 (맨 끝에서 허락 안 한 PC 도 따로 봄)
+await E.ctx.addInitScript(() => { try { if (location.pathname.endsWith("/desk.html") && !/nocap/.test(location.search)) localStorage.setItem("asideCap", "live"); } catch (e) {} });
 seed(E.gas, T);
 const LIM = { fullRun: 2000, closeShow: 4000, deskBeat: 60e3 };
 
@@ -113,6 +115,17 @@ const saved = await A.armedPage().evaluate(() => window.__saved);
 ok(D().misPush.status === "done" && saved["46492"] && saved["46492"]["900001"] === 3 && saved["46492"]["900002"] === 5 && saved["49212"] && saved["49212"]["900005"] === 2, "발주: 가짜 MIS 에 수량이 맞게 저장됨 " + JSON.stringify(saved));
 ok(!A.seen.includes("READ"), "발주만 켠 설정에서는 읽기를 시키지 않음");
 await A.end(); await desk.close();
+
+// ---- E) 허락 안 한 PC(폰·집 PC·남)에서 책상을 열면: 보기만, 시트에 아무것도 안 씀 ----
+E.set("asideCfg", { reads: "shadow", shadow: { kinds: ["recv"], times: ["10:40"] }, lim: LIM });
+E.gas.post({ action: "set", key: "asidePush", value: null }); E.gas.post({ action: "set", key: "asideDesk", value: null });
+const guest = await E.ctx.newPage();
+await guest.goto("https://mfgkorea.github.io/order.html/aside/desk.html?tick=1500&fresh=1&nocap=1");
+await guest.evaluate(() => { localStorage.removeItem("asideCap"); }); await guest.reload();
+const postsB = E.hits.sheetPost; await sleep(6000);
+ok((await codeOf(guest)) === "IDLE" && E.hits.sheetPost === postsB && !D().asidePush && !D().asideDesk, "허락 안 한 PC: 섀도 설정이어도 '할 일 없음' · 시트 쓰기 0번");
+ok(/보기만/.test(await guest.evaluate(() => document.getElementById("cCap").textContent)), "허락 안 한 PC: '이 PC 보기만' 표시 · " + (await guest.evaluate(() => document.getElementById("cCap").textContent)));
+await guest.close();
 
 await E.stop();
 process.exit(done("책상 화면 시험") ? 1 : 0);

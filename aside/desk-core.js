@@ -57,6 +57,16 @@
     return out;
   }
 
+  // 이 PC 한도: 시트 설정(asideCfg)이 무엇이든, 이 PC 에서 KM 이 허락한 데까지만 움직임 (cap = "off" | "shadow" | "live")
+  //  책상 화면은 공개 주소라 누구나 열 수 있음 → 허락 안 한 PC(폰·집 PC·남)에서는 보기만 되고 시트에 아무것도 안 씀
+  function clampCfg(c, cap) {
+    const out = Object.assign({}, isObj(c) ? c : {}), rank = { off: 0, shadow: 1, live: 2 }, lim = rank[cap] == null ? 0 : rank[cap];
+    const reads = /^(off|shadow|live)$/.test(out.reads || "") ? out.reads : "off";
+    out.reads = rank[reads] <= lim ? reads : lim === 1 ? "shadow" : "off";
+    out.orders = lim === 2 && out.orders === "live" ? "live" : "off";
+    return out;
+  }
+
   // 섀도로 읽어 볼 종류와 요청 모양 (읽기 코드 mis-sales.js 의 종류 이름으로). Y = 어제, T = 오늘
   const SHADOW_ARGS = {
     recv: () => ["recv", {}], orders: () => ["orders", {}], xfer: () => ["xfer", {}], hour: () => ["hour", {}], scout: () => ["scout", {}],
@@ -134,14 +144,14 @@
       st.deskBeatAt = now;
       post({ action: "set", key: "asideDesk", value: { at: now, reads: cfg.reads, orders: cfg.orders, instr: (st.instr || "").split("|")[0], fails: st.fails, stop: st.stop ? st.stop.why : "", run: st.run ? { ch: st.run.ch, id: st.run.id, stage: st.run.stage } : null, ver: VER } });
     };
-    const failOne = (why) => {
+    const failOne = (why, kind) => {
       st.fails++;
       st.last = { at: now, ok: false, text: why };
       log("실패 " + st.fails + "번째: " + why);
       if (st.fails >= L.maxFail && !st.stop) {
         st.stops = (st.stops || 0) + 1;
         const cool = Math.min(L.coolMax, L.coolOff * Math.pow(2, st.stops - 1));
-        st.stop = { at: now, until: now + cool, why: `잇달아 ${st.fails}번 실패 — 마지막: ${why} (${Math.round(cool / MIN)}분 쉬고 다시 해 봄)` };
+        st.stop = { at: now, until: now + cool, kind: kind || "read", why: `잇달아 ${st.fails}번 실패 — 마지막: ${why} (${Math.round(cool / MIN)}분 쉬고 다시 해 봄)` };
         post({ action: "set", key: "asideDiag", value: { at: now, code: "fail3", why: st.stop.why.slice(0, 200), until: st.stop.until, ver: VER } });
       }
     };
@@ -213,6 +223,8 @@
         st.orderErr = mp.id;
         post({ action: "merge", key: "misPush", patch: { status: "error", doneAt: now, text: "PC 자동입력이 쉬는 중 · 멈춘 곳: 발주 대기 탭이 꺼져 있음 → MIS에 직접 넣어 주세요" } });
       }
+      // 읽기가 잇달아 실패해 쉬는 중이어도 발주 대기 탭은 켜 두게 함 (읽기 고장이 발주까지 막지 않게). 어사이드가 [막힘]을 누른 경우는 GW 자체가 안 되는 것이라 시키지 않음
+      if (st.stop.kind === "read" && cfg.orders === "live" && !(ag.at && ag.grid === true && now - ag.at < L.armStale)) { deskBeat(); return out("ARM", "읽기는 쉬는 중 · 발주 대기 탭은 켜 둠" + (orderPending ? " (급함: 폰이 기다리는 중)" : ""), { mode: "live", job: "order", urgent: orderPending ? 1 : 0 }); }
       deskBeat(); return out("STOP", st.stop.why);
     }
     {
@@ -228,7 +240,7 @@
       if (orderPending && !armed && now - (mp.at || 0) > L.orderStuck && st.orderErr !== mp.id) {
         st.orderErr = mp.id;
         post({ action: "merge", key: "misPush", patch: { status: "error", doneAt: now, text: `PC 자동입력이 ${Math.round(L.orderStuck / MIN)}분 안에 시작 못 함 · 멈춘 곳: 발주 대기 탭이 꺼져 있음 → MIS에 직접 넣어 주세요` } });
-        failOne("발주 대기 탭이 꺼져 있어 전송을 못 받음");
+        failOne("발주 대기 탭이 꺼져 있어 전송을 못 받음", "order");
         if (st.stop) return out("STOP", st.stop.why);
       }
       if (!armed) { deskBeat(); return out("ARM", orderPending ? "급함: 폰이 전송을 기다리는 중" : "발주 대기 탭이 꺼져 있음", { mode: "live", job: "order", urgent: orderPending ? 1 : 0 }); }
@@ -348,11 +360,11 @@
     }
     st.stops = (st.stops || 0) + 1; st.fails = Math.max(st.fails || 0, L.maxFail);
     const cool = Math.min(L.coolMax, L.coolOff * Math.pow(2, st.stops - 1));
-    st.stop = { at: now, until: now + cool, why: `어사이드가 알림: ${why} (${Math.round(cool / MIN)}분 쉬고 다시 해 봄)` };
+    st.stop = { at: now, until: now + cool, kind: "agent", why: `어사이드가 알림: ${why} (${Math.round(cool / MIN)}분 쉬고 다시 해 봄)` };
     st.last = { at: now, ok: false, text: why };
     posts.push({ action: "set", key: "asideDiag", value: { at: now, code: "stuck", why: String(why).slice(0, 200), until: st.stop.until, ver: VER } });
     return { st, posts };
   }
 
-  G.AsideDesk = { decide, mergeCfg, shadowBundle, snippet, steps, stuck, DEF, VER, ymd, hmOf };
+  G.AsideDesk = { decide, mergeCfg, clampCfg, shadowBundle, snippet, steps, stuck, DEF, VER, ymd, hmOf };
 })(typeof self !== "undefined" ? self : globalThis);
