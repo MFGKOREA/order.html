@@ -1,0 +1,125 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>어사이드 기능 시험</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --ink:#16202a; --sub:#5b6875; --line:#dde2e8; --go:#0b6bcb; --ok:#11734b; --bad:#b3261e; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#12161b; --card:#1b2129; --ink:#e8edf2; --sub:#9aa7b4; --line:#2c3541; --go:#6fb1ff; --ok:#5fd0a0; --bad:#ff8a80; } }
+  * { box-sizing:border-box; }
+  body { margin:0; background:var(--bg); color:var(--ink); font:15px/1.55 system-ui, "Malgun Gothic", sans-serif; }
+  main { max-width:860px; margin:0 auto; padding:16px; }
+  h1 { font-size:18px; margin:4px 0 10px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:0 0 12px; }
+  .t { display:grid; grid-template-columns:1fr auto; gap:6px 12px; align-items:start; padding:10px 0; border-top:1px solid var(--line); }
+  .t:first-child { border-top:0; }
+  .t h2 { font-size:15px; margin:0; }
+  .t p { margin:2px 0 0; color:var(--sub); font-size:13px; }
+  .r { font-weight:800; white-space:nowrap; }
+  .r[data-r="1"] { color:var(--ok); } .r[data-r="0"] { color:var(--bad); } .r[data-r=""] { color:var(--sub); }
+  textarea, pre { width:100%; font:12px/1.45 ui-monospace, Consolas, monospace; border:1px solid var(--line); border-radius:8px; padding:8px; background:transparent; color:var(--ink); margin:6px 0 0; }
+  pre { max-height:150px; overflow:auto; white-space:pre; }
+  textarea { height:64px; resize:vertical; }
+  button, a.bm { font:inherit; padding:5px 10px; border-radius:8px; border:1px solid var(--line); background:var(--card); color:var(--ink); cursor:pointer; }
+  a.bm { display:inline-block; border:1px dashed var(--go); color:var(--go); text-decoration:none; font-weight:700; }
+  #sum { font-size:20px; font-weight:800; }
+  #line { font:12px/1.5 ui-monospace, Consolas, monospace; color:var(--sub); overflow-wrap:anywhere; }
+  .wide { grid-column:1 / -1; }
+</style>
+</head>
+<body>
+<main>
+  <h1>어사이드 기능 시험 (매장 PC)</h1>
+  <section class="card">
+    <div id="sum">결과: 시험 전</div>
+    <div id="line" aria-live="polite"></div>
+    <div style="margin-top:8px"><button id="save" type="button">결과를 시트에 남기기 (KM 이 시켰을 때만)</button> <span id="saved"></span></div>
+  </section>
+
+  <section class="card">
+    <div class="t"><div><h2>1. 코드 실행</h2><p>아래 코드를 <b>이 탭에서</b> 실행한다. 되면 MIS 화면에서도 '시작 코드'를 실행할 수 있다.</p></div><div class="r" id="r-eval" data-r="">대기</div>
+      <textarea class="wide" id="snip" readonly spellcheck="false"></textarea></div>
+    <div class="t"><div><h2>2. 바깥 코드 불러오기</h2><p>1번 코드가 불러오는 작은 파일이 열리면 됨 (1번을 하면 같이 확인됨).</p></div><div class="r" id="r-script" data-r="">대기</div></div>
+    <div class="t"><div><h2>3. 북마크</h2><p>이 단추를 북마크 막대로 끌어다 놓고, <b>북마크 막대에서</b> 누른다 (1번이 안 될 때 쓰는 길).</p><p><a class="bm" id="bm" href="#">어사이드 시험 북마크</a></p></div><div class="r" id="r-bookmark" data-r="">대기</div></div>
+    <div class="t"><div><h2>4. 표 옮겨 넣기</h2><p>아래 표(지어낸 값 60줄)를 <b>그대로</b> 다음 칸에 옮겨 넣는다. 한 글자라도 다르면 틀린 줄로 센다.</p></div><div class="r" id="r-paste" data-r="">대기</div>
+      <pre class="wide" id="src" tabindex="0"></pre><textarea class="wide" id="dst" spellcheck="false" placeholder="여기에 옮겨 넣기"></textarea></div>
+    <div class="t"><div><h2>5. 확인 창</h2><p>단추를 누르면 뜨는 확인 창에서 [확인]을 누른다.</p><p><button id="dlg" type="button">확인 창 띄우기</button></p></div><div class="r" id="r-dialog" data-r="">대기</div></div>
+    <div class="t"><div><h2>6. 발주 시트 연결</h2><p>스스로 확인함 (상태만 읽음 — 품목·수량은 안 받음).</p></div><div class="r" id="r-sheet" data-r="">확인 중</div></div>
+    <div class="t"><div><h2>7. 시계 · 시간대</h2><p>스스로 확인함. 한국 시간이고 시계가 1분 안으로 맞아야 함 (발주 날짜가 PC 시계로 정해짐).</p></div><div class="r" id="r-clock" data-r="">확인 중</div></div>
+    <div class="t"><div><h2>8. 뒤에 깔린 탭 타이머</h2><p>이 탭을 뒤에 둔 채 <b>6분</b> 기다렸다가 돌아온다. 뒤에서도 1분에 한 번은 돌아야 책상 화면이 제때 움직인다.</p><p id="timerNote"></p></div><div class="r" id="r-timer" data-r="">대기</div></div>
+  </section>
+</main>
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id), HERE = location.href.replace(/[^/]*([?#].*)?$/, ""), LL = "https://mfgkorea.github.io/label-list/";
+  const R = { eval: null, script: null, bookmark: null, paste: null, dialog: null, sheet: null, clock: null, timer: null }, note = {};
+  const set = (k, v, text, n) => { R[k] = v; if (n !== undefined) note[k] = n; const el = $("r-" + k); el.dataset.r = v === null ? "" : v ? "1" : "0"; el.textContent = text || (v ? "됨 ✓" : "안 됨 ✗"); sum(); };
+  function sum() {
+    const ks = Object.keys(R), done = ks.filter((k) => R[k] !== null), ok = ks.filter((k) => R[k] === true);
+    $("sum").textContent = `결과: 됨 ${ok.length} / ${ks.length}` + (done.length < ks.length ? ` (아직 ${ks.length - done.length}개 안 함)` : "");
+    $("line").textContent = ks.map((k) => `${k}=${R[k] === null ? "-" : R[k] ? 1 : 0}${note[k] ? "(" + note[k] + ")" : ""}`).join(" ") + " · " + (navigator.userAgent.match(/(Aside|Edg|Chrome)\/[\d.]+/g) || []).join(" ");
+  }
+  // 1·2·3: 코드 실행 · 바깥 코드 · 북마크
+  window.__asideProbeHit = (how) => { if (how === "eval") set("eval", true); if (how === "script") set("script", true); if (how === "bookmark") set("bookmark", true); };
+  $("snip").value = `(()=>{window.__asideProbeHit('eval');const s=document.createElement('script');s.src='${HERE}probe.js?t='+Date.now();document.body.appendChild(s)})()`;
+  $("bm").href = "javascript:" + encodeURIComponent("(()=>{if(window.__asideProbeHit)window.__asideProbeHit('bookmark');else alert('어사이드 기능 시험 화면에서 눌러 주세요')})()");
+  $("bm").addEventListener("click", (e) => { e.preventDefault(); alert("이 단추는 북마크 막대로 끌어다 놓은 뒤, 북마크 막대에서 눌러 주세요."); });
+  // 4: 표 옮겨 넣기 — 지어낸 값(씨앗 고정)이라 언제나 같은 표
+  let seed = 20261128; const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const names = ["시험양파", "시험마늘", "시험토마토", "시험버터", "시험크림", "시험새우", "시험치즈", "시험바질", "시험올리브", "시험파스타"], units = ["EA", "KG", "PK", "BOX", "CAN"];
+  const rows = ["품목코드\t품목명\t입고수량\t단위"];
+  for (let i = 0; i < 60; i++) { const q = Math.round(rnd() * 4000) / (rnd() < 0.3 ? 100 : 1) * (rnd() < 0.08 ? -1 : 1); rows.push(`${900001 + Math.floor(rnd() * 99998)}\t${names[Math.floor(rnd() * names.length)]} ${Math.floor(rnd() * 900 + 100)}g\t${q.toLocaleString("en-US")}\t${units[Math.floor(rnd() * units.length)]}`); }
+  $("src").textContent = rows.join("\n");
+  const cells = (line) => line.trim().split(/\t+| {2,}/).map((c) => c.trim()).join("|");
+  $("dst").addEventListener("input", () => {
+    const got = $("dst").value.split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+    if (got.length < 5) return set("paste", null, "대기", "");
+    // 줄 순서가 밀려도 한 줄 빠진 것은 한 줄로만 셈: 있어야 할 줄 가운데 없는 줄 수(틀림) · 없어야 할 줄 수(더 있음)
+    const bag = new Map(); got.forEach((l) => { const c = cells(l); bag.set(c, (bag.get(c) || 0) + 1); });
+    let bad = 0; rows.forEach((l) => { const c = cells(l), n = bag.get(c) || 0; if (n) bag.set(c, n - 1); else bad++; });
+    const extra = [...bag.values()].reduce((a, b) => a + b, 0);
+    set("paste", bad === 0 && extra === 0, bad === 0 && extra === 0 ? "됨 ✓" : `${bad}줄 틀림 ✗`, `${rows.length}줄 중 ${bad}줄 틀림${extra ? "·더 있음 " + extra : ""}`);
+  });
+  // 5: 확인 창
+  $("dlg").onclick = () => { const t = Date.now(), ok = confirm("어사이드 기능 시험: [확인]을 눌러 주세요."); set("dialog", !!ok, ok ? "됨 ✓" : "취소함 ✗", Math.round((Date.now() - t) / 1000) + "초"); };
+  // 6·7: 시트 연결 · 시계
+  let API = "";
+  (async () => {
+    try {
+      const t = await (await fetch(LL + "mis-agent.js?t=" + Date.now(), { cache: "no-store" })).text(), m = /const API = "(https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec)"/.exec(t);
+      if (!m) throw new Error("no api"); API = m[1];
+      const j = await (await fetch(API + "?api=1&status=1&t=" + Date.now(), { cache: "no-store" })).json();
+      set("sheet", !!(j && j.ok), j && j.ok ? "됨 ✓" : "안 됨 ✗", j && j.locked ? "잠김" : "열림");
+    } catch (e) { set("sheet", false, "안 됨 ✗", "연결 실패"); }
+    try {
+      const t0 = Date.now(), res = await fetch(HERE + "probe.js?clock=" + t0, { cache: "no-store" }), srv = Date.parse(res.headers.get("date") || ""), tz = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+      const skew = isFinite(srv) ? Math.round((t0 + (Date.now() - t0) / 2 - srv) / 1000) : null, tzOk = new Date().getTimezoneOffset() === -540;
+      set("clock", tzOk && skew !== null && Math.abs(skew) <= 60, tzOk && skew !== null && Math.abs(skew) <= 60 ? "됨 ✓" : "안 맞음 ✗", `${tz || "시간대 모름"} · ${skew === null ? "서버 시각 모름" : "차이 " + skew + "초"}`);
+    } catch (e) { set("clock", false, "안 됨 ✗", "확인 실패"); }
+  })();
+  // 8: 뒤에 깔린 탭 타이머 — 숨은 동안 화면 타이머와 워커 타이머가 가장 길게 쉰 시간
+  let hidAt = 0, hidMs = 0, lastM = Date.now(), lastW = Date.now(), gapM = 0, gapW = 0, hasW = false;
+  const beat = (who) => { const now = Date.now(); if (document.hidden) { if (who === "m") gapM = Math.max(gapM, now - lastM); else gapW = Math.max(gapW, now - lastW); } if (who === "m") lastM = now; else lastW = now; };
+  setInterval(() => beat("m"), 1000);
+  try { const w = new Worker(URL.createObjectURL(new Blob(["setInterval(function(){postMessage(1)},1000)"], { type: "text/javascript" }))); w.onmessage = () => { hasW = true; beat("w"); }; } catch (e) {}
+  document.addEventListener("visibilitychange", () => {
+    const now = Date.now();
+    if (document.hidden) { hidAt = now; lastM = lastW = now; return; }
+    if (hidAt) hidMs += now - hidAt; hidAt = 0;
+    const best = hasW ? Math.min(gapM || 1e9, gapW || 1e9) : gapM, txt = `숨은 시간 ${Math.round(hidMs / 60e3 * 10) / 10}분 · 화면 타이머 최대 ${Math.round(gapM / 1000)}초 · 워커 타이머 ${hasW ? "최대 " + Math.round(gapW / 1000) + "초" : "없음"}`;
+    $("timerNote").textContent = txt;
+    if (hidMs >= 6 * 60e3) set("timer", best <= 70e3, best <= 70e3 ? "됨 ✓" : "느림 ✗", `화면 ${Math.round(gapM / 1000)}초·워커 ${hasW ? Math.round(gapW / 1000) + "초" : "없음"}`);
+    else set("timer", null, `아직 ${Math.round(hidMs / 60e3 * 10) / 10}분`, "");
+  });
+  // 결과를 시트에 남기기 (KM 이 시켰을 때만): 됨/안 됨 한 줄만, 매장 값 없음
+  $("save").onclick = async () => {
+    if (!API) { $("saved").textContent = "시트 주소를 못 찾음"; return; }
+    try { const r = await fetch(API, { method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, body: JSON.stringify({ action: "set", key: "asideSelftest", value: { at: Date.now(), line: $("line").textContent.slice(0, 400), ok: Object.keys(R).filter((k) => R[k] === true).length, n: Object.keys(R).length } }) }); const j = await r.json(); $("saved").textContent = j && j.ok ? "남김 ✓" : "못 남김"; }
+    catch (e) { $("saved").textContent = "못 남김 (인터넷 확인)"; }
+  };
+  sum();
+})();
+</script>
+</body>
+</html>

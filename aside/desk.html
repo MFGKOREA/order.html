@@ -52,7 +52,7 @@
       <button type="button" data-stuck="로그인 창이 나옴">막힘: 로그인 창</button>
       <button type="button" data-stuck="GW 가 안 열림 (인터넷·VPN)">막힘: GW 가 안 열림</button>
       <button type="button" data-stuck="시작 코드가 실행되지 않음">막힘: 시작 코드 실행 안 됨</button>
-      <button type="button" id="resume" class="hide">다시 시작 (KM)</button>
+      <button type="button" id="resume" class="hide">지금 다시 시작 (KM)</button>
     </div>
   </section>
 
@@ -99,6 +99,7 @@
   const TICK = Math.max(3e3, +(Q.get("tick") || 20e3));
   const ls = { get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } }, set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} } };
   let API = Q.get("api") || ls.get("asideApi") || "", KEY = ls.get("asideKey") || "";
+  if (Q.get("fresh")) { ls.set("asideDeskSt", "{}"); ls.set("asideDeskLog", "[]"); } // ?fresh=1 : 기억해 둔 것을 지우고 처음부터
   let st = {}; try { st = JSON.parse(ls.get("asideDeskSt") || "{}") || {}; } catch (e) { st = {}; }
   let full = null, fullAt = 0, fullFailAt = 0, plan, planAt = 0, light = {}, lightAt = 0, netOk = null, cur = null, logs = [];
   try { logs = JSON.parse(ls.get("asideDeskLog") || "[]"); } catch (e) {}
@@ -122,9 +123,14 @@
     try { const t = await (await fetch(LL + "mis-agent.js?t=" + Date.now(), { cache: "no-store" })).text(); const m = /const API = "(https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec)"/.exec(t); if (m) { API = m[1]; return true; } } catch (e) {}
     return false;
   }
-  async function readFull(now) {
-    try { const j = await getJson(withKey(API + "?api=1&t=" + now), 45e3); if (!j || !j.ok || !j.data) throw new Error("x"); full = j.data; fullAt = Date.now(); return true; }
-    catch (e) { fullFailAt = Date.now(); log("시트 전체를 못 읽음"); return false; }
+  // 시트 전체는 1MB 가 넘음 → 먼저 판 번호(ver)만 보고, 지난번과 같으면 다시 받지 않음 (그새 아무도 안 썼다는 뜻)
+  let fullVer = "", stats = { full: 0, skip: 0 };
+  async function readFull(now, force) {
+    try {
+      if (full && fullVer && !force) { const v = await getJson(API + "?api=1&ver=1&t=" + now, 15e3); if (v && v.ok && String(v.ver) === fullVer) { fullAt = Date.now(); stats.skip++; return true; } }
+      const j = await getJson(withKey(API + "?api=1&t=" + now), 45e3); if (!j || !j.ok || !j.data) throw new Error("x");
+      full = j.data; fullVer = String(j.ver || ""); fullAt = Date.now(); stats.full++; return true;
+    } catch (e) { fullFailAt = Date.now(); log("시트 전체를 못 읽음"); return false; }
   }
   async function readPlan(now) {
     if (now - planAt < 30 * MIN) return;
@@ -186,14 +192,13 @@
   // ---- 단추 ----
   $("copy").onclick = async () => { $("code").select(); try { await navigator.clipboard.writeText($("code").value); } catch (e) { document.execCommand("copy"); } $("copied").classList.remove("hide"); setTimeout(() => $("copied").classList.add("hide"), 1500); };
   document.querySelectorAll("[data-stuck]").forEach((b) => { b.onclick = async () => {
-    const why = b.dataset.stuck, now = Date.now();
-    st.stop = { at: now, why: "어사이드가 알림: " + why, auto: 0 }; if (st.run) { st.tried = st.tried || {}; st.tried[st.run.id] = now; st.run = null; }
-    ls.set("asideDeskSt", JSON.stringify(st)); log("막힘: " + why);
-    if (API) await post({ action: "set", key: "asideDiag", value: { at: now, code: "stuck", why, ver: D.VER } });
+    const r = D.stuck(st, Date.now(), b.dataset.stuck, (full || {}).asideCfg);
+    st = r.st; ls.set("asideDeskSt", JSON.stringify(st)); log("막힘: " + b.dataset.stuck);
+    if (API) for (const b2 of r.posts) await post(b2);
     tick();
   }; });
-  $("resume").onclick = () => { st.stop = null; st.fails = 0; ls.set("asideDeskSt", JSON.stringify(st)); log("다시 시작"); tick(); };
-  $("reload").onclick = async () => { await readFull(Date.now()); tick(); };
+  $("resume").onclick = () => { st.stop = null; st.fails = 0; st.stops = 0; ls.set("asideDeskSt", JSON.stringify(st)); log("다시 시작"); tick(); };
+  $("reload").onclick = async () => { await readFull(Date.now(), true); tick(); };
   $("saveApi").onclick = () => { API = $("fApi").value.trim() || ""; KEY = $("fKey").value.trim(); ls.set("asideApi", API); ls.set("asideKey", KEY); fullAt = 0; fullFailAt = 0; tick(); };
   $("saveCfg").onclick = async () => {
     const msg = (t) => { $("cfgMsg").textContent = t; $("cfgMsg").classList.remove("hide"); };
@@ -201,13 +206,13 @@
     const cfg = { reads: $("fReads").value, orders: $("fOrders").value, shadow: { kinds: $("fKinds").value.split(/[,\s]+/).filter(Boolean), times: $("fTimes").value.split(/[,\s]+/).filter(Boolean) }, at: Date.now(), by: "desk" };
     if (!cfg.shadow.kinds.length) delete cfg.shadow.kinds; if (!cfg.shadow.times.length) delete cfg.shadow.times;
     msg((await post({ action: "set", key: "asideCfg", value: cfg })) ? "저장됨" : "저장 실패"); $("fOk").value = "";
-    await readFull(Date.now()); tick();
+    await readFull(Date.now(), true); tick();
   };
   const bm = (mode, job) => "javascript:" + encodeURIComponent(D.snippet(HERE, mode, job));
   $("bmShadow").href = bm("shadow", "read"); $("bmLive").href = bm("live", "read"); $("bmOrder").href = bm("live", "order");
   $("setBox").addEventListener("toggle", () => { const c = D.mergeCfg((full || {}).asideCfg); $("fReads").value = c.reads; $("fOrders").value = c.orders; $("fKinds").value = c.shadow.kinds.join(","); $("fTimes").value = c.shadow.times.join(","); $("fApi").value = ls.get("asideApi") || ""; $("fKey").value = KEY; });
   $("log").textContent = logs.slice().reverse().join("\n");
-  self.__desk = { tick, state: () => ({ st, light, fullAt, cur }) };
+  self.__desk = { tick, state: () => ({ st, light, fullAt, cur, stats }) };
 })();
 </script>
 </body>

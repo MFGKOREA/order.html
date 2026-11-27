@@ -39,7 +39,7 @@ async function aside(desk, page, o = {}) {
   })();
   return { seen, armedPage: () => armed, end: async () => { stop = true; await loop; if (mis) await mis.close(); if (armed) await armed.close(); } };
 }
-const openDesk = async () => { const p = await E.ctx.newPage(); const errs = []; p.on("pageerror", (e) => errs.push(e.message)); await p.goto("https://mfgkorea.github.io/order.html/aside/desk.html?tick=1500"); p.__errs = errs; return p; };
+const openDesk = async () => { const p = await E.ctx.newPage(); const errs = []; p.on("pageerror", (e) => errs.push(e.message)); await p.goto("https://mfgkorea.github.io/order.html/aside/desk.html?tick=1500&fresh=1"); p.__errs = errs; return p; };
 const until = async (fn, ms = 60e3) => { const t = Date.now(); while (Date.now() - t < ms) { if (await fn()) return true; await sleep(300); } return false; };
 const codeOf = (desk) => desk.evaluate(() => document.getElementById("instr").dataset.code);
 const stOf = (desk) => desk.evaluate(() => window.__desk.state().st);
@@ -66,7 +66,7 @@ await A.end(); await desk.close();
 
 // ---- B) 어사이드가 시작 코드를 안 돌리면: 책상이 요청에 오류를 적고 실패로 셈 ----
 E.set("asideCfg", { reads: "shadow", shadow: { kinds: ["recv"], times: ["10:40"] }, lim: { ...LIM, pickup: 6000 } });
-await E.ctx.clearCookies(); desk = await openDesk();
+desk = await openDesk();
 await desk.evaluate(() => { localStorage.removeItem("asideDeskSt"); }); await desk.reload();
 A = await aside(desk, "recv-main.html", { lazy: true });
 ok(await until(async () => A.seen.includes("READ") && A.seen.includes("CLOSE"), 60e3), "게으른 어사이드: 읽기 시작 → (안 함) → 책상이 접음 · " + A.seen.join(" → "));
@@ -82,7 +82,7 @@ E.gas.post({ action: "set", key: "misAgent", value: null });
 const VT0 = kday(vnow());
 for (const k of ["hourShare", "misOrderScan", "misRecvScan", "misXferScan", "misSetScan"]) E.set(k, { at: vnow(), to: VT0 });
 E.set("gwScout", { at: vnow(), menus: [] });
-desk = await openDesk(); await desk.evaluate(() => { localStorage.removeItem("asideDeskSt"); }); await desk.reload();
+desk = await openDesk();
 await until(async () => !!(await codeOf(desk)), 20e3); await sleep(2500);
 ok((await codeOf(desk)) === "IDLE", "실제: 받을 것이 없으면 '할 일 없음' · " + (await desk.evaluate(() => document.getElementById("iWhy").textContent)));
 A = await aside(desk, "recv-main.html");
@@ -102,7 +102,7 @@ const VT = kday(vnow());
 E.set("input." + VT, { "시험품목1": { s: "1", o: "3" }, "시험품목2": { s: "2", o: "5" }, "시험품목5": { s: "0", o: "2" }, "시험품목7": { s: "4", o: "" } });
 E.gas.post({ action: "set", key: "misAgent", value: null });
 E.set("asideCfg", { orders: "live", lim: LIM });
-desk = await openDesk(); await desk.evaluate(() => { localStorage.removeItem("asideDeskSt"); }); await desk.reload();
+desk = await openDesk();
 A = await aside(desk, "main.html", { master });
 ok(await until(async () => A.seen.includes("ARM"), 30e3), "발주: 책상이 '발주 대기 켜기'를 띄움");
 ok(await until(async () => (D().misAgent || {}).grid === true, 40e3), "발주: 대기 탭이 켜져 소식을 적음 (주문등록 화면)");

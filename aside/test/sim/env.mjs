@@ -25,7 +25,7 @@ const serve = (root) => (r) => {
   const u = new URL(r.request().url()), rel = decodeURIComponent(u.pathname).replace(/^\/(label-list|order\.html)\//, "/");
   const f = path.join(root, rel);
   if (!f.startsWith(root) || !fs.existsSync(f) || fs.statSync(f).isDirectory()) return r.fulfill({ status: 404, body: "not found" });
-  r.fulfill({ status: 200, contentType: TYPES[path.extname(f)] || "application/octet-stream", body: fs.readFileSync(f), headers: { "Access-Control-Allow-Origin": "*" } });
+  r.fulfill({ status: 200, contentType: TYPES[path.extname(f)] || "application/octet-stream", body: fs.readFileSync(f), headers: { "Access-Control-Allow-Origin": "*", Date: new Date().toUTCString() } });
 };
 
 // 시트가 "정상"으로 보이게 채워 둠(품목 60개 · Forecast 60일 · 메뉴 40일) — 자동 판단(autoPlan)이 빈 시트로 보고 멈추지 않게. 모두 지어낸 값

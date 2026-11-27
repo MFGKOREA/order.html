@@ -68,8 +68,8 @@ test("섀도: 발주 시간대(12:30~14:45)와 발주 전송 중에는 요청하
   r = go(at(day, "14:50")); assert.equal(posts(r, "asidePush").length, 1);
 });
 
-test("어사이드가 시작 코드를 안 돌리면 10분 뒤 요청에 오류를 적고, 3번 잇달아 실패하면 멈춤 · 다음 날 풀림", () => {
-  const go = runner({ reads: "shadow", shadow: { kinds: ["recv"], times: ["10:40", "15:40", "19:40"] } }), day = "2026-11-30";
+test("어사이드가 시작 코드를 안 돌리면 10분 뒤 요청에 오류를 적고, 3번 잇달아 실패하면 멈춤 → 1시간 쉬고 한 번 다시 → 또 실패하면 2시간", () => {
+  const go = runner({ reads: "shadow", shadow: { kinds: ["recv"], times: ["08:00", "09:00", "10:00", "12:00", "15:00"], slotMin: 60 } }), day = "2026-11-30";
   const once = (hhmm) => {
     const t = at(day, hhmm); let r = go(t); const req = posts(r, "asidePush")[0].value;
     r = go(t + 5 * MIN, { full: { asidePush: req }, fullAt: t + 5 * MIN }); assert.equal(r.instr.code, "READ");
@@ -77,11 +77,32 @@ test("어사이드가 시작 코드를 안 돌리면 10분 뒤 요청에 오류�
     const e = posts(r, "asidePush")[0]; assert.equal(e.action, "merge"); assert.equal(e.patch.status, "error"); assert.match(e.patch.text, /10분 안에 시작 못 함/);
     return r;
   };
-  let r = once("10:40"); assert.equal(r.st.fails, 1); assert.equal(r.instr.code, "CLOSE");
-  r = once("15:40"); assert.equal(r.st.fails, 2);
-  r = once("19:40"); assert.equal(r.st.fails, 3); assert.ok(r.st.stop); assert.equal(posts(r, "asideDiag").length, 1);
-  r = go(at(day, "20:30")); assert.equal(r.instr.code, "STOP"); assert.match(r.instr.why, /잇달아 3번 실패/);
-  r = go(at("2026-12-01", "09:00")); assert.notEqual(r.instr.code, "STOP", "다음 날에는 다시 해 봄");
+  let r = once("08:00"); assert.equal(r.st.fails, 1); assert.equal(r.instr.code, "CLOSE");
+  r = once("09:00"); assert.equal(r.st.fails, 2);
+  r = once("10:00"); assert.equal(r.st.fails, 3); assert.ok(r.st.stop); assert.equal(posts(r, "asideDiag").length, 1);
+  r = go(at(day, "10:30")); assert.equal(r.instr.code, "STOP"); assert.match(r.instr.why, /잇달아 3번 실패.*60분 쉬고/);
+  r = go(at(day, "11:05")); assert.equal(r.instr.code, "STOP", "쉬는 동안에는 아무것도 안 시킴"); assert.equal(posts(r, "asidePush").length, 0);
+  r = once("12:00"); assert.equal(r.st.fails, 3, "쉰 뒤 한 번 해 보고 또 실패 → 바로 다시 멈춤"); assert.match(r.st.stop.why, /120분 쉬고/);
+  r = go(at(day, "13:59")); assert.equal(r.instr.code, "STOP");
+  // 쉰 뒤 성공하면 실패 횟수 0
+  const t = at(day, "15:00"); r = go(t); const req = posts(r, "asidePush")[0].value;
+  r = go(t + 3 * MIN, { full: { asidePush: { ...req, status: "done", doneAt: t + 3 * MIN }, asideShadow: { runs: { [req.id]: { ok: true, same: 5, nDiff: 0, nMiss: 0 } } } }, fullAt: t + 3 * MIN });
+  assert.equal(r.st.fails, 0); assert.equal(r.st.stop, null);
+});
+
+test("어사이드가 [막힘]을 누르면 하던 일을 접고 멈춤 · 쉬는 시간 뒤 스스로 다시", () => {
+  const cfg = { reads: "live" }, t = at("2026-11-30", "10:00"), sp = { id: 7, at: t, status: "pending" };
+  let r = D.decide({ now: t, cfg, st: {}, light: { salesPush: sp } }); assert.equal(r.instr.code, "READ");
+  const k = D.stuck(r.st, t + MIN, "GW 가 안 열림 (인터넷·VPN)", cfg);
+  assert.equal(k.st.run, null); assert.deepEqual(k.posts.map((b) => b.key), ["salesPush", "asideDiag"]);
+  assert.equal(k.posts[0].patch.status, "error", "하던 요청은 오류로 풀어 폰이 갇히지 않게"); assert.equal(k.posts[1].value.code, "stuck");
+  r = D.decide({ now: t + 2 * MIN, cfg, st: k.st, light: { salesPush: sp } }); assert.equal(r.instr.code, "STOP"); assert.match(r.instr.why, /GW 가 안 열림/);
+  // 쉬는 동안 들어온 새 요청: 3분 뒤 오류를 적어 풀어 줌 (한 번만)
+  const sp2 = { id: 8, at: t + 10 * MIN, status: "pending" };
+  r = D.decide({ now: t + 11 * MIN, cfg, st: r.st, light: { salesPush: sp2 } }); assert.equal(posts(r, "salesPush").length, 0);
+  r = D.decide({ now: t + 14 * MIN, cfg, st: r.st, light: { salesPush: sp2 } }); assert.match(posts(r, "salesPush")[0].patch.text, /쉬는 중/);
+  r = D.decide({ now: t + 15 * MIN, cfg, st: r.st, light: { salesPush: sp2 } }); assert.equal(posts(r, "salesPush").length, 0);
+  r = D.decide({ now: t + 62 * MIN, cfg, st: r.st, light: { salesPush: { id: 9, at: t + 61 * MIN, status: "pending" } } }); assert.equal(r.instr.code, "READ", "1시간 뒤 새 요청은 다시 받음");
 });
 
 test("내 요청이 시트에 안 보이면 남의 요청 칸에 오류를 적지 않음", () => {
@@ -120,6 +141,19 @@ test("실제(live): 읽기가 14분 넘게 안 끝나면 오류를 적어 폰이
   go(t + MIN, { light: { salesPush: { ...sp, status: "running", startAt: t + MIN } } });
   const r = go(t + 16 * MIN, { light: { salesPush: { ...sp, status: "running", startAt: t + MIN } } });
   const e = posts(r, "salesPush")[0]; assert.equal(e.patch.status, "error"); assert.match(e.patch.text, /14분 안에 못 끝냄/); assert.equal(r.instr.code, "CLOSE");
+});
+
+test("실제(live): 오류 쓰기가 사라져(인터넷 끊김) 남은 요청·죽은 탭의 요청을 나중에 거둠", () => {
+  const go = runner({ reads: "live" }), t = at("2026-11-30", "10:00"), sp = { id: 7, at: t, status: "pending" };
+  go(t, { light: { salesPush: sp } });
+  let r = go(t + 11 * MIN, { light: { salesPush: sp } }); assert.equal(posts(r, "salesPush").length, 1, "시작 못 함 → 오류를 씀(이 쓰기가 사라졌다고 침)");
+  r = go(t + 13 * MIN, { light: { salesPush: sp } }); assert.equal(posts(r, "salesPush").length, 0);
+  r = go(t + 16 * MIN, { light: { salesPush: sp } }); assert.match(posts(r, "salesPush")[0].patch.text, /받지 못함/);
+  r = go(t + 17 * MIN, { light: { salesPush: sp } }); assert.equal(posts(r, "salesPush").length, 0, "한 번만");
+  // 책상이 모르는 '읽는 중' 요청이 20분 넘게 그대로면 거둠
+  const go2 = runner({ reads: "live" }), run = { id: 9, at: t, status: "running", startAt: t };
+  r = go2(t + 10 * MIN, { light: { salesPush: run } }); assert.equal(posts(r, "salesPush").length, 0);
+  r = go2(t + 20 * MIN, { light: { salesPush: run } }); assert.match(posts(r, "salesPush")[0].patch.text, /읽다가 멈춤/);
 });
 
 test("실제(live): GW Agent 확장이 아직 켜져 있으면 물러섬", () => {

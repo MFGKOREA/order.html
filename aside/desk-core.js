@@ -29,13 +29,15 @@
       run: 14 * MIN,         // 읽기 시작 뒤 끝날 때까지 (확장의 12분 + 여유)
       closeShow: 2 * MIN,    // "탭 닫기"를 보여 주는 시간
       closeMin: 20e3,        // 기다리는 요청이 있으면 "탭 닫기"는 이만큼만 보여 주고 바로 다음 읽기로
-      cfgEvery: 15 * MIN,    // 설정(asideCfg)을 다시 읽는 간격 = 시트 전체 읽기
-      fullRun: 30e3,         // 섀도가 도는 동안 진행을 보는 간격(시트 전체)
-      beat: 10 * MIN, deskBeat: 30 * MIN,
+      cfgEvery: 30 * MIN,    // 설정(asideCfg)을 다시 읽는 간격 = 시트 전체 읽기 (시트가 1MB 를 넘어 자주 읽지 않음. 확장의 상시 수집과 같은 30분)
+      fullRun: 30e3,         // 섀도가 도는 동안 진행을 보는 간격 (화면은 먼저 시트 판 번호만 보고, 바뀌었을 때만 전체를 읽음)
+      beat: 10 * MIN, deskBeat: 60 * MIN, // 책상 소식(asideDesk)은 1시간에 한 번 + 상태가 바뀔 때 (쓸 때마다 폰 앱이 시트를 다시 읽으므로 아낌)
       armStale: 4 * MIN,     // 발주 대기 탭이 이만큼 소식이 없으면 꺼진 것으로 봄 (대기 탭은 110초마다 적음)
       orderStuck: 6 * MIN,   // 폰 전송이 이만큼 안 풀리면 폰에 알림 (확장과 같음)
       orderAge: 30 * MIN, salesAge: 6 * HOUR,
       maxFail: 3,            // 잇달아 이만큼 실패하면 멈추고 KM 에게 (3회 멈춤 규칙)
+      coolOff: 60 * MIN,     // 멈춘 뒤 이만큼 쉬고 한 번 다시 해 봄. 또 실패하면 2배씩(최대 4시간) — 인터넷·VPN 이 돌아오면 스스로 풀리게
+      coolMax: 4 * HOUR,
       autoEvery: 30 * MIN, autoIdle: 3 * HOUR, autoRetry: 5 * MIN, autoMax: 4,
       perMax: 20, perWait: 3 * MIN, shadowWait: 3 * MIN,
     },
@@ -99,8 +101,10 @@
     };
 
     // 날이 바뀌면 하루 횟수만 0으로
-    if (st.day !== T) { st.day = T; st.sh = { done: {} }; st.tried = {}; if (st.stop && st.stop.auto) { st.stop = null; st.fails = 0; } }
-    st.sh = st.sh || { done: {} }; st.tried = st.tried || {}; st.fails = st.fails || 0;
+    if (st.day !== T) { st.day = T; st.sh = { done: {} }; st.tried = {}; st.rel = {}; st.stops = 0; }
+    // 멈춤은 쉬는 시간이 지나면 풀고 한 번 다시 해 봄 (그때 또 실패하면 바로 다시 멈춤 — 실패 횟수는 성공해야 0이 됨)
+    if (st.stop && st.stop.until && now >= st.stop.until) { acts.push({ type: "log", msg: "쉬는 시간이 지나 다시 해 봄" }); st.stop = null; st.fails = Math.max(0, (st.fails || 0) - 1); }
+    st.sh = st.sh || { done: {} }; st.tried = st.tried || {}; st.rel = st.rel || {}; st.fails = st.fails || 0;
     st.auto = st.auto || {}; st.per = st.per || {};
 
     // 설정을 가끔 다시 읽음 (시트 전체 읽기)
@@ -110,6 +114,18 @@
     const orderPending = mp.date === T && mp.status === "pending" && now - (mp.at || 0) < L.orderAge;
     const orderBusy = /^(pending|running)$/.test(String(mp.status || "")) && now - (mp.at || 0) < 20 * MIN;
     const inSkip = hm >= cfg.orderSkip[0] && hm <= cfg.orderSkip[1];
+    // 치우기(실제 방식): 아무도 안 맡는 요청이 남아 폰이 '받는 중'에 갇히지 않게 오류를 적어 풀어 줌 (요청마다 한 번).
+    //  오류 쓰기가 인터넷 끊김으로 사라졌거나, 책상이 쉬는 동안 들어왔거나, 읽던 탭이 죽은 경우를 여기서 거둠
+    const janitor = (stopped) => {
+      if (cfg.reads !== "live" || !sp.id || st.rel[sp.id] || (st.run && String(st.run.id) === String(sp.id))) return;
+      const age = now - (sp.at || 0);
+      if (age > L.salesAge) return;
+      const lost = sp.status === "pending" && (stopped ? age > 3 * MIN : !!st.tried[sp.id] && age > L.pickup + 5 * MIN);
+      const dead = sp.status === "running" && now - (sp.startAt || sp.at || 0) > L.run + 5 * MIN;
+      if (!lost && !dead) return;
+      st.rel[sp.id] = now; st.tried[sp.id] = st.tried[sp.id] || now;
+      post({ action: "merge", key: "salesPush", patch: { status: "error", doneAt: now, text: stopped ? "어사이드가 쉬는 중이라 못 받음 · 조금 뒤 다시 눌러 주세요" : dead ? "읽다가 멈춤 (탭이 닫힘) · 다시 눌러 주세요" : "어사이드가 받지 못함 · 다시 눌러 주세요", cur: null, prog: null } });
+    };
 
     // 책상이 살아 있음을 가끔 적음 (클라우드에서 보임). 상태가 바뀔 때도 적음
     const deskBeat = (force) => {
@@ -123,8 +139,10 @@
       st.last = { at: now, ok: false, text: why };
       log("실패 " + st.fails + "번째: " + why);
       if (st.fails >= L.maxFail && !st.stop) {
-        st.stop = { at: now, why: `잇달아 ${st.fails}번 실패 — 마지막: ${why}`, auto: 1 };
-        post({ action: "set", key: "asideDiag", value: { at: now, code: "fail3", why: st.stop.why.slice(0, 200), ver: VER } });
+        st.stops = (st.stops || 0) + 1;
+        const cool = Math.min(L.coolMax, L.coolOff * Math.pow(2, st.stops - 1));
+        st.stop = { at: now, until: now + cool, why: `잇달아 ${st.fails}번 실패 — 마지막: ${why} (${Math.round(cool / MIN)}분 쉬고 다시 해 봄)` };
+        post({ action: "set", key: "asideDiag", value: { at: now, code: "fail3", why: st.stop.why.slice(0, 200), until: st.stop.until, ver: VER } });
       }
     };
 
@@ -188,7 +206,15 @@
     }
 
     // ---------- 2) 멈춤 ----------
-    if (st.stop) { deskBeat(); return out("STOP", st.stop.why); }
+    //  쉬는 동안 들어온 요청은 받지 못함 → 폰이 '받는 중'에 갇히지 않게 3분 뒤 오류를 적어 풀어 줌 (요청마다 한 번)
+    if (st.stop) {
+      janitor(true);
+      if (cfg.orders === "live" && orderPending && now - (mp.at || 0) > L.orderStuck && st.orderErr !== mp.id && !(ag.at && ag.grid === true && now - ag.at < L.armStale)) {
+        st.orderErr = mp.id;
+        post({ action: "merge", key: "misPush", patch: { status: "error", doneAt: now, text: "PC 자동입력이 쉬는 중 · 멈춘 곳: 발주 대기 탭이 꺼져 있음 → MIS에 직접 넣어 주세요" } });
+      }
+      deskBeat(); return out("STOP", st.stop.why);
+    }
     {
       const waiting = cfg.reads === "live" && (light.salesPush || {}).status === "pending" && now - ((light.salesPush || {}).at || 0) < L.salesAge && !st.tried[(light.salesPush || {}).id];
       if (st.close && now < (waiting ? Math.min(st.close.until, (st.close.at || 0) + L.closeMin) : st.close.until)) return out("CLOSE", st.close.text);
@@ -214,6 +240,7 @@
       if (ag.at && /^\d+\.\d+/.test(String(ag.ver || "")) && now - ag.at < 15 * MIN) { deskBeat(); return out("STOP", "GW Agent 확장이 켜져 있어요 — 확장을 끄거나 설정을 shadow 로 (둘이 같은 요청을 받으면 안 됨)", { soft: 1 }); }
       if (cfg.orders !== "live" && now - (st.beatAt || 0) > L.beat) { st.beatAt = now; post({ action: "set", key: "misAgent", value: { at: now, mode: "ondemand", ver: VER, auto: 1 } }); }
       const salesWaiting = sp.status === "pending" && now - (sp.at || 0) < L.salesAge && !st.tried[sp.id];
+      janitor(false);
       if (orderPending && cfg.orders !== "live") { deskBeat(); return out("IDLE", "발주 전송 중 (GW Agent 가 맡음) — 읽기는 잠시 쉼"); }
       if (salesWaiting && !orderBusy) {
         st.tried[sp.id] = now;
@@ -311,5 +338,21 @@
     return ["할 일 없음"];
   }
 
-  G.AsideDesk = { decide, mergeCfg, shadowBundle, snippet, steps, DEF, VER, ymd, hmOf };
+  // 어사이드가 [막힘] 단추를 눌렀을 때: 하던 일을 접고 멈춤(쉬는 시간 뒤 스스로 다시 해 봄). 돌려주는 것은 새 st 와 시트에 적을 한 줄
+  function stuck(stIn, now, why, cfgIn) {
+    const st = clone(stIn), L = mergeCfg(cfgIn).lim;
+    const posts = [];
+    if (st.run) {
+      posts.push({ action: "merge", key: st.run.ch, patch: { status: "error", doneAt: now, text: `어사이드가 알림: ${String(why).slice(0, 80)} · 조금 뒤 다시 눌러 주세요`, cur: null, prog: null } });
+      st.tried = st.tried || {}; st.tried[st.run.id] = now; st.run = null;
+    }
+    st.stops = (st.stops || 0) + 1; st.fails = Math.max(st.fails || 0, L.maxFail);
+    const cool = Math.min(L.coolMax, L.coolOff * Math.pow(2, st.stops - 1));
+    st.stop = { at: now, until: now + cool, why: `어사이드가 알림: ${why} (${Math.round(cool / MIN)}분 쉬고 다시 해 봄)` };
+    st.last = { at: now, ok: false, text: why };
+    posts.push({ action: "set", key: "asideDiag", value: { at: now, code: "stuck", why: String(why).slice(0, 200), until: st.stop.until, ver: VER } });
+    return { st, posts };
+  }
+
+  G.AsideDesk = { decide, mergeCfg, shadowBundle, snippet, steps, stuck, DEF, VER, ymd, hmOf };
 })(typeof self !== "undefined" ? self : globalThis);
