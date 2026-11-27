@@ -318,6 +318,12 @@ html.cmp-on .app { max-width: 1040px; }
 .drow .life { font-size: 13px; font-weight: 800; color: var(--muted); white-space: nowrap; }
 .drow .cat { font-size: 12px; color: var(--muted); }
 .drow .gone { justify-self: end; font-size: 12px; font-weight: 800; color: #fff; background: var(--rose-ink); border-radius: 999px; padding: 2px 9px; }
+#renBox { display: grid; gap: 10px; margin-top: 6px; padding-top: 14px; border-top: 1px solid var(--line); }
+.rrow { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); gap: 2px 8px; align-items: baseline; background: var(--fill-2); border-radius: 12px; padding: 10px 12px; font-size: 14px; }
+.rrow .from { color: var(--muted); overflow-wrap: anywhere; }
+.rrow .arr { color: var(--muted); }
+.rrow b { font-weight: 700; overflow-wrap: anywhere; }
+.rrow .cat { grid-column: 1 / -1; font-size: 12px; color: var(--muted); }
 .prow { display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 10px 12px; border-radius: 12px; background: var(--fill-2); cursor: pointer; }
 .prow.on { background: var(--accent-soft); box-shadow: inset 0 0 0 2px var(--accent); }
 .prow input { width: 22px; height: 22px; margin: 0; accent-color: var(--accent-text); flex: none; }
@@ -396,13 +402,17 @@ html.cmp-on .app { max-width: 1040px; }
     <div class="cmpsum" id="cmpSum"></div>
     <div class="cmpcols">
       <section class="group cmpcol">
-        <div class="colhd"><h2>삭제된 라벨 <span class="n del" id="delN"></span></h2><span class="sub">새 라벨에 없어서 뺍니다</span></div>
+        <div class="colhd"><h2>삭제된 라벨 <span class="n del" id="delN"></span></h2><span class="sub">기존 파일에만 있는 라벨</span></div>
         <ul class="clist" id="delList"></ul>
         <p class="sub" id="delNote" hidden></p>
+        <div id="renBox" hidden>
+          <div class="colhd"><h2>이름이 바뀐 라벨 <span class="n" id="renN"></span></h2><span class="sub">같은 라벨로 보고 Open을 이어 줍니다</span></div>
+          <ul class="clist" id="renList"></ul>
+        </div>
       </section>
       <section class="group cmpcol addcol">
         <div class="colhd"><h2>새로 추가된 라벨 <span class="n add" id="addN"></span></h2><button class="btn" type="button" id="addAll">모두 선택</button></div>
-        <span class="sub">Open으로 뽑을 라벨을 여러 개 눌러 고르세요</span>
+        <span class="sub">새 파일에만 있는 라벨입니다. 기존 파일에서 지웠던 품목도 여기에 나옵니다. Open으로 뽑을 것만 고르세요.</span>
         <ul class="clist" id="addPick"></ul>
         <button class="btn green wide" type="button" id="cmpApply">넣을 라벨을 고르세요</button>
         <button class="linkbtn" type="button" id="cmpSkip">새 라벨은 건너뛰고 Open만 옮기기</button>
@@ -1211,6 +1221,7 @@ $('sortCatBtn').addEventListener('click', () => {
 });
 
 /* ----- 지난 파일에서 Open 가져오기: 그 파일의 Open 목록과 순서를 그대로 (교체) ----- */
+const RENAME_SIM = 0.8; // 같은 카테고리·같은 일수에서 이름이 이 정도로 비슷하면 이름만 바뀐 라벨로 본다 (화면에 A → B로 보여 줌)
 const normName = s => (s || '').replace(/\s+/g, ' ').trim().toLowerCase();
 function similar(a, b) { // 0~1, 글자 편집 거리 기준
   if (a === b) return 1; const m = a.length, n = b.length; if (!m || !n) return 0;
@@ -1224,7 +1235,7 @@ function planImport(oldOpen) {
   const life = c => [t(c[C.DAYS]), t(c[C.HOURS]), t(c[6]), t(c[7])].join('|');
   const full = c => cat(c) + '|' + t(c[C.ITEM]) + '|' + life(c);
   const used = new Set(), extra = [], rep = { exact: 0, renamed: [], copied: [], missing: [] };
-  const best = (c, pool) => { let bi = -1, bs = 0; pool.forEach(i => { const s = similar(normName(rows[i].cells[C.ITEM]), normName(c[C.ITEM])); if (s > bs) { bs = s; bi = i; } }); return bs >= 0.85 ? bi : -1; };
+  const best = (c, pool) => { let bi = -1, bs = 0; pool.forEach(i => { const s = similar(normName(rows[i].cells[C.ITEM]), normName(c[C.ITEM])); if (s > bs) { bs = s; bi = i; } }); return bs >= RENAME_SIM ? bi : -1; };
   const idxs = rows.map((r, i) => i);
   oldOpen.forEach((c, k) => {
     const seq = k + 1, take = i => { used.add(i); rows[i]._open = true; rows[i].seq = seq; };
@@ -1425,7 +1436,7 @@ function diffTables(oldRows, newRows) { // 품목 단위(카테고리·이름·�
     let hit = [...nLeft].find(nk => { const n = N.get(nk); return cat(n) === cat(o) && normName(n[C.ITEM]) === normName(o[C.ITEM]); });
     if (hit) { nLeft.delete(hit); lifeChanged.push([o, N.get(hit)]); return; }
     let best = null, bs = 0; nLeft.forEach(nk => { const n = N.get(nk); if (cat(n) !== cat(o) || lifeOf(n) !== lifeOf(o)) return; const s = similar(normName(n[C.ITEM]), normName(o[C.ITEM])); if (s > bs) { bs = s; best = nk; } });
-    if (best && bs >= 0.85) { nLeft.delete(best); renamed.push([o, N.get(best)]); return; }
+    if (best && bs >= RENAME_SIM) { nLeft.delete(best); renamed.push([o, N.get(best)]); return; }
     deleted.push(o);
   });
   return { deleted, renamed, lifeChanged, added: [...nLeft].map(k => N.get(k)), addedKeys: new Set(nLeft) };
@@ -1466,6 +1477,13 @@ $('cmpBtn').addEventListener('click', () => {
     del.appendChild(li);
   });
   if (!diff.deleted.length) del.innerHTML = '<li class="none">삭제된 라벨이 없습니다</li>';
+  const ren = $('renList'); ren.innerHTML = ''; $('renBox').hidden = !diff.renamed.length; $('renN').textContent = diff.renamed.length;
+  diff.renamed.forEach(([o, n]) => {
+    const li = document.createElement('li'); li.className = 'rrow';
+    li.innerHTML = '<span class="from"></span><span class="arr">→</span><b></b><span class="cat"></span>';
+    li.querySelector('.from').textContent = t(o[C.ITEM]); li.querySelector('b').textContent = t(n[C.ITEM]); li.querySelector('.cat').textContent = catText(n) + ' · ' + lifeText(n);
+    ren.appendChild(li);
+  });
   renderPick(); showCmp(true);
 });
 function renderPick() {
