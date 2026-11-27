@@ -272,13 +272,21 @@ html.selmode-on .toast { bottom: calc(150px + env(safe-area-inset-bottom, 0px));
 .impsec.warn ul { color: var(--rose-ink); }
 .improw { display: flex; justify-content: flex-end; gap: 8px; }
 /* 시작: 두 파일 */
-.pair { display: grid; grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr); align-items: stretch; gap: 8px; }
+.pair { display: grid; grid-template-columns: minmax(0, 1fr) 40px minmax(0, 1fr); align-items: stretch; gap: 8px; }
 .drop.slot { margin-top: 0; padding: 20px 12px; align-content: start; }
 .drop.slot .tag { font-size: 12px; font-weight: 800; color: var(--accent-text); background: var(--accent-soft); border-radius: 999px; padding: 3px 10px; }
 .drop.slot b { font-size: 14px; overflow-wrap: anywhere; }
 .drop.slot .meta { font-size: 12px; }
 .drop.slot.done { border-style: solid; border-color: var(--accent); background: var(--surface); }
-.pair-arrow { display: grid; place-items: center; color: var(--muted); }
+.pair-arrow { display: grid; place-items: center; align-self: center; width: 40px; height: 40px; border-radius: 50%; color: var(--fg); background: var(--surface); box-shadow: inset 0 0 0 1px var(--line); }
+.pair-arrow:hover { background: var(--fill); }
+.swapwarn { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-top: 10px; background: var(--rose); color: var(--rose-ink); border-radius: 12px; padding: 10px 12px; font-size: 13px; font-weight: 700; }
+.swapwarn span { flex: 1 1 220px; }
+.swapwarn .btn { min-height: 36px; padding: 6px 14px; font-size: 13px; }
+.cmphead #cmpFiles { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; }
+.ftag { font-size: 11px; font-weight: 800; color: var(--muted); background: var(--surface); border-radius: 999px; padding: 2px 8px; }
+.ftag.new { color: var(--accent-text); background: var(--accent-soft); }
+.cmphead .arr { color: var(--muted); }
 .pair + .err { margin-top: 8px; }
 #cmpBtn { margin-top: 12px; }
 .alt { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px 16px; margin-top: 10px; }
@@ -325,7 +333,7 @@ html.cmp-on .app { max-width: 1040px; }
 }
 @media (max-width: 560px) {
   .pair { grid-template-columns: minmax(0, 1fr); }
-  .pair-arrow { transform: rotate(90deg); height: 20px; }
+  .pair-arrow { justify-self: center; transform: rotate(90deg); }
 }
 @media (pointer: coarse) { input, select { font-size: 16px !important; } .days input { width: 50px; } }
 @media (prefers-reduced-motion: reduce) { .seg button::after, label.sw input, label.sw input::after, button { transition: none; } }
@@ -343,6 +351,7 @@ html.cmp-on .app { max-width: 1040px; }
   <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></symbol>
   <symbol id="i-x" viewBox="0 0 24 24"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></symbol>
   <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24"><path d="m16 3 4 4-4 4"/><path d="M20 7H4"/><path d="m8 21-4-4 4-4"/><path d="M4 17h16"/></symbol>
   <symbol id="i-plus" viewBox="0 0 24 24"><path d="M5 12h14"/><path d="M12 5v14"/></symbol>
   <symbol id="i-shield" viewBox="0 0 24 24"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></symbol>
 </svg>
@@ -357,7 +366,7 @@ html.cmp-on .app { max-width: 1040px; }
         <button class="btn" type="button" id="pickOld">파일 선택</button>
         <input type="file" id="fileOld" accept=".pkg,application/octet-stream" hidden>
       </div>
-      <div class="pair-arrow" aria-hidden="true"><svg class="ic"><use href="#i-arrow"/></svg></div>
+      <button type="button" class="pair-arrow" id="swapBtn" aria-label="기존과 새 라벨 자리 서로 바꾸기" title="서로 바꾸기"><svg class="ic"><use href="#i-swap"/></svg></button>
       <div class="drop slot" id="dropNew">
         <span class="tag">새 라벨 · 업데이트</span>
         <b id="newName">.pkg 끌어다 놓기</b>
@@ -365,6 +374,10 @@ html.cmp-on .app { max-width: 1040px; }
         <button class="btn" type="button" id="pickNew">파일 선택</button>
         <input type="file" id="fileNew" accept=".pkg,application/octet-stream" hidden>
       </div>
+    </div>
+    <div class="swapwarn" id="swapWarn" hidden>
+      <span>오른쪽 파일이 편집기로 저장한 기존 파일입니다. 기존과 새 라벨 자리가 바뀐 것 같습니다.</span>
+      <button class="btn" type="button" id="swapFix">자리 바꾸기</button>
     </div>
     <p class="err" id="openErr"></p>
     <button class="btn green wide" type="button" id="cmpBtn" disabled>확인</button>
@@ -1357,12 +1370,26 @@ function loadSlot(which, buf, name) {
     const E = PKG.parse(buf), te = E.find(x => x.kind === 'c' && /\/tables\/[^/]+\.xml$/.test(x.path));
     if (!te) throw new Error('품목 테이블이 없는 파일입니다');
     const T = PKG.parseTable(te.raw), nOpen = T.rows.filter(c => t(c[C.OPEN])).length;
-    state.pair[which] = { buf, name: clean, T };
+    state.pair[which] = { buf, name: clean, T, nOpen, edited: OpenFix.status(E) === 'done' };
     $(which + 'Name').textContent = clean; $(which + 'Meta').textContent = `품목 ${T.rows.length}개 · Open ${nOpen}개`;
     $(which === 'old' ? 'dropOld' : 'dropNew').classList.add('done'); $('openErr').textContent = '';
-  } catch (e) { state.pair[which] = null; $(which + 'Name').textContent = '.pkg 끌어다 놓기'; $(which + 'Meta').textContent = e.message || String(e); $(which === 'old' ? 'dropOld' : 'dropNew').classList.remove('done'); }
-  $('cmpBtn').disabled = !(state.pair.old && state.pair.new);
+  } catch (e) { state.pair[which] = null; renderPairSlots(); $(which + 'Meta').textContent = e.message || String(e); return; }
+  renderPairSlots();
 }
+function renderPairSlots() {
+  ['old', 'new'].forEach(w => {
+    const p = state.pair[w], drop = $(w === 'old' ? 'dropOld' : 'dropNew');
+    drop.classList.toggle('done', !!p);
+    if (p) { $(w + 'Name').textContent = p.name; $(w + 'Meta').textContent = `품목 ${p.T.rows.length}개 · Open ${p.nOpen}개` + (p.edited ? ' · 편집기로 저장한 파일' : ''); }
+    else { $(w + 'Name').textContent = '.pkg 끌어다 놓기'; $(w + 'Meta').textContent = w === 'old' ? '지난번 프린터에 넣었던 파일' : '새로 받은 라벨 파일'; }
+  });
+  const P = state.pair;
+  $('swapWarn').hidden = !(P.old && P.new && P.new.edited && !P.old.edited); // 편집기로 저장한 파일은 보통 기존 쪽
+  $('cmpBtn').disabled = !(P.old && P.new);
+}
+function swapPair() { const P = state.pair; [P.old, P.new] = [P.new, P.old]; pendingPair = null; renderPairSlots(); toast('기존과 새 라벨 자리를 바꿨습니다'); }
+$('swapBtn').addEventListener('click', swapPair);
+$('swapFix').addEventListener('click', swapPair);
 [['old', 'dropOld', 'pickOld', 'fileOld'], ['new', 'dropNew', 'pickNew', 'fileNew']].forEach(([w, d, p, f]) => {
   $(p).addEventListener('click', () => $(f).click());
   $(f).addEventListener('change', async e => { const x = e.target.files[0]; e.target.value = ''; if (x) loadSlot(w, await x.arrayBuffer(), x.name); });
@@ -1401,7 +1428,8 @@ $('cmpBtn').addEventListener('click', () => {
   const missKeys = new Set(plan ? plan.rep.missing.map(itemKey) : []);
   pendingPair = { diff, plan, picked: new Set(), missKeys };
   const r = plan ? plan.rep : { total: 0, missing: [] };
-  $('cmpFiles').textContent = `${P.old.name} → ${P.new.name}`;
+  $('cmpFiles').innerHTML = '<span class="ftag">기존</span><b></b><span class="arr">→</span><span class="ftag new">새 라벨</span><b></b>';
+  const fb = $('cmpFiles').querySelectorAll('b'); fb[0].textContent = P.old.name; fb[1].textContent = P.new.name;
   const sum = $('cmpSum'); sum.innerHTML = '';
   [['삭제된 라벨', diff.deleted.length, 'del'], ['새로 추가된 라벨', diff.added.length, 'add'], ['이름 바뀜 (자동 맞춤)', diff.renamed.length, ''], ['옮겨지는 Open', `${r.total - r.missing.length} / ${r.total}`, 'go']].forEach(([k, v, cls]) => {
     const d = document.createElement('div'); d.className = 'kpi ' + cls; d.innerHTML = '<span></span><b></b>'; d.querySelector('span').textContent = k; d.querySelector('b').textContent = v; sum.appendChild(d);
