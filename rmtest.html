@@ -185,6 +185,15 @@ p { margin: 0; text-wrap: pretty; }
 .mark.due { background: var(--or); box-shadow: none; }
 .mark.r2::after { content: ""; position: absolute; left: 5px; top: 1px; width: 5px; height: 10px; border: solid var(--ink); border-width: 0 2.2px 2.2px 0; rotate: 45deg; }
 
+/* 레시피 머리글 */
+.rh { display: grid; grid-template-columns: 56px minmax(0, 1fr); gap: 12px; align-items: center; padding: 26px 0 8px; border-bottom: 1.5px solid var(--ink); }
+.rh[hidden] { display: none; }
+.rh img, .rh .noimg { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: var(--box); }
+.rh b { display: block; font-size: 16px; font-weight: 800; color: var(--ink); letter-spacing: -0.03em; line-height: 1.3; }
+.rh small { display: block; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.badge { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 6px; font-size: 11px; font-style: normal; font-weight: 800; color: var(--or-text); background: var(--or-soft); vertical-align: 2px; }
+.badge.new { color: var(--or-ink); background: var(--or); }
+.it:has(+ .rh), .it:last-child { border-bottom: 0; }
 /* 암기 시트: 글자 모양 그대로 주황 시트가 덮고, 탭하면 왼쪽부터 걷힘 */
 .sh { padding: 0 2px; margin: 0 -1px; -webkit-box-decoration-break: clone; box-decoration-break: clone;
   background-image: linear-gradient(var(--or), var(--or)), linear-gradient(var(--sheet), var(--sheet));
@@ -418,9 +427,12 @@ const reduced = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
 const shuffle = a => { a = a.slice(); for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
 const buzz = ms => { try { navigator.vibrate?.(ms); } catch (e) {} };
 const chev = '<svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg>';
-const unitLabel = u => u === "A" ? "부록 A" : `UNIT ${u}`;
+const isRec = u => /^(L|PR)\d/.test(u);
+const unitNo = u => isRec(u) ? u.replace(/^(L|PR)/, "") : u;
+const unitKind = u => u === "A" ? "APPENDIX" : u.startsWith("L") && isRec(u) ? "LINE" : u.startsWith("PR") ? "PREP" : "UNIT";
+const unitLabel = u => u === "A" ? "부록 A" : isRec(u) ? `${unitKind(u)} ${D.units[u].t}` : `UNIT ${u}`;
 const steps = h => h.replace(/\s*([②③④⑤⑥⑦⑧⑨])/g, "<br>$1");
-const runsHTML = (runs, hideVals) => steps(runs.map(([t, o]) => o ? `<span class="v${hideVals ? " sh" : ""}">${esc(t)}</span>` : esc(t)).join(""));
+const runsHTML = (runs, hideVals) => steps(runs.map(([t, o]) => o ? `<span class="v${hideVals ? " sh" : ""}">${esc(t)}</span>` : esc(t)).join("")).replace(/\n/g, "<br>");
 const hasVal = it => it.a.some(r => r[1]);
 let toastT;
 function toast(m) { const t = $("#toast"); t.textContent = m; t.classList.add("show"); clearTimeout(toastT); toastT = setTimeout(() => t.classList.remove("show"), 1900); }
@@ -458,7 +470,7 @@ const VALUES = (() => {
   const out = [];
   const num = s => { const m = s.replace(/,/g, "").match(/-?\d+(\.\d+)?/); return m ? +m[0] : 0; };
   ITEMS.forEach(it => {
-    if (it.u === "A") return; // 부록 A는 다른 단원 온도를 모은 것이라 중복
+    if (it.u === "A" || it.g) return; // 부록 A는 중복, 레시피 정량은 레시피 단원에서
     // 180℃ ±3℃ 처럼 짧은 기호로 이어진 값은 하나로 합침
     const m = [];
     it.a.forEach(([t, o]) => {
@@ -509,7 +521,7 @@ function toc() {
   $("#toc").innerHTML = D.parts.map(p => {
     const rows = p.units.filter(u => D.units[u]).map(u => {
       const Un = D.units[u], c = unitStats(u), pct = c.n ? Math.round(c.k2 / c.n * 100) : 0;
-      return `<button class="urow" data-u="${u}"><span class="un">${u}</span><span class="ut"><b>${esc(Un.t)}</b></span><span class="us">${c.due ? `<span class="due">복습 ${c.due}</span>` : c.seen ? `<span class="pct${pct === 100 ? " full" : ""}">${pct}%</span>` : ""}</span></button>`;
+      return `<button class="urow" data-u="${u}"><span class="un">${unitNo(u)}</span><span class="ut"><b>${esc(Un.t)}</b></span><span class="us">${c.due ? `<span class="due">복습 ${c.due}</span>` : c.seen ? `<span class="pct${pct === 100 ? " full" : ""}">${pct}%</span>` : ""}</span></button>`;
     }).join("");
     return `<div class="part"><div class="part-h"><span class="pno">${esc(p.no)}</span><b>${esc(p.name)}</b></div>${rows}</div>`;
   }).join("");
@@ -533,10 +545,14 @@ function itemHTML(it) {
   const ans = hideAll ? `<span class="sh">${runsHTML(it.a, false)}</span>` : runsHTML(it.a, hideVal);
   const ref = it.r ? `<span class="ref">${esc(it.r)}</span>` : "";
   return `<li class="it${hid ? " hid" : ""}" data-id="${it.id}"${hid ? ` tabindex="0" role="button" aria-label="${esc(it.k)} · 눌러서 기준 보기"` : ""}>
-    <span class="no">${it.r ? "" : esc(it.n)}</span>
+    <span class="no">${it.r || it.g ? "" : esc(it.n)}</span>
     <div><p class="k">${ref}${esc(it.k)}</p><p class="a">${ans}</p></div>
     <span class="mark${r != null ? " r" + r : ""}${due ? " due" : ""}"></span>
   </li>`;
+}
+function recHead(g) {
+  const r = (D.recipes || {})[g]; if (!r) return "";
+  return `<li class="rh" data-g="${g}">${r.img ? `<img src="rm-img/${esc(r.img)}" alt="" loading="lazy" decoding="async">` : `<span class="noimg"></span>`}<div><b>${esc(r.s || r.n)}${r.b ? `<em class="badge${r.b === "신규" ? " new" : ""}">${r.b}</em>` : ""}</b>${r.s ? `<small>${esc(r.n)}</small>` : ""}</div></li>`;
 }
 function fieldHTML(f) {
   const mode = S.mode;
@@ -565,7 +581,7 @@ function renderUnit() {
   const rated = c.seen > 0;
   $("#unit").innerHTML = `
     <header class="uh">
-      <div class="top"><div class="num"><small>${u === "A" ? "APPENDIX" : "UNIT"}</small><b>${u}</b></div><h1>${esc(Un.t)}</h1></div>
+      <div class="top"><div class="num"><small>${unitKind(u)}</small><b>${unitNo(u)}</b></div><h1>${esc(Un.t)}</h1></div>
     </header>
     ${rated ? `<div class="filters" id="filters">
       <button data-f="all">전체</button>
@@ -574,10 +590,10 @@ function renderUnit() {
     </div>` : ""}
     ${howto ? `<p class="howto">${howto}</p>` : ""}
     ${notes ? `<div class="notes">${notes.map(([h, t]) => `<span><b>${esc(h)}</b>${esc(t)}</span>`).join("")}</div>` : ""}
-    <ol class="items" id="items">${its.map(itemHTML).join("")}</ol>
+    <ol class="items" id="items">${its.map((it, i) => (it.g && it.g !== its[i - 1]?.g ? recHead(it.g) : "") + itemHTML(it)).join("")}</ol>
     ${fields.length ? `<div class="field-h"><span class="pill">FIELD</span><b>현장 적용</b></div>${fields.map(fieldHTML).join("")}` : ""}
     ${qs.length ? `<button class="sc" id="sc-go"><span><b>셀프 체크</b><small>${qst.length ? `지난번 ${qok}/${qst.length}` : `${Math.min(5, qs.length)}문제`}</small></span>${chev}</button>` : ""}
-    ${nx ? `<button class="nextu" data-u="${nx}"><span><small>다음 단원</small><b><i>${nx}</i>${esc(D.units[nx].t)}</b></span>${chev}</button>` : ""}`;
+    ${nx ? `<button class="nextu" data-u="${nx}"><span><small>다음 단원</small><b><i>${unitNo(nx)}</i>${esc(D.units[nx].t)}</b></span>${chev}</button>` : ""}`;
   applyFilter();
 }
 function applyFilter() {
@@ -586,6 +602,7 @@ function applyFilter() {
     const id = li.dataset.id;
     li.hidden = filter === "due" ? !isDue(id) : filter === "todo" ? stOf(id) === 2 : false;
   });
+  document.querySelectorAll("#items .rh").forEach(h => { h.hidden = ![...document.querySelectorAll(`#items .it`)].some(li => !li.hidden && byItem[li.dataset.id]?.g === h.dataset.g); });
 }
 // 빈칸은 하나씩: 누른 빈칸(없으면 다음 빈칸)만 열고, 마지막 빈칸이 열리면 평가 버튼
 function reveal(el, target) {
