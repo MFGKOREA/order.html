@@ -190,8 +190,8 @@ p { margin: 0; text-wrap: pretty; }
   background-image: linear-gradient(var(--or), var(--or)), linear-gradient(var(--sheet), var(--sheet));
   background-repeat: no-repeat; background-position: right bottom, right center; background-size: 100% 2px, 100% 100%;
   transition: background-size 380ms var(--ease); }
-.hid:not(.open):not(.peek) .sh, .hid:not(.open):not(.peek) .sh * { color: transparent !important; }
-.hid.open .sh, .hid.peek .sh { background-size: 0% 2px, 0% 100%; }
+.hid:not(.open):not(.peek) .sh:not(.on), .hid:not(.open):not(.peek) .sh:not(.on) * { color: transparent !important; }
+.hid.open .sh, .hid.peek .sh, .sh.on { background-size: 0% 2px, 0% 100%; }
 .hid.peek .sh { transition-duration: 160ms; }
 
 .rate { grid-column: 2; display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; animation: rin 260ms var(--ease); }
@@ -561,7 +561,7 @@ function renderUnit() {
   const qok = qst.filter(q => S.q[q.id].last).length;
   const nx = UNIT_ORDER[UNIT_ORDER.indexOf(u) + 1];
   const notes = D.notes[u];
-  const howto = S.mode !== "read" && !S.tip ? "가려진 곳을 탭하면 보여요. 꾹 누르면 잠깐만 보여요." : "";
+  const howto = S.mode !== "read" && !S.tip ? "빈칸을 하나씩 탭해서 열어요. 꾹 누르면 잠깐만 보여요." : "";
   const rated = c.seen > 0;
   $("#unit").innerHTML = `
     <header class="uh">
@@ -587,8 +587,15 @@ function applyFilter() {
     li.hidden = filter === "due" ? !isDue(id) : filter === "todo" ? stOf(id) === 2 : false;
   });
 }
-function reveal(el) {
+// 빈칸은 하나씩: 누른 빈칸(없으면 다음 빈칸)만 열고, 마지막 빈칸이 열리면 평가 버튼
+function reveal(el, target) {
   if (!el.classList.contains("hid") || el.classList.contains("open")) return;
+  const blanks = [...el.querySelectorAll(".sh:not(.on)")];
+  if (blanks.length) {
+    const b = (target && target.closest && target.closest(".sh:not(.on)")) || blanks[0];
+    b.classList.add("on");
+    if (blanks.length > 1) { buzz(5); return; }
+  }
   el.classList.add("open");
   if (el.classList.contains("it")) {
     const id = el.dataset.id;
@@ -626,7 +633,7 @@ function wirePress(root) {
     const rb = e.target.closest(".rate [data-r]"); if (rb) { rateLi(rb.closest(".it"), +rb.dataset.r); return; }
     const el = e.target.closest(".hid"); if (!el) return;
     if (peeked === el) { peeked = null; return; }
-    reveal(el);
+    reveal(el, e.target);
   });
   root.addEventListener("contextmenu", e => { if (e.target.closest(".hid")) e.preventDefault(); });
 }
