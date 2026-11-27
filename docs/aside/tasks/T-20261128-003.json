@@ -1,0 +1,17 @@
+{
+  "task_id": "T-20261128-003",
+  "intent": "매장 PC 어사이드로 기능 5가지(명령줄·Routines·GW 진입·입고현황 조회·GW Agent 와 동시 로그인)를 조회만으로 확인해 됨/안 됨 표로 보고한다. 끝 기준: 표 5줄이 다 차고 보고서 1개와 board 한 줄이 올라옴",
+  "assigned_to": "aside",
+  "verify_by": "claude-code",
+  "sla_sec": 600,
+  "retry_count": 0,
+  "max_retries": 3,
+  "status": "queued",
+  "evidence": [],
+  "created_at": "2026-11-28T06:56:00+09:00",
+  "fallback": [
+    "km"
+  ],
+  "source": "11/28 KM: GW Agent 일을 매장 PC 어사이드로 전체 이전 (docs/aside/migrate-gw-agent.md 0단계)",
+  "result_path": "docs/aside/reports/report-YYYYMMDD-gw-store-check.md"
+}
